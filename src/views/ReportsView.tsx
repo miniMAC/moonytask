@@ -39,7 +39,9 @@ export default function ReportsView(p: Props) {
   const { resolved } = useTheme();
   // palette dataviz: stessa tinta, step calibrato per superficie chiara/scura
   const chart =
-    resolved === "dark"
+    resolved === "pro"
+      ? { bar: "#bd93f9", grid: "#44475a", tick: "#f8f8f2", cursor: "rgba(189,147,249,0.12)" }
+      : resolved === "dark"
       ? { bar: "#3987e5", grid: "#2e2e2c", tick: "#c3c2b7", cursor: "rgba(255,255,255,0.06)" }
       : { bar: "#2a78d6", grid: "#eeedeb", tick: "#52514e", cursor: "rgba(0,0,0,0.04)" };
 

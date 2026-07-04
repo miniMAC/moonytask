@@ -65,7 +65,20 @@
   "popover": {
     "all": "All",
     "recent": "Recent",
-    "open": "Open TinyTime"
+    "open": "Open TinyTime",
+    "search": "Search project…",
+    "newProject": "Project",
+    "newFolder": "Folder",
+    "exportCsv": "CSV",
+    "exportJson": "JSON",
+    "exported": "Exported to Downloads",
+    "exportFailed": "Export failed",
+    "quickCreate": "New",
+    "projectName": "Project name",
+    "folderName": "Folder name",
+    "selectFolder": "Choose folder",
+    "rate": "$/h",
+    "noResults": "No projects found."
   },
   "settings": {
     "title": "Settings",
@@ -75,6 +88,7 @@
     "themeAuto": "Auto",
     "themeLight": "Light",
     "themeDark": "Dark",
+    "themePro": "TinyTime PRO",
     "watchedApps": "Watched apps",
     "watchedAppsHelp": "If you use one of these apps for 1 minute without an active timer, TinyTime sends you a notification reminding you to start one.",
     "watchNotifications": "Reminder notifications",

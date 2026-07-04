@@ -49,6 +49,13 @@ export const entryAddManual = (
   note: string | null,
 ) => invoke<void>("entry_add_manual", { projectId, startedAt, durationSecs, note });
 
+// export
+export type ExportFormat = "csv" | "json";
+export const dataExport = (format: ExportFormat) =>
+  invoke<string>("data_export", { format });
+export const projectExport = (projectId: string, format: ExportFormat) =>
+  invoke<string>("project_export", { projectId, format });
+
 // timer
 export const timerStart = (projectId: string) =>
   invoke<void>("timer_start", { projectId });

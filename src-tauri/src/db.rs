@@ -1,5 +1,6 @@
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
+use std::fmt::Write as _;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager, State};
@@ -123,6 +124,24 @@ pub struct WatchedApp {
     pub deleted: i64,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingRow {
+    pub key: String,
+    pub value: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportData {
+    pub exported_at: i64,
+    pub folders: Vec<Folder>,
+    pub projects: Vec<Project>,
+    pub time_entries: Vec<TimeEntry>,
+    pub watched_apps: Vec<WatchedApp>,
+    pub settings: Vec<SettingRow>,
+}
+
 // ---------- helpers ----------
 
 pub fn insert_time_entry(
@@ -148,11 +167,9 @@ pub fn insert_time_entry(
 }
 
 pub fn get_setting(conn: &Connection, key: &str) -> Option<String> {
-    conn.query_row(
-        "SELECT value FROM settings WHERE key = ?1",
-        [key],
-        |r| r.get(0),
-    )
+    conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| {
+        r.get(0)
+    })
     .ok()
 }
 
@@ -201,7 +218,11 @@ pub fn folder_create(db: State<Db>, name: String, color: Option<String>) -> Resu
         id: new_id(),
         name,
         position: conn
-            .query_row("SELECT COALESCE(MAX(position), -1) + 1 FROM folders", [], |r| r.get(0))
+            .query_row(
+                "SELECT COALESCE(MAX(position), -1) + 1 FROM folders",
+                [],
+                |r| r.get(0),
+            )
             .unwrap_or(0),
         color,
         updated_at: now_secs(),
@@ -444,6 +465,450 @@ pub fn entry_add_manual(
     .map_err(err)?;
     crate::sync::mark_dirty();
     Ok(())
+}
+
+// ---------- commands: export ----------
+
+#[tauri::command]
+pub fn data_export(app: AppHandle, db: State<Db>, format: String) -> Result<String, String> {
+    let format = format.to_lowercase();
+    if format != "json" && format != "csv" {
+        return Err("unsupported_export_format".into());
+    }
+
+    let data = {
+        let conn = db.0.lock().unwrap();
+        export_data_inner(&conn).map_err(err)?
+    };
+
+    let contents = if format == "json" {
+        serde_json::to_string_pretty(&data).map_err(err)?
+    } else {
+        export_data_csv(&data)
+    };
+
+    let dir = app
+        .path()
+        .download_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(err)?;
+    std::fs::create_dir_all(&dir).map_err(err)?;
+
+    let path = dir.join(format!("tinytime-export-{}.{}", data.exported_at, format));
+    std::fs::write(&path, contents).map_err(err)?;
+
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn project_export(
+    app: AppHandle,
+    db: State<Db>,
+    project_id: String,
+    format: String,
+) -> Result<String, String> {
+    let format = format.to_lowercase();
+    if format != "json" && format != "csv" {
+        return Err("unsupported_export_format".into());
+    }
+
+    let data = {
+        let conn = db.0.lock().unwrap();
+        project_export_data_inner(&conn, &project_id).map_err(err)?
+    };
+
+    let contents = if format == "json" {
+        serde_json::to_string_pretty(&data).map_err(err)?
+    } else {
+        export_data_csv(&data)
+    };
+
+    let dir = app
+        .path()
+        .download_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(err)?;
+    std::fs::create_dir_all(&dir).map_err(err)?;
+
+    let project_name = data
+        .projects
+        .first()
+        .map(|project| safe_file_stem(&project.name))
+        .unwrap_or_else(|| "project".into());
+    let path = dir.join(format!(
+        "tinytime-{}-{}.{}",
+        project_name, data.exported_at, format
+    ));
+    std::fs::write(&path, contents).map_err(err)?;
+
+    Ok(path.to_string_lossy().to_string())
+}
+
+fn export_data_inner(conn: &Connection) -> rusqlite::Result<ExportData> {
+    Ok(ExportData {
+        exported_at: now_secs(),
+        folders: query_folders_all(conn)?,
+        projects: query_projects_all(conn)?,
+        time_entries: query_entries_all(conn)?,
+        watched_apps: query_watched_all(conn)?,
+        settings: query_settings_all(conn)?,
+    })
+}
+
+fn project_export_data_inner(
+    conn: &Connection,
+    project_id: &str,
+) -> rusqlite::Result<ExportData> {
+    let all = export_data_inner(conn)?;
+    let Some(project) = all
+        .projects
+        .iter()
+        .find(|project| project.id == project_id && project.deleted == 0)
+        .cloned()
+    else {
+        return Err(rusqlite::Error::QueryReturnedNoRows);
+    };
+
+    let folder = all
+        .folders
+        .into_iter()
+        .find(|folder| folder.id == project.folder_id);
+    let time_entries = all
+        .time_entries
+        .into_iter()
+        .filter(|entry| entry.project_id == project.id && entry.deleted == 0)
+        .collect();
+    let watched_apps = all
+        .watched_apps
+        .into_iter()
+        .filter(|app| {
+            app.project_id.as_deref() == Some(project.id.as_str()) && app.deleted == 0
+        })
+        .collect();
+
+    Ok(ExportData {
+        exported_at: all.exported_at,
+        folders: folder.into_iter().collect(),
+        projects: vec![project],
+        time_entries,
+        watched_apps,
+        settings: Vec::new(),
+    })
+}
+
+fn query_folders_all(conn: &Connection) -> rusqlite::Result<Vec<Folder>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, position, color, updated_at, deleted
+         FROM folders ORDER BY deleted, position, name",
+    )?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(Folder {
+                id: r.get(0)?,
+                name: r.get(1)?,
+                position: r.get(2)?,
+                color: r.get(3)?,
+                updated_at: r.get(4)?,
+                deleted: r.get(5)?,
+            })
+        })?
+        .collect();
+    rows
+}
+
+fn query_projects_all(conn: &Connection) -> rusqlite::Result<Vec<Project>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, folder_id, name, hourly_rate, color, archived, updated_at, deleted
+         FROM projects ORDER BY deleted, name",
+    )?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(Project {
+                id: r.get(0)?,
+                folder_id: r.get(1)?,
+                name: r.get(2)?,
+                hourly_rate: r.get(3)?,
+                color: r.get(4)?,
+                archived: r.get(5)?,
+                updated_at: r.get(6)?,
+                deleted: r.get(7)?,
+            })
+        })?
+        .collect();
+    rows
+}
+
+fn query_entries_all(conn: &Connection) -> rusqlite::Result<Vec<TimeEntry>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, project_id, started_at, ended_at, duration_secs, note, updated_at, deleted
+         FROM time_entries ORDER BY started_at DESC",
+    )?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(TimeEntry {
+                id: r.get(0)?,
+                project_id: r.get(1)?,
+                started_at: r.get(2)?,
+                ended_at: r.get(3)?,
+                duration_secs: r.get(4)?,
+                note: r.get(5)?,
+                updated_at: r.get(6)?,
+                deleted: r.get(7)?,
+            })
+        })?
+        .collect();
+    rows
+}
+
+fn query_watched_all(conn: &Connection) -> rusqlite::Result<Vec<WatchedApp>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, bundle_id, app_name, project_id, enabled, updated_at, deleted
+         FROM watched_apps ORDER BY deleted, app_name",
+    )?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(WatchedApp {
+                id: r.get(0)?,
+                bundle_id: r.get(1)?,
+                app_name: r.get(2)?,
+                project_id: r.get(3)?,
+                enabled: r.get(4)?,
+                updated_at: r.get(5)?,
+                deleted: r.get(6)?,
+            })
+        })?
+        .collect();
+    rows
+}
+
+fn query_settings_all(conn: &Connection) -> rusqlite::Result<Vec<SettingRow>> {
+    let mut stmt = conn.prepare("SELECT key, value FROM settings ORDER BY key")?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(SettingRow {
+                key: r.get(0)?,
+                value: r.get(1)?,
+            })
+        })?
+        .collect();
+    rows
+}
+
+fn export_data_csv(data: &ExportData) -> String {
+    let mut out = String::new();
+    writeln!(
+        out,
+        "record_type,id,folder_id,folder_name,project_id,project_name,name,color,hourly_rate,archived,position,started_at,ended_at,duration_secs,note,bundle_id,app_name,enabled,setting_key,setting_value,updated_at,deleted"
+    )
+    .unwrap();
+
+    let folder_by_id = data
+        .folders
+        .iter()
+        .map(|f| (f.id.as_str(), f))
+        .collect::<std::collections::HashMap<_, _>>();
+    let project_by_id = data
+        .projects
+        .iter()
+        .map(|p| (p.id.as_str(), p))
+        .collect::<std::collections::HashMap<_, _>>();
+
+    for f in &data.folders {
+        csv_row(
+            &mut out,
+            &[
+                "folder",
+                &f.id,
+                "",
+                "",
+                "",
+                "",
+                &f.name,
+                f.color.as_deref().unwrap_or(""),
+                "",
+                "",
+                &f.position.to_string(),
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                &f.updated_at.to_string(),
+                &f.deleted.to_string(),
+            ],
+        );
+    }
+
+    for p in &data.projects {
+        let folder_name = folder_by_id
+            .get(p.folder_id.as_str())
+            .map(|f| f.name.as_str())
+            .unwrap_or("");
+        csv_row(
+            &mut out,
+            &[
+                "project",
+                &p.id,
+                &p.folder_id,
+                folder_name,
+                "",
+                "",
+                &p.name,
+                p.color.as_deref().unwrap_or(""),
+                &p.hourly_rate.to_string(),
+                &p.archived.to_string(),
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                &p.updated_at.to_string(),
+                &p.deleted.to_string(),
+            ],
+        );
+    }
+
+    for e in &data.time_entries {
+        let project = project_by_id.get(e.project_id.as_str());
+        let folder_id = project.map(|p| p.folder_id.as_str()).unwrap_or("");
+        let folder_name = folder_by_id
+            .get(folder_id)
+            .map(|f| f.name.as_str())
+            .unwrap_or("");
+        let project_name = project.map(|p| p.name.as_str()).unwrap_or("");
+        csv_row(
+            &mut out,
+            &[
+                "time_entry",
+                &e.id,
+                folder_id,
+                folder_name,
+                &e.project_id,
+                project_name,
+                "",
+                "",
+                "",
+                "",
+                "",
+                &e.started_at.to_string(),
+                &e.ended_at.to_string(),
+                &e.duration_secs.to_string(),
+                e.note.as_deref().unwrap_or(""),
+                "",
+                "",
+                "",
+                "",
+                "",
+                &e.updated_at.to_string(),
+                &e.deleted.to_string(),
+            ],
+        );
+    }
+
+    for w in &data.watched_apps {
+        let project_name = w
+            .project_id
+            .as_deref()
+            .and_then(|id| project_by_id.get(id))
+            .map(|p| p.name.as_str())
+            .unwrap_or("");
+        csv_row(
+            &mut out,
+            &[
+                "watched_app",
+                &w.id,
+                "",
+                "",
+                w.project_id.as_deref().unwrap_or(""),
+                project_name,
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                &w.bundle_id,
+                &w.app_name,
+                &w.enabled.to_string(),
+                "",
+                "",
+                &w.updated_at.to_string(),
+                &w.deleted.to_string(),
+            ],
+        );
+    }
+
+    for s in &data.settings {
+        csv_row(
+            &mut out,
+            &[
+                "setting", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+                &s.key, &s.value, "", "",
+            ],
+        );
+    }
+
+    out
+}
+
+fn csv_row(out: &mut String, fields: &[&str]) {
+    for (idx, field) in fields.iter().enumerate() {
+        if idx > 0 {
+            out.push(',');
+        }
+        csv_field(out, field);
+    }
+    out.push('\n');
+}
+
+fn csv_field(out: &mut String, value: &str) {
+    if value.contains(',') || value.contains('"') || value.contains('\n') || value.contains('\r') {
+        out.push('"');
+        for ch in value.chars() {
+            if ch == '"' {
+                out.push('"');
+            }
+            out.push(ch);
+        }
+        out.push('"');
+    } else {
+        out.push_str(value);
+    }
+}
+
+fn safe_file_stem(value: &str) -> String {
+    let slug = value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+
+    if slug.is_empty() {
+        "project".into()
+    } else {
+        slug
+    }
 }
 
 // ---------- commands: watched apps ----------

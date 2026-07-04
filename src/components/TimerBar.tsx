@@ -15,7 +15,7 @@ export default function TimerBar({
   if (timer.status === "idle") return null;
 
   return (
-    <div className="flex items-center gap-4 border-t border-neutral-200 bg-neutral-900 px-5 py-3 text-white dark:border-neutral-800 dark:bg-black/60">
+    <div className="flex items-center gap-4 border-t border-neutral-200 bg-neutral-900 px-5 py-3 text-white dark:border-neutral-800 dark:bg-black/60 pro:border-[#44475a] pro:bg-[#21222c]">
       <button
         onClick={() => timer.projectId && onOpenProject(timer.projectId)}
         className="min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline"

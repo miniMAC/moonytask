@@ -56,6 +56,8 @@ pub fn run() {
             db::entries_range,
             db::entry_delete,
             db::entry_add_manual,
+            db::data_export,
+            db::project_export,
             db::watched_list,
             db::watched_add,
             db::watched_update,

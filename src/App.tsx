@@ -141,7 +141,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full pro:bg-[#282a36]">
       <Sidebar
         folders={folders}
         projects={projects}
@@ -160,7 +160,7 @@ export default function App() {
         onStart={(id) => api.timerStart(id)}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col bg-white dark:bg-neutral-900">
+      <div className="flex min-w-0 flex-1 flex-col bg-white dark:bg-neutral-900 pro:bg-[#282a36]">
         <main className="flex-1 overflow-y-auto">
           {view === "reports" ? (
             <ReportsView

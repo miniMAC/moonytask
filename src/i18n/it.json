@@ -65,7 +65,20 @@
   "popover": {
     "all": "Tutti",
     "recent": "Recenti",
-    "open": "Apri TinyTime"
+    "open": "Apri TinyTime",
+    "search": "Cerca progetto…",
+    "newProject": "Progetto",
+    "newFolder": "Cartella",
+    "exportCsv": "CSV",
+    "exportJson": "JSON",
+    "exported": "Esportato in Downloads",
+    "exportFailed": "Export non riuscito",
+    "quickCreate": "Nuovo",
+    "projectName": "Nome progetto",
+    "folderName": "Nome cartella",
+    "selectFolder": "Scegli cartella",
+    "rate": "€/h",
+    "noResults": "Nessun progetto trovato."
   },
   "settings": {
     "title": "Impostazioni",
@@ -75,6 +88,7 @@
     "themeAuto": "Automatico",
     "themeLight": "Chiaro",
     "themeDark": "Scuro",
+    "themePro": "TinyTime PRO",
     "watchedApps": "App monitorate",
     "watchedAppsHelp": "Se usi una di queste app per 1 minuto senza un timer attivo, TinyTime ti manda una notifica per ricordarti di avviarlo.",
     "watchNotifications": "Notifiche di promemoria",

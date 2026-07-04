@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant pro (&:where(.tt-pro, .tt-pro *));
 
 @theme {
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
@@ -16,6 +17,36 @@ body,
 body {
   @apply bg-neutral-100 text-neutral-900 antialiased select-none dark:bg-neutral-900 dark:text-neutral-100;
   overscroll-behavior: none;
+}
+
+:root.tt-pro {
+  color-scheme: dark;
+  --tt-pro-bg: #282a36;
+  --tt-pro-panel: #21222c;
+  --tt-pro-surface: #343746;
+  --tt-pro-line: #44475a;
+  --tt-pro-text: #f8f8f2;
+  --tt-pro-muted: #b9b9c8;
+  --tt-pro-purple: #bd93f9;
+  --tt-pro-pink: #ff79c6;
+  --tt-pro-cyan: #8be9fd;
+  --tt-pro-green: #50fa7b;
+}
+
+.tt-pro body {
+  background: var(--tt-pro-bg);
+  color: var(--tt-pro-text);
+}
+
+.tt-pro input,
+.tt-pro select,
+.tt-pro textarea {
+  color-scheme: dark;
+  accent-color: var(--tt-pro-purple);
+}
+
+.tt-pro ::selection {
+  background: color-mix(in srgb, var(--tt-pro-purple) 45%, transparent);
 }
 
 /* la finestra popover è trasparente: gli angoli stondati li disegna il contenuto */

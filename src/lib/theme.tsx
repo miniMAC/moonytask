@@ -8,8 +8,8 @@ import {
 import { listen } from "@tauri-apps/api/event";
 import * as api from "./api";
 
-export type ThemePref = "auto" | "light" | "dark";
-export type ResolvedTheme = "light" | "dark";
+export type ThemePref = "auto" | "light" | "dark" | "pro";
+export type ResolvedTheme = "light" | "dark" | "pro";
 
 const ThemeCtx = createContext<{
   pref: ThemePref;
@@ -31,12 +31,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     api.settingsGet("theme").then((v) => {
-      if (v === "light" || v === "dark" || v === "auto") setPrefState(v);
+      if (isThemePref(v)) setPrefState(v);
     });
     // il cambio tema fatto in un'altra finestra si propaga via evento
     const un = listen<[string, string]>("setting_changed", (e) => {
       const [key, value] = e.payload;
-      if (key === "theme" && (value === "light" || value === "dark" || value === "auto")) {
+      if (key === "theme" && isThemePref(value)) {
         setPrefState(value);
       }
     });
@@ -48,9 +48,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => {
-      const dark = pref === "dark" || (pref === "auto" && mq.matches);
+      const pro = pref === "pro";
+      const dark = pro || pref === "dark" || (pref === "auto" && mq.matches);
       document.documentElement.classList.toggle("dark", dark);
-      setResolved(dark ? "dark" : "light");
+      document.documentElement.classList.toggle("tt-pro", pro);
+      setResolved(pro ? "pro" : dark ? "dark" : "light");
     };
     apply();
     mq.addEventListener("change", apply);
@@ -67,4 +69,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       {children}
     </ThemeCtx.Provider>
   );
+}
+
+function isThemePref(value: string | null): value is ThemePref {
+  return value === "auto" || value === "light" || value === "dark" || value === "pro";
 }

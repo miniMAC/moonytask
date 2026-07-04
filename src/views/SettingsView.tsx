@@ -15,7 +15,7 @@ import { PlusIcon, TrashIcon } from "../components/Icons";
 const CURRENCIES = ["EUR", "USD", "GBP", "CHF"];
 
 const inputCls =
-  "rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800";
+  "rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2]";
 
 interface Props {
   projects: Project[];
@@ -61,6 +61,7 @@ export default function SettingsView(p: Props) {
             <option value="auto">{t("settings.themeAuto")}</option>
             <option value="light">{t("settings.themeLight")}</option>
             <option value="dark">{t("settings.themeDark")}</option>
+            <option value="pro">{t("settings.themePro")}</option>
           </select>
         </label>
         <label className="block">
