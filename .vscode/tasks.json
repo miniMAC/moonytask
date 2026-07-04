@@ -1,0 +1,190 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Tauri: dev",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "tauri", "dev"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Rust target: macOS Intel",
+      "type": "shell",
+      "command": "rustup",
+      "args": ["target", "add", "x86_64-apple-darwin"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Build: macOS DMG universal",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "tauri",
+        "--",
+        "build",
+        "--target",
+        "universal-apple-darwin",
+        "--bundles",
+        "dmg"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": ["Rust target: macOS Intel"],
+      "dependsOrder": "sequence",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Build: macOS DMG Apple Silicon",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "tauri",
+        "--",
+        "build",
+        "--target",
+        "aarch64-apple-darwin",
+        "--bundles",
+        "dmg"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Build: macOS DMG Intel",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "tauri",
+        "--",
+        "build",
+        "--target",
+        "x86_64-apple-darwin",
+        "--bundles",
+        "dmg"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": ["Rust target: macOS Intel"],
+      "dependsOrder": "sequence",
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Rust target: Windows x64",
+      "type": "shell",
+      "command": "rustup",
+      "args": ["target", "add", "x86_64-pc-windows-msvc"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Rust target: Windows ARM64",
+      "type": "shell",
+      "command": "rustup",
+      "args": ["target", "add", "aarch64-pc-windows-msvc"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Build: Windows x64",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "tauri",
+        "--",
+        "build",
+        "--target",
+        "x86_64-pc-windows-msvc"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": ["Rust target: Windows x64"],
+      "dependsOrder": "sequence",
+      "group": "build",
+      "problemMatcher": [],
+      "detail": "Da eseguire preferibilmente su Windows o in una CI Windows.",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Build: Windows ARM64",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "tauri",
+        "--",
+        "build",
+        "--target",
+        "aarch64-pc-windows-msvc"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": ["Rust target: Windows ARM64"],
+      "dependsOrder": "sequence",
+      "group": "build",
+      "problemMatcher": [],
+      "detail": "Da eseguire preferibilmente su Windows o in una CI Windows.",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    }
+  ]
+}

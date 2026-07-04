@@ -1,4 +1,4 @@
-use rusqlite::Connection;
+use rusqlite::{Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
@@ -95,33 +95,117 @@ pub fn init(app: &AppHandle) -> Result<Connection, Box<dyn std::error::Error>> {
 }
 
 fn migrate_legacy_db(db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    if db_path.exists() {
+    let Some((legacy_dir, legacy_db_name, legacy_db)) = newest_legacy_db()? else {
+        return Ok(());
+    };
+
+    if db_path.exists() && db_has_user_data(db_path)? {
         return Ok(());
     }
 
-    let Some(home) = std::env::var_os("HOME") else {
-        return Ok(());
-    };
-    let legacy_base = ["tiny", "time"].concat();
-    let legacy_dir = PathBuf::from(home)
-        .join("Library")
-        .join("Application Support")
-        .join(format!("com.minimamente.{legacy_base}"));
-    let legacy_db_name = format!("{legacy_base}.db");
-    let legacy_db = legacy_dir.join(&legacy_db_name);
-    if !legacy_db.exists() {
-        return Ok(());
+    if db_path.exists() {
+        backup_existing_db(db_path)?;
     }
 
     std::fs::copy(&legacy_db, db_path)?;
     for suffix in ["-wal", "-shm"] {
         let legacy_sidecar = legacy_dir.join(format!("{legacy_db_name}{suffix}"));
         if legacy_sidecar.exists() {
-            let new_sidecar = db_path.with_file_name(format!("moonytask.db{suffix}"));
-            let _ = std::fs::copy(legacy_sidecar, new_sidecar);
+            let new_sidecar = db_sidecar_path(db_path, suffix);
+            std::fs::copy(legacy_sidecar, new_sidecar)?;
         }
     }
     Ok(())
+}
+
+fn newest_legacy_db() -> Result<Option<(PathBuf, String, PathBuf)>, Box<dyn std::error::Error>> {
+    let Some(home) = std::env::var_os("HOME") else {
+        return Ok(None);
+    };
+
+    let app_support = PathBuf::from(home)
+        .join("Library")
+        .join("Application Support");
+    let mut newest: Option<(PathBuf, String, PathBuf, SystemTime)> = None;
+    for legacy_base in ["tinytime", "tinytask"] {
+        let legacy_dir = app_support.join(format!("com.minimamente.{legacy_base}"));
+        let legacy_db_name = format!("{legacy_base}.db");
+        let legacy_db = legacy_dir.join(&legacy_db_name);
+        if !legacy_db.exists() {
+            continue;
+        }
+
+        let modified = legacy_db.metadata()?.modified().unwrap_or(UNIX_EPOCH);
+        if newest
+            .as_ref()
+            .map(|(_, _, _, previous)| modified > *previous)
+            .unwrap_or(true)
+        {
+            newest = Some((legacy_dir, legacy_db_name, legacy_db, modified));
+        }
+    }
+
+    Ok(newest.map(|(dir, name, db, _)| (dir, name, db)))
+}
+
+fn db_has_user_data(db_path: &Path) -> Result<bool, Box<dyn std::error::Error>> {
+    let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    for table in [
+        "folders",
+        "projects",
+        "time_entries",
+        "project_payments",
+        "watched_apps",
+    ] {
+        if table_row_count(&conn, table)? > 0 {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn table_row_count(conn: &Connection, table: &str) -> rusqlite::Result<i64> {
+    let exists = conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
+        [table],
+        |row| row.get::<_, i64>(0),
+    )?;
+    if exists == 0 {
+        return Ok(0);
+    }
+
+    conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+        row.get(0)
+    })
+}
+
+fn backup_existing_db(db_path: &Path) -> std::io::Result<()> {
+    let timestamp = now_secs();
+    for path in [
+        db_path.to_path_buf(),
+        db_sidecar_path(db_path, "-wal"),
+        db_sidecar_path(db_path, "-shm"),
+    ] {
+        if !path.exists() {
+            continue;
+        }
+
+        let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        let backup_path =
+            path.with_file_name(format!("{file_name}.backup-before-legacy-{timestamp}"));
+        std::fs::rename(path, backup_path)?;
+    }
+    Ok(())
+}
+
+fn db_sidecar_path(db_path: &Path, suffix: &str) -> PathBuf {
+    let file_name = db_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("moonytask.db");
+    db_path.with_file_name(format!("{file_name}{suffix}"))
 }
 
 // ---------- models ----------
