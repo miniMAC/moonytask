@@ -1,4 +1,4 @@
-# TinyTime
+# MoonyTask
 
 Time tracker per progetti, nativo per macOS (Tauri 2), pronto per essere portato su altri sistemi operativi e mobile.
 
@@ -8,7 +8,7 @@ Time tracker per progetti, nativo per macOS (Tauri 2), pronto per essere portato
 - **Timer manuale**: avvia / pausa / riprendi / stop, sempre visibile nella **menu bar** (anche a finestra chiusa)
 - **App monitorate**: scegli app installate sul Mac; se ne usi una per 1 minuto senza timer attivo ricevi una notifica che ti propone di avviarlo
 - **Report** con grafico tempo/giorno, ripartizione per progetto, tabella giornaliera e stima dei costi
-- **Sync con Google Drive** (appDataFolder) per usare TinyTime su più dispositivi — vedi [SETUP.md](SETUP.md)
+- **Sync con Google Drive** (appDataFolder) per usare MoonyTask su più dispositivi — vedi [SETUP.md](SETUP.md)
 - Interfaccia **italiano / inglese**
 
 ## Sviluppo
@@ -18,7 +18,7 @@ Prerequisiti: Rust (`rustup`), Node.js, Xcode Command Line Tools.
 ```bash
 npm install
 npm run tauri dev     # avvio in sviluppo
-npm run tauri build   # crea TinyTime.app / dmg in src-tauri/target/release/bundle
+npm run tauri build   # crea MoonyTask.app / dmg in src-tauri/target/release/bundle
 ```
 
 ## Struttura
@@ -28,5 +28,5 @@ npm run tauri build   # crea TinyTime.app / dmg in src-tauri/target/release/bund
 
 ## Dati
 
-Database locale: `~/Library/Application Support/com.minimamente.tinytime/tinytime.db` (SQLite).
+Database locale: `~/Library/Application Support/com.minimamente.moonytask/moonytask.db` (SQLite).
 Ogni record ha `updated_at` + tombstone `deleted` per il merge last-write-wins della sync.

@@ -35,7 +35,7 @@ export default function Sidebar(p: Props) {
     <aside className="flex w-72 shrink-0 flex-col border-r border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 pro:border-[#44475a] pro:bg-[#21222c]">
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
         <span className="text-base font-bold tracking-wide text-neutral-700 dark:text-neutral-200 pro:text-[#f8f8f2]">
-          TinyTime
+          MoonyTask
         </span>
       </div>
 

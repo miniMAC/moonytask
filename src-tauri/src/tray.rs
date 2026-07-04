@@ -26,7 +26,7 @@ fn labels(app: &AppHandle) -> (String, String, String, String, String) {
     };
     if lang == "en" {
         (
-            "Open TinyTime".into(),
+            "Open MoonyTask".into(),
             "Pause".into(),
             "Resume".into(),
             "Stop".into(),
@@ -34,7 +34,7 @@ fn labels(app: &AppHandle) -> (String, String, String, String, String) {
         )
     } else {
         (
-            "Apri TinyTime".into(),
+            "Apri MoonyTask".into(),
             "Pausa".into(),
             "Riprendi".into(),
             "Stop".into(),

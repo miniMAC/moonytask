@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const SCOPE: &str = "https://www.googleapis.com/auth/drive.appdata openid email";
-const KEYRING_SERVICE: &str = "com.minimamente.tinytime";
+const KEYRING_SERVICE: &str = "com.minimamente.moonytask";
 const KEYRING_USER: &str = "google_oauth";
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -125,7 +125,7 @@ pub fn login(
         }
         if let Some(code) = query.get("code") {
             let _ = req.respond(html_response(
-                "TinyTime è connesso! Puoi chiudere questa finestra. / TinyTime is connected! You can close this window.",
+                "MoonyTask è connesso! Puoi chiudere questa finestra. / MoonyTask is connected! You can close this window.",
             ));
             break code.clone();
         }

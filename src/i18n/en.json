@@ -94,7 +94,7 @@
   "popover": {
     "all": "All",
     "recent": "Recent",
-    "open": "Open TinyTime",
+    "open": "Open MoonyTask",
     "search": "Search project…",
     "newProject": "Project",
     "newFolder": "Folder",
@@ -129,10 +129,10 @@
     "themeAuto": "Auto",
     "themeLight": "Light",
     "themeDark": "Dark",
-    "themePro": "TinyTime PRO",
+    "themePro": "MoonyTask PRO",
     "pdfExportDir": "PDF export folder",
     "pdfExportDirPlaceholder": "Empty = Downloads",
-    "pdfExportDirHelp": "Folder path where project PDFs are saved. You can also use ~/Documents/TinyTime.",
+    "pdfExportDirHelp": "Folder path where project PDFs are saved. You can also use ~/Documents/MoonyTask.",
     "chooseFolder": "Choose…",
     "rates": {
       "title": "Rate profiles",
@@ -155,7 +155,7 @@
       }
     },
     "watchedApps": "Watched apps",
-    "watchedAppsHelp": "If you use one of these apps without an active timer, TinyTime opens the menu bar popover and shows a reminder for 10 seconds.",
+    "watchedAppsHelp": "If you use one of these apps without an active timer, MoonyTask opens the menu bar popover and shows a reminder for 10 seconds.",
     "watchNotifications": "Menu bar reminders",
     "reminderAfter": "Remind after",
     "minutesShort": "min",

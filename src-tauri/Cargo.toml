@@ -1,12 +1,12 @@
 [package]
-name = "tinytime"
+name = "moonytask"
 version = "0.1.0"
-description = "TinyTime — project time tracker"
+description = "MoonyTask — project time tracker"
 authors = ["miniMAC"]
 edition = "2021"
 
 [lib]
-name = "tinytime_lib"
+name = "moonytask_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

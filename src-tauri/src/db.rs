@@ -2,6 +2,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -23,7 +24,9 @@ pub fn new_id() -> String {
 pub fn init(app: &AppHandle) -> Result<Connection, Box<dyn std::error::Error>> {
     let dir = app.path().app_data_dir()?;
     std::fs::create_dir_all(&dir)?;
-    let conn = Connection::open(dir.join("tinytime.db"))?;
+    let db_path = dir.join("moonytask.db");
+    migrate_legacy_db(&db_path)?;
+    let conn = Connection::open(db_path)?;
     conn.execute_batch(
         "PRAGMA journal_mode = WAL;
         CREATE TABLE IF NOT EXISTS folders (
@@ -89,6 +92,36 @@ pub fn init(app: &AppHandle) -> Result<Connection, Box<dyn std::error::Error>> {
         [],
     );
     Ok(conn)
+}
+
+fn migrate_legacy_db(db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    if db_path.exists() {
+        return Ok(());
+    }
+
+    let Some(home) = std::env::var_os("HOME") else {
+        return Ok(());
+    };
+    let legacy_base = ["tiny", "time"].concat();
+    let legacy_dir = PathBuf::from(home)
+        .join("Library")
+        .join("Application Support")
+        .join(format!("com.minimamente.{legacy_base}"));
+    let legacy_db_name = format!("{legacy_base}.db");
+    let legacy_db = legacy_dir.join(&legacy_db_name);
+    if !legacy_db.exists() {
+        return Ok(());
+    }
+
+    std::fs::copy(&legacy_db, db_path)?;
+    for suffix in ["-wal", "-shm"] {
+        let legacy_sidecar = legacy_dir.join(format!("{legacy_db_name}{suffix}"));
+        if legacy_sidecar.exists() {
+            let new_sidecar = db_path.with_file_name(format!("moonytask.db{suffix}"));
+            let _ = std::fs::copy(legacy_sidecar, new_sidecar);
+        }
+    }
+    Ok(())
 }
 
 // ---------- models ----------
@@ -797,7 +830,7 @@ pub fn data_export(app: AppHandle, db: State<Db>, format: String) -> Result<Stri
         .map_err(err)?;
     std::fs::create_dir_all(&dir).map_err(err)?;
 
-    let path = dir.join(format!("tinytime-export-{}.{}", data.exported_at, format));
+    let path = dir.join(format!("moonytask-export-{}.{}", data.exported_at, format));
     std::fs::write(&path, contents).map_err(err)?;
 
     Ok(path.to_string_lossy().to_string())
@@ -839,7 +872,7 @@ pub fn project_export(
         .map(|project| safe_file_stem(&project.name))
         .unwrap_or_else(|| "project".into());
     let path = dir.join(format!(
-        "tinytime-{}-{}.{}",
+        "moonytask-{}-{}.{}",
         project_name, data.exported_at, format
     ));
     std::fs::write(&path, contents).map_err(err)?;
@@ -944,7 +977,11 @@ pub fn report_export_pdf(
     let all_time = from <= 0;
 
     let mut meta = vec![if all_time {
-        if en { "Period: all time".into() } else { "Periodo: tutto".to_string() }
+        if en {
+            "Period: all time".into()
+        } else {
+            "Periodo: tutto".to_string()
+        }
     } else {
         format!(
             "{}: {} - {}",
@@ -977,7 +1014,11 @@ pub fn report_export_pdf(
     if !all_time {
         meta.push(format!(
             "{}: {}",
-            if en { "Total cost since start" } else { "Costo totale dall'inizio" },
+            if en {
+                "Total cost since start"
+            } else {
+                "Costo totale dall'inizio"
+            },
             fmt_pdf_money(total_money, &currency, &locale)
         ));
     }
@@ -1032,7 +1073,7 @@ pub fn report_export_pdf(
         .map_err(err)?;
     std::fs::create_dir_all(&dir).map_err(err)?;
     let path = dir.join(format!(
-        "tinytime-{}-report-{}.pdf",
+        "moonytask-{}-report-{}.pdf",
         safe_file_stem(&project_label),
         now_secs()
     ));
@@ -1202,7 +1243,6 @@ fn write_report_pdf(
     ));
     std::fs::write(path, out)
 }
-
 
 fn pdf_escape(value: &str) -> String {
     value
@@ -1913,7 +1953,7 @@ fn escape_applescript_string(value: &str) -> String {
 mod tests {
     #[test]
     fn report_pdf_renders() {
-        let path = std::env::temp_dir().join("tinytime-test-report.pdf");
+        let path = std::env::temp_dir().join("moonytask-test-report.pdf");
         let meta = vec![
             "Periodo: tutto".to_string(),
             String::new(),
@@ -1934,10 +1974,7 @@ mod tests {
             &path,
             "App mobile",
             &meta,
-            Some((
-                vec!["Giorno".into(), "Tempo".into(), "Costo".into()],
-                rows,
-            )),
+            Some((vec!["Giorno".into(), "Tempo".into(), "Costo".into()], rows)),
         )
         .unwrap();
         assert!(path.metadata().unwrap().len() > 500);

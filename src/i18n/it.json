@@ -94,7 +94,7 @@
   "popover": {
     "all": "Tutti",
     "recent": "Recenti",
-    "open": "Apri TinyTime",
+    "open": "Apri MoonyTask",
     "search": "Cerca progetto…",
     "newProject": "Progetto",
     "newFolder": "Cartella",
@@ -129,10 +129,10 @@
     "themeAuto": "Automatico",
     "themeLight": "Chiaro",
     "themeDark": "Scuro",
-    "themePro": "TinyTime PRO",
+    "themePro": "MoonyTask PRO",
     "pdfExportDir": "Cartella export PDF",
     "pdfExportDirPlaceholder": "Vuoto = Downloads",
-    "pdfExportDirHelp": "Percorso della cartella dove salvare i PDF dei progetti. Puoi usare anche ~/Documents/TinyTime.",
+    "pdfExportDirHelp": "Percorso della cartella dove salvare i PDF dei progetti. Puoi usare anche ~/Documents/MoonyTask.",
     "chooseFolder": "Scegli…",
     "rates": {
       "title": "Profili tariffari",
@@ -155,7 +155,7 @@
       }
     },
     "watchedApps": "App monitorate",
-    "watchedAppsHelp": "Se usi una di queste app senza un timer attivo, TinyTime apre il popover nella menu bar e mostra un promemoria per 10 secondi.",
+    "watchedAppsHelp": "Se usi una di queste app senza un timer attivo, MoonyTask apre il popover nella menu bar e mostra un promemoria per 10 secondi.",
     "watchNotifications": "Promemoria nella menu bar",
     "reminderAfter": "Avvisa dopo",
     "minutesShort": "min",
