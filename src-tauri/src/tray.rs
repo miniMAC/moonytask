@@ -1,0 +1,185 @@
+use crate::timer::{TimerSnapshot, TimerStatus};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Manager};
+use tauri_plugin_positioner::{Position, WindowExt};
+
+const TRAY_ID: &str = "main-tray";
+
+fn fmt_hms(total: i64) -> String {
+    format!("{:02}:{:02}:{:02}", total / 3600, (total % 3600) / 60, total % 60)
+}
+
+fn labels(app: &AppHandle) -> (String, String, String, String, String) {
+    let lang = {
+        let db = app.state::<crate::db::Db>();
+        let conn = db.0.lock().unwrap();
+        crate::db::get_setting(&conn, "language").unwrap_or_else(|| "it".into())
+    };
+    if lang == "en" {
+        (
+            "Open TinyTime".into(),
+            "Pause".into(),
+            "Resume".into(),
+            "Stop".into(),
+            "Quit".into(),
+        )
+    } else {
+        (
+            "Apri TinyTime".into(),
+            "Pausa".into(),
+            "Riprendi".into(),
+            "Stop".into(),
+            "Esci".into(),
+        )
+    }
+}
+
+pub fn setup(app: &AppHandle) -> tauri::Result<()> {
+    let (open, pause, _resume, stop, quit) = labels(app);
+    let open_i = MenuItem::with_id(app, "open", &open, true, None::<&str>)?;
+    let pause_i = MenuItem::with_id(app, "pause_resume", &pause, false, None::<&str>)?;
+    let stop_i = MenuItem::with_id(app, "stop", &stop, false, None::<&str>)?;
+    let quit_i = MenuItem::with_id(app, "quit", &quit, true, None::<&str>)?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &open_i,
+            &PredefinedMenuItem::separator(app)?,
+            &pause_i,
+            &stop_i,
+            &PredefinedMenuItem::separator(app)?,
+            &quit_i,
+        ],
+    )?;
+
+    TrayIconBuilder::with_id(TRAY_ID)
+        .icon(app.default_window_icon().unwrap().clone())
+        .icon_as_template(true)
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_tray_icon_event(|tray, event| {
+            tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                toggle_popover(tray.app_handle());
+            }
+        })
+        .on_menu_event(|app, event| {
+            let id = event.id.as_ref();
+            match id {
+                "open" => show_main_window(app),
+                "pause_resume" => {
+                    let status = {
+                        let timer = app.state::<crate::timer::Timer>();
+                        let t = timer.0.lock().unwrap();
+                        t.status
+                    };
+                    match status {
+                        TimerStatus::Running => {
+                            let _ = crate::timer::timer_pause(
+                                app.clone(),
+                                app.state(),
+                                app.state(),
+                            );
+                        }
+                        TimerStatus::Paused => {
+                            let _ = crate::timer::timer_resume(app.clone(), app.state());
+                        }
+                        TimerStatus::Idle => {}
+                    }
+                }
+                "stop" => {
+                    let _ = crate::timer::timer_stop(app.clone(), app.state(), app.state());
+                }
+                "quit" => {
+                    app.exit(0);
+                }
+                _ => {}
+            }
+        })
+        .build(app)?;
+
+    // memorizza gli item per aggiornarli dopo
+    app.manage(TrayMenuItems { pause: pause_i, stop: stop_i });
+    Ok(())
+}
+
+pub struct TrayMenuItems {
+    pause: MenuItem<tauri::Wry>,
+    stop: MenuItem<tauri::Wry>,
+}
+
+pub fn show_main_window(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.show();
+        let _ = win.unminimize();
+        let _ = win.set_focus();
+    }
+}
+
+/// Mostra/nasconde il popover ancorato all'icona nella menu bar.
+pub fn toggle_popover(app: &AppHandle) {
+    let Some(win) = app.get_webview_window("popover") else { return };
+    if win.is_visible().unwrap_or(false) {
+        let _ = win.hide();
+    } else {
+        let _ = win.as_ref().window().move_window(Position::TrayBottomCenter);
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+}
+
+#[tauri::command]
+pub fn open_main(app: AppHandle) {
+    if let Some(pop) = app.get_webview_window("popover") {
+        let _ = pop.hide();
+    }
+    show_main_window(&app);
+}
+
+#[tauri::command]
+pub fn hide_popover(app: AppHandle) {
+    if let Some(pop) = app.get_webview_window("popover") {
+        let _ = pop.hide();
+    }
+}
+
+/// Aggiorna titolo tray e voci di menu in base allo stato del timer.
+pub fn refresh(app: &AppHandle, snap: &TimerSnapshot) {
+    let Some(tray) = app.tray_by_id(TRAY_ID) else { return };
+    let title = match snap.status {
+        TimerStatus::Idle => None,
+        _ => {
+            let name = snap.project_name.clone().unwrap_or_default();
+            let pause_mark = if snap.status == TimerStatus::Paused { "⏸ " } else { "" };
+            Some(format!("{}{} · {}", pause_mark, fmt_hms(snap.elapsed_secs), name))
+        }
+    };
+    let _ = tray.set_title(title.as_deref());
+
+    if let Some(items) = app.try_state::<TrayMenuItems>() {
+        let (_open, pause, resume, _stop, _quit) = labels(app);
+        match snap.status {
+            TimerStatus::Idle => {
+                let _ = items.pause.set_enabled(false);
+                let _ = items.stop.set_enabled(false);
+                let _ = items.pause.set_text(&pause);
+            }
+            TimerStatus::Running => {
+                let _ = items.pause.set_enabled(true);
+                let _ = items.stop.set_enabled(true);
+                let _ = items.pause.set_text(&pause);
+            }
+            TimerStatus::Paused => {
+                let _ = items.pause.set_enabled(true);
+                let _ = items.stop.set_enabled(true);
+                let _ = items.pause.set_text(&resume);
+            }
+        }
+    }
+}

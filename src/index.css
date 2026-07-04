@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    Roboto, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-neutral-100 text-neutral-900 antialiased select-none dark:bg-neutral-900 dark:text-neutral-100;
+  overscroll-behavior: none;
+}
+
+/* la finestra popover è trasparente: gli angoli stondati li disegna il contenuto */
+body.popover-window {
+  background: transparent !important;
+}
+
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}

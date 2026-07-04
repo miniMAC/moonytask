@@ -1,0 +1,119 @@
+{
+  "nav": {
+    "projects": "Progetti",
+    "reports": "Report",
+    "settings": "Impostazioni"
+  },
+  "folders": {
+    "title": "Cartelle",
+    "new": "Nuova cartella",
+    "name": "Nome cartella",
+    "rename": "Rinomina",
+    "delete": "Elimina",
+    "notEmpty": "La cartella contiene progetti: spostali o eliminali prima.",
+    "empty": "Nessuna cartella. Creane una per iniziare."
+  },
+  "projects": {
+    "new": "Nuovo progetto",
+    "name": "Nome progetto",
+    "hourlyRate": "Costo orario",
+    "folder": "Cartella",
+    "edit": "Modifica progetto",
+    "delete": "Elimina progetto",
+    "deleteConfirm": "Eliminare \"{{name}}\"? Le ore registrate non appariranno più nei report.",
+    "empty": "Nessun progetto in questa cartella.",
+    "select": "Seleziona un progetto dalla barra laterale",
+    "todayTime": "Oggi",
+    "weekTime": "Questa settimana",
+    "totalTime": "Totale",
+    "recentEntries": "Registrazioni recenti",
+    "noEntries": "Nessuna registrazione ancora. Avvia il timer!",
+    "addManual": "Aggiungi tempo manualmente",
+    "date": "Data",
+    "durationMinutes": "Durata (minuti)",
+    "note": "Nota (opzionale)"
+  },
+  "timer": {
+    "start": "Avvia",
+    "pause": "Pausa",
+    "resume": "Riprendi",
+    "stop": "Stop",
+    "running": "In corso",
+    "paused": "In pausa"
+  },
+  "reports": {
+    "title": "Report",
+    "today": "Oggi",
+    "week": "Settimana",
+    "month": "Mese",
+    "custom": "Periodo",
+    "from": "Dal",
+    "to": "Al",
+    "allProjects": "Tutti i progetti",
+    "allFolders": "Tutte le cartelle",
+    "totalTime": "Tempo totale",
+    "totalCost": "Costo stimato",
+    "daysWorked": "Giorni lavorati",
+    "byDay": "Tempo per giorno",
+    "byProject": "Ripartizione per progetto",
+    "day": "Giorno",
+    "project": "Progetto",
+    "time": "Tempo",
+    "cost": "Costo",
+    "noData": "Nessuna registrazione nel periodo selezionato."
+  },
+  "popover": {
+    "all": "Tutti",
+    "recent": "Recenti",
+    "open": "Apri TinyTime"
+  },
+  "settings": {
+    "title": "Impostazioni",
+    "language": "Lingua",
+    "currency": "Valuta",
+    "theme": "Tema",
+    "themeAuto": "Automatico",
+    "themeLight": "Chiaro",
+    "themeDark": "Scuro",
+    "watchedApps": "App monitorate",
+    "watchedAppsHelp": "Se usi una di queste app per 1 minuto senza un timer attivo, TinyTime ti manda una notifica per ricordarti di avviarlo.",
+    "watchNotifications": "Notifiche di promemoria",
+    "addApp": "Aggiungi app",
+    "searchApps": "Cerca tra le app installate…",
+    "linkedProject": "Progetto suggerito",
+    "noLinkedProject": "Nessuno (chiedi ogni volta)",
+    "noWatched": "Nessuna app monitorata.",
+    "sync": {
+      "title": "Sincronizzazione Google",
+      "help": "I dati vengono salvati in una cartella nascosta del tuo Google Drive. Sync automatica: a ogni modifica, ogni 15 minuti, a ogni stop del timer e alla chiusura dell'app.",
+      "notConfigured": "Le credenziali OAuth non sono ancora incorporate nell'app: inseriscile in src-tauri/google_credentials.json e ricompila (istruzioni in SETUP.md).",
+      "connect": "Connetti",
+      "connectHelp": "Si aprirà il browser per autorizzare l'accesso con questo account Google.",
+      "emailLabel": "Il tuo account Gmail",
+      "emailPlaceholder": "nome@gmail.com",
+      "disconnect": "Disconnetti",
+      "connectedAs": "Connesso come {{email}}",
+      "connected": "Connesso",
+      "syncNow": "Sincronizza ora",
+      "syncing": "Sincronizzazione…",
+      "lastSync": "Ultima sync: {{time}}",
+      "error": "Errore: {{error}}"
+    }
+  },
+  "suggest": {
+    "title": "Vuoi avviare un timer?",
+    "body": "Stai usando {{app}} da un minuto senza un timer attivo.",
+    "project": "Progetto",
+    "start": "Avvia timer",
+    "dismiss": "Non ora"
+  },
+  "common": {
+    "save": "Salva",
+    "cancel": "Annulla",
+    "add": "Aggiungi",
+    "delete": "Elimina",
+    "close": "Chiudi",
+    "hours": "ore",
+    "loading": "Caricamento…"
+  }
+}

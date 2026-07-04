@@ -1,0 +1,119 @@
+{
+  "nav": {
+    "projects": "Projects",
+    "reports": "Reports",
+    "settings": "Settings"
+  },
+  "folders": {
+    "title": "Folders",
+    "new": "New folder",
+    "name": "Folder name",
+    "rename": "Rename",
+    "delete": "Delete",
+    "notEmpty": "The folder contains projects: move or delete them first.",
+    "empty": "No folders yet. Create one to get started."
+  },
+  "projects": {
+    "new": "New project",
+    "name": "Project name",
+    "hourlyRate": "Hourly rate",
+    "folder": "Folder",
+    "edit": "Edit project",
+    "delete": "Delete project",
+    "deleteConfirm": "Delete \"{{name}}\"? Its tracked time will no longer appear in reports.",
+    "empty": "No projects in this folder.",
+    "select": "Select a project from the sidebar",
+    "todayTime": "Today",
+    "weekTime": "This week",
+    "totalTime": "Total",
+    "recentEntries": "Recent entries",
+    "noEntries": "No entries yet. Start the timer!",
+    "addManual": "Add time manually",
+    "date": "Date",
+    "durationMinutes": "Duration (minutes)",
+    "note": "Note (optional)"
+  },
+  "timer": {
+    "start": "Start",
+    "pause": "Pause",
+    "resume": "Resume",
+    "stop": "Stop",
+    "running": "Running",
+    "paused": "Paused"
+  },
+  "reports": {
+    "title": "Reports",
+    "today": "Today",
+    "week": "Week",
+    "month": "Month",
+    "custom": "Custom",
+    "from": "From",
+    "to": "To",
+    "allProjects": "All projects",
+    "allFolders": "All folders",
+    "totalTime": "Total time",
+    "totalCost": "Estimated cost",
+    "daysWorked": "Days worked",
+    "byDay": "Time per day",
+    "byProject": "Breakdown by project",
+    "day": "Day",
+    "project": "Project",
+    "time": "Time",
+    "cost": "Cost",
+    "noData": "No entries in the selected period."
+  },
+  "popover": {
+    "all": "All",
+    "recent": "Recent",
+    "open": "Open TinyTime"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "currency": "Currency",
+    "theme": "Theme",
+    "themeAuto": "Auto",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "watchedApps": "Watched apps",
+    "watchedAppsHelp": "If you use one of these apps for 1 minute without an active timer, TinyTime sends you a notification reminding you to start one.",
+    "watchNotifications": "Reminder notifications",
+    "addApp": "Add app",
+    "searchApps": "Search installed apps…",
+    "linkedProject": "Suggested project",
+    "noLinkedProject": "None (ask every time)",
+    "noWatched": "No watched apps.",
+    "sync": {
+      "title": "Google sync",
+      "help": "Your data is stored in a hidden folder of your Google Drive. Auto-sync: on every change, every 15 minutes, on timer stop and when the app quits.",
+      "notConfigured": "OAuth credentials are not embedded in the app yet: add them to src-tauri/google_credentials.json and rebuild (see SETUP.md).",
+      "connect": "Connect",
+      "connectHelp": "Your browser will open to authorize access with this Google account.",
+      "emailLabel": "Your Gmail account",
+      "emailPlaceholder": "name@gmail.com",
+      "disconnect": "Disconnect",
+      "connectedAs": "Connected as {{email}}",
+      "connected": "Connected",
+      "syncNow": "Sync now",
+      "syncing": "Syncing…",
+      "lastSync": "Last sync: {{time}}",
+      "error": "Error: {{error}}"
+    }
+  },
+  "suggest": {
+    "title": "Start a timer?",
+    "body": "You've been using {{app}} for a minute without an active timer.",
+    "project": "Project",
+    "start": "Start timer",
+    "dismiss": "Not now"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "add": "Add",
+    "delete": "Delete",
+    "close": "Close",
+    "hours": "hours",
+    "loading": "Loading…"
+  }
+}

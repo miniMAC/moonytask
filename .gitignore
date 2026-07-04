@@ -1,14 +1,24 @@
-# Esclusioni generiche
-/node_modules
-/vendor
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
 .idea
-npm-debug.log
-
-# Specifico per il mondo mac
 .DS_Store
-
-# Specifico Sublime
-sftp-config.json
-
-# Specifico per Visual Studio Code
-.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
