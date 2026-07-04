@@ -16,6 +16,21 @@
       }
     },
     {
+      "label": "Artifacts: copy all to Desktop",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/build-tauri-artifact.mjs", "all", "--copy-only"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "detail": "Copia DMG, MSI/EXE, AppImage, DEB e RPM gia generati in ~/Desktop/MoonyTask.",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
       "label": "Rust target: macOS Intel",
       "type": "shell",
       "command": "rustup",
@@ -32,15 +47,11 @@
     {
       "label": "Build: macOS DMG universal",
       "type": "shell",
-      "command": "npm",
+      "command": "node",
       "args": [
-        "run",
-        "tauri",
-        "--",
-        "build",
-        "--target",
+        "scripts/build-tauri-artifact.mjs",
+        "macos",
         "universal-apple-darwin",
-        "--bundles",
         "dmg"
       ],
       "options": {
@@ -61,15 +72,11 @@
     {
       "label": "Build: macOS DMG Apple Silicon",
       "type": "shell",
-      "command": "npm",
+      "command": "node",
       "args": [
-        "run",
-        "tauri",
-        "--",
-        "build",
-        "--target",
+        "scripts/build-tauri-artifact.mjs",
+        "macos",
         "aarch64-apple-darwin",
-        "--bundles",
         "dmg"
       ],
       "options": {
@@ -85,15 +92,11 @@
     {
       "label": "Build: macOS DMG Intel",
       "type": "shell",
-      "command": "npm",
+      "command": "node",
       "args": [
-        "run",
-        "tauri",
-        "--",
-        "build",
-        "--target",
+        "scripts/build-tauri-artifact.mjs",
+        "macos",
         "x86_64-apple-darwin",
-        "--bundles",
         "dmg"
       ],
       "options": {
@@ -139,13 +142,10 @@
     {
       "label": "Build: Windows x64",
       "type": "shell",
-      "command": "npm",
+      "command": "node",
       "args": [
-        "run",
-        "tauri",
-        "--",
-        "build",
-        "--target",
+        "scripts/build-tauri-artifact.mjs",
+        "windows",
         "x86_64-pc-windows-msvc"
       ],
       "options": {
@@ -164,13 +164,10 @@
     {
       "label": "Build: Windows ARM64",
       "type": "shell",
-      "command": "npm",
+      "command": "node",
       "args": [
-        "run",
-        "tauri",
-        "--",
-        "build",
-        "--target",
+        "scripts/build-tauri-artifact.mjs",
+        "windows",
         "aarch64-pc-windows-msvc"
       ],
       "options": {
@@ -181,6 +178,112 @@
       "group": "build",
       "problemMatcher": [],
       "detail": "Da eseguire preferibilmente su Windows o in una CI Windows.",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Rust target: Linux x64",
+      "type": "shell",
+      "command": "rustup",
+      "args": ["target", "add", "x86_64-unknown-linux-gnu"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Build: Linux AppImage (KDE/GNOME)",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "scripts/build-tauri-artifact.mjs",
+        "linux",
+        "x86_64-unknown-linux-gnu",
+        "appimage"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": ["Rust target: Linux x64"],
+      "dependsOrder": "sequence",
+      "group": "build",
+      "problemMatcher": [],
+      "detail": "Pacchetto portabile per desktop Linux KDE e GNOME. Da eseguire su Linux o in una CI Linux.",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Build: Linux DEB (GNOME Ubuntu/Debian)",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "scripts/build-tauri-artifact.mjs",
+        "linux",
+        "x86_64-unknown-linux-gnu",
+        "deb"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": ["Rust target: Linux x64"],
+      "dependsOrder": "sequence",
+      "group": "build",
+      "problemMatcher": [],
+      "detail": "Pacchetto installabile per Ubuntu, Debian e derivate GNOME. Da eseguire su Linux o in una CI Linux.",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Build: Linux RPM (KDE Fedora/openSUSE)",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "scripts/build-tauri-artifact.mjs",
+        "linux",
+        "x86_64-unknown-linux-gnu",
+        "rpm"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": ["Rust target: Linux x64"],
+      "dependsOrder": "sequence",
+      "group": "build",
+      "problemMatcher": [],
+      "detail": "Pacchetto installabile per Fedora, openSUSE e derivate KDE. Da eseguire su Linux o in una CI Linux.",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Build: Linux all packages",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "scripts/build-tauri-artifact.mjs",
+        "linux",
+        "x86_64-unknown-linux-gnu",
+        "appimage,deb,rpm"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": ["Rust target: Linux x64"],
+      "dependsOrder": "sequence",
+      "group": "build",
+      "problemMatcher": [],
+      "detail": "Genera AppImage, DEB e RPM. Da eseguire su Linux o in una CI Linux.",
       "presentation": {
         "reveal": "always",
         "panel": "dedicated"
