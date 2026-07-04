@@ -50,7 +50,13 @@
     "addEntryNote": "Aggiungi nota",
     "editEntryNote": "Modifica nota",
     "exportPdf": "PDF",
-    "exportPdfHelp": "Esporta il PDF di tutto il periodo"
+    "exportPdfHelp": "Esporta il PDF di tutto il periodo",
+    "exportJson": "JSON",
+    "exportJsonHelp": "Esporta i dati del progetto in JSON",
+    "exportCsv": "CSV",
+    "exportCsvHelp": "Esporta i dati del progetto in CSV",
+    "exported": "Esportato",
+    "exportFailed": "Export non riuscito"
   },
   "timer": {
     "start": "Avvia",
@@ -131,9 +137,9 @@
     "themeLight": "Chiaro",
     "themeDark": "Scuro",
     "themePro": "MoonyTask PRO",
-    "pdfExportDir": "Cartella export PDF",
+    "pdfExportDir": "Cartella export",
     "pdfExportDirPlaceholder": "Vuoto = Downloads",
-    "pdfExportDirHelp": "Percorso della cartella dove salvare i PDF dei progetti. Puoi usare anche ~/Documents/MoonyTask.",
+    "pdfExportDirHelp": "Percorso della cartella dove salvare gli export dei progetti (PDF, JSON, CSV). Puoi usare anche ~/Documents/MoonyTask.",
     "chooseFolder": "Scegli…",
     "rates": {
       "title": "Profili tariffari",

@@ -49,6 +49,11 @@ export const projectUpdate = (p: Project) =>
   });
 export const projectDelete = (id: string) =>
   invoke<void>("project_delete", { id });
+export const foldersReorder = (ids: string[]) =>
+  invoke<void>("folders_reorder", { ids });
+// ids = elenco completo e ordinato dei progetti della cartella di destinazione
+export const projectsReorder = (folderId: string, ids: string[]) =>
+  invoke<void>("projects_reorder", { folderId, ids });
 
 // time entries
 export const entriesRange = (from: number, to: number) =>

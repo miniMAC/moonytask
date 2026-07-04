@@ -1,3 +1,4 @@
+import { useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { Folder, Project, TimerSnapshot } from "../lib/types";
 import { projectColor } from "../lib/colors";
@@ -26,10 +27,116 @@ interface Props {
   onDeleteFolder: (f: Folder) => void;
   onNewProject: (folderId: string) => void;
   onStart: (projectId: string) => void;
+  onReorderFolders: (ids: string[]) => void;
+  onReorderProjects: (folderId: string, ids: string[]) => void;
+}
+
+const PROJECT_MIME = "application/x-moonytask-project";
+const FOLDER_MIME = "application/x-moonytask-folder";
+
+// dove verrebbe rilasciato l'elemento trascinato
+type DropHint =
+  | { kind: "project-into-folder"; folderId: string }
+  | { kind: "before-project" | "after-project"; projectId: string }
+  | { kind: "before-folder" | "after-folder"; folderId: string }
+  | null;
+
+function halfOf(event: DragEvent): "before" | "after" {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  return event.clientY < rect.top + rect.height / 2 ? "before" : "after";
 }
 
 export default function Sidebar(p: Props) {
   const { t } = useTranslation();
+  const [dropHint, setDropHint] = useState<DropHint>(null);
+
+  const visibleIn = (folderId: string) =>
+    p.projects
+      .filter((pr) => pr.folderId === folderId && !pr.archived)
+      .map((pr) => pr.id);
+
+  // trascinamento sopra il blocco cartella: progetto → aggiungi in coda,
+  // cartella → riordina prima/dopo rispetto alla metà del blocco
+  const onDragOverFolder = (event: DragEvent, folderId: string) => {
+    const types = event.dataTransfer.types;
+    if (types.includes(PROJECT_MIME)) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      setDropHint({ kind: "project-into-folder", folderId });
+    } else if (types.includes(FOLDER_MIME)) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      setDropHint({
+        kind: halfOf(event) === "before" ? "before-folder" : "after-folder",
+        folderId,
+      });
+    }
+  };
+
+  const onDropOnFolder = (event: DragEvent, folderId: string) => {
+    event.preventDefault();
+    setDropHint(null);
+    const projectId = event.dataTransfer.getData(PROJECT_MIME);
+    if (projectId) {
+      const ids = visibleIn(folderId).filter((id) => id !== projectId);
+      ids.push(projectId);
+      p.onReorderProjects(folderId, ids);
+      return;
+    }
+    const draggedFolder = event.dataTransfer.getData(FOLDER_MIME);
+    if (draggedFolder && draggedFolder !== folderId) {
+      const ids = p.folders.map((f) => f.id).filter((id) => id !== draggedFolder);
+      let idx = ids.indexOf(folderId);
+      if (halfOf(event) === "after") idx += 1;
+      ids.splice(idx, 0, draggedFolder);
+      p.onReorderFolders(ids);
+    }
+  };
+
+  // trascinamento sopra una riga progetto: inserisci prima/dopo quella riga
+  const onDragOverProject = (event: DragEvent, projectId: string) => {
+    if (!event.dataTransfer.types.includes(PROJECT_MIME)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+    setDropHint({
+      kind: halfOf(event) === "before" ? "before-project" : "after-project",
+      projectId,
+    });
+  };
+
+  const onDropOnProject = (
+    event: DragEvent,
+    folderId: string,
+    targetId: string,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDropHint(null);
+    const draggedId = event.dataTransfer.getData(PROJECT_MIME);
+    if (!draggedId || draggedId === targetId) return;
+    const ids = visibleIn(folderId).filter((id) => id !== draggedId);
+    let idx = ids.indexOf(targetId);
+    if (halfOf(event) === "after") idx += 1;
+    ids.splice(idx, 0, draggedId);
+    p.onReorderProjects(folderId, ids);
+  };
+
+  const projectHint = (projectId: string) =>
+    dropHint?.kind === "before-project" && dropHint.projectId === projectId
+      ? "shadow-[inset_0_2px_0_0_#60a5fa]"
+      : dropHint?.kind === "after-project" && dropHint.projectId === projectId
+        ? "shadow-[inset_0_-2px_0_0_#60a5fa]"
+        : "";
+
+  const folderHint = (folderId: string) =>
+    dropHint?.kind === "project-into-folder" && dropHint.folderId === folderId
+      ? "bg-blue-100 ring-1 ring-blue-400 dark:bg-blue-950/40 pro:bg-[#44475a]/60 pro:ring-[#bd93f9]"
+      : dropHint?.kind === "before-folder" && dropHint.folderId === folderId
+        ? "shadow-[inset_0_2px_0_0_#60a5fa]"
+        : dropHint?.kind === "after-folder" && dropHint.folderId === folderId
+          ? "shadow-[inset_0_-2px_0_0_#60a5fa]"
+          : "";
 
   return (
     <aside className="flex w-72 shrink-0 flex-col border-r border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 pro:border-[#44475a] pro:bg-[#21222c]">
@@ -64,8 +171,21 @@ export default function Sidebar(p: Props) {
             (pr) => pr.folderId === folder.id && !pr.archived,
           );
           return (
-            <div key={folder.id} className="mb-2">
-              <div className="group flex items-center gap-1.5 rounded px-2 py-1 text-neutral-600 dark:text-neutral-300 pro:text-[#d7d7e2]">
+            <div
+              key={folder.id}
+              onDragOver={(e) => onDragOverFolder(e, folder.id)}
+              onDragLeave={() => setDropHint(null)}
+              onDrop={(e) => onDropOnFolder(e, folder.id)}
+              className={`mb-2 rounded-md transition ${folderHint(folder.id)}`}
+            >
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(FOLDER_MIME, folder.id);
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                className="group flex items-center gap-1.5 rounded px-2 py-1 text-neutral-600 dark:text-neutral-300 pro:text-[#d7d7e2]"
+              >
                 <span style={{ color: folder.color ?? undefined }}>
                   <FolderIcon size={13} />
                 </span>
@@ -106,8 +226,15 @@ export default function Sidebar(p: Props) {
                 return (
                   <div
                     key={project.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(PROJECT_MIME, project.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => onDragOverProject(e, project.id)}
+                    onDrop={(e) => onDropOnProject(e, folder.id, project.id)}
                     onClick={() => p.onSelectProject(project.id)}
-                    className={`group ml-3 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-base ${
+                    className={`group ml-3 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-base ${projectHint(project.id)} ${
                       active
                         ? "bg-white font-medium shadow-sm dark:bg-neutral-800 pro:bg-[#44475a] pro:text-[#f8f8f2]"
                         : "text-neutral-700 hover:bg-neutral-200/60 dark:text-neutral-300 dark:hover:bg-neutral-800/60 pro:text-[#d7d7e2] pro:hover:bg-[#343746]"

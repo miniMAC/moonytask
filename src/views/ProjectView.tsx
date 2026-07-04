@@ -46,6 +46,7 @@ export default function ProjectView(p: Props) {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfMsg, setPdfMsg] = useState<string | null>(null);
+  const [exportBusy, setExportBusy] = useState<"json" | "csv" | null>(null);
   const [noteEntry, setNoteEntry] = useState<TimeEntry | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(
     () => new Set(),
@@ -116,6 +117,22 @@ export default function ProjectView(p: Props) {
     load();
   };
 
+  // esporta tutti i dati del progetto in JSON o CSV nella cartella export configurata
+  const exportProjectData = async (format: "json" | "csv") => {
+    if (exportBusy) return;
+    setExportBusy(format);
+    setPdfMsg(null);
+    try {
+      await api.projectExport(p.project.id, format);
+      setPdfMsg(t("projects.exported"));
+    } catch {
+      setPdfMsg(t("projects.exportFailed"));
+    } finally {
+      setExportBusy(null);
+      window.setTimeout(() => setPdfMsg(null), 4000);
+    }
+  };
+
   // esporta il PDF dell'intero storico del progetto, senza scegliere un periodo
   const exportAllTimePdf = async () => {
     if (pdfBusy) return;
@@ -176,6 +193,22 @@ export default function ProjectView(p: Props) {
             className="h-11 rounded-lg border border-neutral-300 px-5 text-base font-semibold hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
           >
             {pdfBusy ? "..." : t("projects.exportPdf")}
+          </button>
+          <button
+            onClick={() => exportProjectData("json")}
+            disabled={exportBusy !== null}
+            title={t("projects.exportJsonHelp")}
+            className="h-11 rounded-lg border border-neutral-300 px-5 text-base font-semibold hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+          >
+            {exportBusy === "json" ? "..." : t("projects.exportJson")}
+          </button>
+          <button
+            onClick={() => exportProjectData("csv")}
+            disabled={exportBusy !== null}
+            title={t("projects.exportCsvHelp")}
+            className="h-11 rounded-lg border border-neutral-300 px-5 text-base font-semibold hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+          >
+            {exportBusy === "csv" ? "..." : t("projects.exportCsv")}
           </button>
           <button
             title={t("projects.edit")}

@@ -20,13 +20,113 @@ fn fmt_hms(total: i64) -> String {
     }
 }
 
-fn short_name(value: &str) -> String {
-    const MAX_CHARS: usize = 18;
-    let mut out = value.chars().take(MAX_CHARS).collect::<String>();
-    if value.chars().count() > MAX_CHARS {
-        out.push('…');
+// colori del badge nella menu bar (RGB)
+const BADGE_GREEN: [u8; 3] = [50, 215, 75];
+const BADGE_AMBER: [u8; 3] = [255, 214, 10];
+// altezza del badge in pixel: 18pt @2x per schermi retina
+const BADGE_HEIGHT: usize = 36;
+
+/// Font monospace di sistema usato per disegnare il tempo nella menu bar.
+fn badge_font() -> Option<&'static fontdue::Font> {
+    static FONT: std::sync::OnceLock<Option<fontdue::Font>> = std::sync::OnceLock::new();
+    FONT.get_or_init(|| {
+        // Menlo.ttc indice 1 = Menlo Bold (0 = Regular)
+        let candidates: [(&str, u32); 3] = [
+            ("/System/Library/Fonts/Menlo.ttc", 1),
+            ("/System/Library/Fonts/Menlo.ttc", 0),
+            ("/System/Library/Fonts/Monaco.ttf", 0),
+        ];
+        for (path, index) in candidates {
+            let Ok(bytes) = std::fs::read(path) else {
+                continue;
+            };
+            let settings = fontdue::FontSettings {
+                collection_index: index,
+                ..fontdue::FontSettings::default()
+            };
+            if let Ok(font) = fontdue::Font::from_bytes(bytes, settings) {
+                if font.lookup_glyph_index('0') != 0 {
+                    return Some(font);
+                }
+            }
+        }
+        None
+    })
+    .as_ref()
+}
+
+/// Disegna "● H:MM:SS" (verde) o "⏸ H:MM:SS" (ambra) come immagine per la tray.
+fn timer_badge(status: TimerStatus, time: &str) -> Option<Image<'static>> {
+    let font = badge_font()?;
+    let color = if status == TimerStatus::Paused {
+        BADGE_AMBER
+    } else {
+        BADGE_GREEN
+    };
+
+    let h = BADGE_HEIGHT;
+    let px = 26.0f32;
+    let baseline = 27i32;
+    let pad = 2usize;
+    let sym_w = 11usize;
+    let gap = 8usize;
+
+    let text_w: f32 = time.chars().map(|c| font.metrics(c, px).advance_width).sum();
+    let w = pad + sym_w + gap + text_w.ceil() as usize + pad;
+
+    let mut buf = vec![0u8; w * h * 4];
+    let mut put = |x: i32, y: i32, coverage: f32| {
+        if x < 0 || y < 0 || x >= w as i32 || y >= h as i32 {
+            return;
+        }
+        let alpha = (coverage.clamp(0.0, 1.0) * 255.0).round() as u8;
+        let idx = (y as usize * w + x as usize) * 4;
+        if alpha > buf[idx + 3] {
+            buf[idx] = color[0];
+            buf[idx + 1] = color[1];
+            buf[idx + 2] = color[2];
+            buf[idx + 3] = alpha;
+        }
+    };
+
+    // simbolo a sinistra: pallino pieno (running) o barre di pausa (paused)
+    let center_y = 18.0f32;
+    if status == TimerStatus::Paused {
+        for y in 11..25 {
+            for x in 0..4 {
+                put((pad + x) as i32, y, 1.0);
+                put((pad + 7 + x) as i32, y, 1.0);
+            }
+        }
+    } else {
+        let cx = pad as f32 + sym_w as f32 / 2.0;
+        let r = 5.5f32;
+        for y in 0..h as i32 {
+            for x in 0..(pad + sym_w + 2) as i32 {
+                let dx = x as f32 + 0.5 - cx;
+                let dy = y as f32 + 0.5 - center_y;
+                let dist = (dx * dx + dy * dy).sqrt();
+                put(x, y, r - dist + 0.5);
+            }
+        }
     }
-    out
+
+    // testo del tempo
+    let mut cursor = (pad + sym_w + gap) as f32;
+    for c in time.chars() {
+        let (metrics, bitmap) = font.rasterize(c, px);
+        let gx = cursor.round() as i32 + metrics.xmin;
+        let gy = baseline - metrics.height as i32 - metrics.ymin;
+        for row in 0..metrics.height {
+            for col in 0..metrics.width {
+                let coverage = bitmap[row * metrics.width + col] as f32 / 255.0;
+                put(gx + col as i32, gy + row as i32, coverage);
+            }
+        }
+        cursor += metrics.advance_width;
+    }
+
+    Some(Image::new_owned(buf, w as u32, h as u32))
 }
 
 fn labels(app: &AppHandle) -> (String, String, String, String, String) {
@@ -252,24 +352,32 @@ pub fn refresh(app: &AppHandle, snap: &TimerSnapshot) {
     let Some(tray) = app.tray_by_id(TRAY_ID) else {
         return;
     };
-    let title = match snap.status {
-        TimerStatus::Idle => None,
-        _ => {
-            let name = snap.project_name.clone().unwrap_or_default();
-            let status_mark = if snap.status == TimerStatus::Paused {
-                "⏸"
-            } else {
-                "🟢"
-            };
-            let time = fmt_hms(snap.elapsed_secs);
-            if name.is_empty() {
-                Some(format!("{status_mark} {time}"))
-            } else {
-                Some(format!("{status_mark} {time} · {}", short_name(&name)))
-            }
+    match snap.status {
+        TimerStatus::Idle => {
+            // nessun timer: solo l'icona template (bianca su barra scura), senza testo
+            let _ = tray.set_icon_with_as_template(Some(tray_icon(app)), true);
+            let _ = tray.set_title(None::<&str>);
+            let _ = tray.set_tooltip(None::<&str>);
         }
-    };
-    let _ = tray.set_title(title.as_deref());
+        _ => {
+            let time = fmt_hms(snap.elapsed_secs);
+            if let Some(badge) = timer_badge(snap.status, &time) {
+                // timer attivo: badge colorato (verde/ambra) al posto dell'icona
+                let _ = tray.set_icon_with_as_template(Some(badge), false);
+                let _ = tray.set_title(None::<&str>);
+            } else {
+                // fallback se il font di sistema non è disponibile
+                let mark = if snap.status == TimerStatus::Paused {
+                    "⏸"
+                } else {
+                    "🟢"
+                };
+                let _ = tray.set_icon_with_as_template(Some(tray_icon(app)), true);
+                let _ = tray.set_title(Some(format!("{mark} {time}")));
+            }
+            let _ = tray.set_tooltip(snap.project_name.as_deref());
+        }
+    }
 
     if let Some(items) = app.try_state::<TrayMenuItems>() {
         let (_open, pause, resume, _stop, _quit) = labels(app);
@@ -292,3 +400,5 @@ pub fn refresh(app: &AppHandle, snap: &TimerSnapshot) {
         }
     }
 }
+
+

@@ -8,8 +8,14 @@ import "./i18n";
 import "./index.css";
 
 const isPopover = getCurrentWebviewWindow().label === "popover";
-if (isPopover) document.body.classList.add("popover-window");
-else document.body.classList.add("app-window");
+if (isPopover) {
+  // anche <html> deve essere trasparente, altrimenti il canvas del documento
+  // dipinge angoli netti dietro il bordo stondato del popover
+  document.documentElement.classList.add("popover-window");
+  document.body.classList.add("popover-window");
+} else {
+  document.body.classList.add("app-window");
+}
 
 window.addEventListener(
   "contextmenu",

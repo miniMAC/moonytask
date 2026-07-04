@@ -88,6 +88,10 @@ pub fn init(app: &AppHandle) -> Result<Connection, Box<dyn std::error::Error>> {
     let _ = conn.execute("ALTER TABLE folders ADD COLUMN color TEXT", []);
     let _ = conn.execute("ALTER TABLE projects ADD COLUMN rate_profile_id TEXT", []);
     let _ = conn.execute(
+        "ALTER TABLE projects ADD COLUMN position INTEGER NOT NULL DEFAULT 0",
+        [],
+    );
+    let _ = conn.execute(
         "ALTER TABLE watched_apps ADD COLUMN remind_after_secs INTEGER NOT NULL DEFAULT 60",
         [],
     );
@@ -233,6 +237,8 @@ pub struct Project {
     pub rate_profile_id: Option<String>,
     pub color: Option<String>,
     pub archived: i64,
+    #[serde(default)]
+    pub position: i64,
     pub updated_at: i64,
     pub deleted: i64,
 }
@@ -489,7 +495,7 @@ pub fn folder_delete(app: AppHandle, db: State<Db>, id: String) -> Result<(), St
 pub fn projects_list(db: State<Db>) -> Result<Vec<Project>, String> {
     let conn = db.0.lock().unwrap();
     let mut stmt = conn
-        .prepare("SELECT id, folder_id, name, hourly_rate, rate_profile_id, color, archived, updated_at, deleted FROM projects WHERE deleted = 0 ORDER BY name")
+        .prepare("SELECT id, folder_id, name, hourly_rate, rate_profile_id, color, archived, position, updated_at, deleted FROM projects WHERE deleted = 0 ORDER BY position, name")
         .map_err(err)?;
     let rows = stmt
         .query_map([], |r| {
@@ -501,8 +507,9 @@ pub fn projects_list(db: State<Db>) -> Result<Vec<Project>, String> {
                 rate_profile_id: r.get(4)?,
                 color: r.get(5)?,
                 archived: r.get(6)?,
-                updated_at: r.get(7)?,
-                deleted: r.get(8)?,
+                position: r.get(7)?,
+                updated_at: r.get(8)?,
+                deleted: r.get(9)?,
             })
         })
         .map_err(err)?
@@ -522,6 +529,13 @@ pub fn project_create(
     color: Option<String>,
 ) -> Result<Project, String> {
     let conn = db.0.lock().unwrap();
+    let position: i64 = conn
+        .query_row(
+            "SELECT COALESCE(MAX(position), -1) + 1 FROM projects WHERE folder_id = ?1 AND deleted = 0",
+            rusqlite::params![folder_id],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
     let p = Project {
         id: new_id(),
         folder_id,
@@ -530,12 +544,13 @@ pub fn project_create(
         rate_profile_id,
         color,
         archived: 0,
+        position,
         updated_at: now_secs(),
         deleted: 0,
     };
     conn.execute(
-        "INSERT INTO projects (id, folder_id, name, hourly_rate, rate_profile_id, color, archived, updated_at, deleted)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, 0)",
+        "INSERT INTO projects (id, folder_id, name, hourly_rate, rate_profile_id, color, archived, position, updated_at, deleted)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, 0)",
         rusqlite::params![
             p.id,
             p.folder_id,
@@ -543,6 +558,7 @@ pub fn project_create(
             p.hourly_rate,
             p.rate_profile_id,
             p.color,
+            p.position,
             p.updated_at
         ],
     )
@@ -581,6 +597,45 @@ pub fn project_update(
     .map_err(err)?;
     crate::sync::mark_dirty();
     use tauri::Emitter;
+    let _ = app.emit("data_changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn folders_reorder(app: AppHandle, db: State<Db>, ids: Vec<String>) -> Result<(), String> {
+    let conn = db.0.lock().unwrap();
+    let now = now_secs();
+    for (index, id) in ids.iter().enumerate() {
+        conn.execute(
+            "UPDATE folders SET position = ?2, updated_at = ?3 WHERE id = ?1",
+            rusqlite::params![id, index as i64, now],
+        )
+        .map_err(err)?;
+    }
+    crate::sync::mark_dirty();
+    let _ = app.emit("data_changed", ());
+    Ok(())
+}
+
+/// Riordina (ed eventualmente sposta) i progetti dentro una cartella:
+/// `ids` è l'elenco completo e ordinato dei progetti che la cartella deve contenere.
+#[tauri::command]
+pub fn projects_reorder(
+    app: AppHandle,
+    db: State<Db>,
+    folder_id: String,
+    ids: Vec<String>,
+) -> Result<(), String> {
+    let conn = db.0.lock().unwrap();
+    let now = now_secs();
+    for (index, id) in ids.iter().enumerate() {
+        conn.execute(
+            "UPDATE projects SET folder_id = ?2, position = ?3, updated_at = ?4 WHERE id = ?1",
+            rusqlite::params![id, folder_id, index as i64, now],
+        )
+        .map_err(err)?;
+    }
+    crate::sync::mark_dirty();
     let _ = app.emit("data_changed", ());
     Ok(())
 }
@@ -932,9 +987,12 @@ pub fn project_export(
         return Err("unsupported_export_format".into());
     }
 
-    let data = {
+    let (data, export_dir) = {
         let conn = db.0.lock().unwrap();
-        project_export_data_inner(&conn, &project_id).map_err(err)?
+        (
+            project_export_data_inner(&conn, &project_id).map_err(err)?,
+            get_setting(&conn, "pdf_export_dir"),
+        )
     };
 
     let contents = if format == "json" {
@@ -943,11 +1001,7 @@ pub fn project_export(
         export_data_csv(&data)
     };
 
-    let dir = app
-        .path()
-        .download_dir()
-        .or_else(|_| app.path().app_data_dir())
-        .map_err(err)?;
+    let dir = resolve_export_dir(&app, export_dir)?;
     std::fs::create_dir_all(&dir).map_err(err)?;
 
     let project_name = data
@@ -1149,7 +1203,23 @@ pub fn report_export_pdf(
         Some((headers, rows))
     };
 
-    let dir = export_dir
+    let dir = resolve_export_dir(&app, export_dir)?;
+    std::fs::create_dir_all(&dir).map_err(err)?;
+    let path = dir.join(format!(
+        "moonytask-{}-report-{}.pdf",
+        safe_file_stem(&project_label),
+        now_secs()
+    ));
+    write_report_pdf(&path, &project_label, &meta, table).map_err(err)?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+/// Cartella dove salvare gli export: impostazione dell'app se presente, altrimenti Downloads.
+fn resolve_export_dir(
+    app: &AppHandle,
+    export_dir: Option<String>,
+) -> Result<std::path::PathBuf, String> {
+    export_dir
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -1162,15 +1232,7 @@ pub fn report_export_pdf(
                 .download_dir()
                 .or_else(|_| app.path().app_data_dir())
         })
-        .map_err(err)?;
-    std::fs::create_dir_all(&dir).map_err(err)?;
-    let path = dir.join(format!(
-        "moonytask-{}-report-{}.pdf",
-        safe_file_stem(&project_label),
-        now_secs()
-    ));
-    write_report_pdf(&path, &project_label, &meta, table).map_err(err)?;
-    Ok(path.to_string_lossy().to_string())
+        .map_err(err)
 }
 
 fn expand_user_path(value: &str) -> Result<std::path::PathBuf, std::io::Error> {
@@ -1468,8 +1530,8 @@ fn query_folders_all(conn: &Connection) -> rusqlite::Result<Vec<Folder>> {
 
 fn query_projects_all(conn: &Connection) -> rusqlite::Result<Vec<Project>> {
     let mut stmt = conn.prepare(
-        "SELECT id, folder_id, name, hourly_rate, rate_profile_id, color, archived, updated_at, deleted
-         FROM projects ORDER BY deleted, name",
+        "SELECT id, folder_id, name, hourly_rate, rate_profile_id, color, archived, position, updated_at, deleted
+         FROM projects ORDER BY deleted, position, name",
     )?;
     let rows = stmt
         .query_map([], |r| {
@@ -1481,8 +1543,9 @@ fn query_projects_all(conn: &Connection) -> rusqlite::Result<Vec<Project>> {
                 rate_profile_id: r.get(4)?,
                 color: r.get(5)?,
                 archived: r.get(6)?,
-                updated_at: r.get(7)?,
-                deleted: r.get(8)?,
+                position: r.get(7)?,
+                updated_at: r.get(8)?,
+                deleted: r.get(9)?,
             })
         })?
         .collect();
@@ -1639,7 +1702,7 @@ fn export_data_csv(data: &ExportData) -> String {
                 &p.hourly_rate.to_string(),
                 p.rate_profile_id.as_deref().unwrap_or(""),
                 &p.archived.to_string(),
-                "",
+                &p.position.to_string(),
                 "",
                 "",
                 "",

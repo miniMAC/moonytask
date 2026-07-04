@@ -50,7 +50,13 @@
     "addEntryNote": "Add note",
     "editEntryNote": "Edit note",
     "exportPdf": "PDF",
-    "exportPdfHelp": "Export the all-time PDF"
+    "exportPdfHelp": "Export the all-time PDF",
+    "exportJson": "JSON",
+    "exportJsonHelp": "Export project data as JSON",
+    "exportCsv": "CSV",
+    "exportCsvHelp": "Export project data as CSV",
+    "exported": "Exported",
+    "exportFailed": "Export failed"
   },
   "timer": {
     "start": "Start",
@@ -131,9 +137,9 @@
     "themeLight": "Light",
     "themeDark": "Dark",
     "themePro": "MoonyTask PRO",
-    "pdfExportDir": "PDF export folder",
+    "pdfExportDir": "Export folder",
     "pdfExportDirPlaceholder": "Empty = Downloads",
-    "pdfExportDirHelp": "Folder path where project PDFs are saved. You can also use ~/Documents/MoonyTask.",
+    "pdfExportDirHelp": "Folder path where project exports (PDF, JSON, CSV) are saved. You can also use ~/Documents/MoonyTask.",
     "chooseFolder": "Choose…",
     "rates": {
       "title": "Rate profiles",

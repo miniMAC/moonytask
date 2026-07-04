@@ -185,6 +185,14 @@ export default function App() {
         onDeleteFolder={deleteFolder}
         onNewProject={(folderId) => setProjectModal({ mode: "create", folderId })}
         onStart={(id) => api.timerStart(id)}
+        onReorderFolders={async (ids) => {
+          await api.foldersReorder(ids);
+          await reload();
+        }}
+        onReorderProjects={async (folderId, ids) => {
+          await api.projectsReorder(folderId, ids);
+          await reload();
+        }}
       />
 
       <div className="flex min-w-0 flex-1 flex-col bg-white dark:bg-neutral-900 pro:bg-[#282a36]">

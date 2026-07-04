@@ -16,7 +16,8 @@
         "width": 1100,
         "height": 720,
         "minWidth": 860,
-        "minHeight": 560
+        "minHeight": 560,
+        "dragDropEnabled": false
       },
       {
         "label": "popover",
@@ -24,6 +25,7 @@
         "url": "index.html",
         "width": 360,
         "height": 540,
+        "dragDropEnabled": false,
         "resizable": false,
         "decorations": false,
         "transparent": true,

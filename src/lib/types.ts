@@ -15,6 +15,7 @@ export interface Project {
   rateProfileId: string | null;
   color: string | null;
   archived: number;
+  position: number;
   updatedAt: number;
   deleted: number;
 }

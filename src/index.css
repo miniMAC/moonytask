@@ -49,8 +49,11 @@ body {
   background: color-mix(in srgb, var(--tt-pro-purple) 45%, transparent);
 }
 
-/* la finestra popover è trasparente: gli angoli stondati li disegna il contenuto */
-body.popover-window {
+/* la finestra popover è trasparente: gli angoli stondati li disegna il contenuto.
+   Serve anche su <html>, altrimenti in dark mode il canvas del documento
+   riempie gli angoli con lo sfondo di sistema. */
+html.popover-window,
+html.popover-window body {
   background: transparent !important;
 }
 

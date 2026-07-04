@@ -3,6 +3,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type DragEvent,
   type MouseEvent,
 } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
@@ -31,6 +32,21 @@ import {
 type Tab = "all" | "recent";
 type CreateKind = "project" | "folder";
 type ExportingFormat = api.ExportFormat | null;
+
+const PROJECT_MIME = "application/x-moonytask-project";
+const FOLDER_MIME = "application/x-moonytask-folder";
+
+// dove verrebbe rilasciato l'elemento trascinato
+type DropHint =
+  | { kind: "project-into-folder"; folderId: string }
+  | { kind: "before-project" | "after-project"; projectId: string }
+  | { kind: "before-folder" | "after-folder"; folderId: string }
+  | null;
+
+function halfOf(event: DragEvent): "before" | "after" {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  return event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+}
 type ProjectMenu = {
   project: Project;
   x: number;
@@ -201,6 +217,88 @@ export default function PopoverApp() {
     await emit("open_project", id);
     await api.openMain();
   };
+
+  // drag & drop: sposta un progetto tra cartelle e riordina progetti/cartelle
+  const [dropHint, setDropHint] = useState<DropHint>(null);
+
+  const visibleIn = (folderId: string) =>
+    projects
+      .filter((pr) => pr.folderId === folderId && !pr.archived)
+      .map((pr) => pr.id);
+
+  const onDragOverFolder = (event: DragEvent, folderId: string) => {
+    const types = event.dataTransfer.types;
+    if (types.includes(PROJECT_MIME)) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      setDropHint({ kind: "project-into-folder", folderId });
+    } else if (types.includes(FOLDER_MIME)) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      setDropHint({
+        kind: halfOf(event) === "before" ? "before-folder" : "after-folder",
+        folderId,
+      });
+    }
+  };
+
+  const onDropOnFolder = async (event: DragEvent, folderId: string) => {
+    event.preventDefault();
+    setDropHint(null);
+    const projectId = event.dataTransfer.getData(PROJECT_MIME);
+    if (projectId) {
+      const ids = visibleIn(folderId).filter((id) => id !== projectId);
+      ids.push(projectId);
+      await api.projectsReorder(folderId, ids);
+      await loadAll();
+      return;
+    }
+    const draggedFolder = event.dataTransfer.getData(FOLDER_MIME);
+    if (draggedFolder && draggedFolder !== folderId) {
+      const ids = folders.map((f) => f.id).filter((id) => id !== draggedFolder);
+      let idx = ids.indexOf(folderId);
+      if (halfOf(event) === "after") idx += 1;
+      ids.splice(idx, 0, draggedFolder);
+      await api.foldersReorder(ids);
+      await loadAll();
+    }
+  };
+
+  const onDragOverProject = (event: DragEvent, projectId: string) => {
+    if (!event.dataTransfer.types.includes(PROJECT_MIME)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+    setDropHint({
+      kind: halfOf(event) === "before" ? "before-project" : "after-project",
+      projectId,
+    });
+  };
+
+  const onDropOnProject = async (
+    event: DragEvent,
+    folderId: string,
+    targetId: string,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDropHint(null);
+    const draggedId = event.dataTransfer.getData(PROJECT_MIME);
+    if (!draggedId || draggedId === targetId) return;
+    const ids = visibleIn(folderId).filter((id) => id !== draggedId);
+    let idx = ids.indexOf(targetId);
+    if (halfOf(event) === "after") idx += 1;
+    ids.splice(idx, 0, draggedId);
+    await api.projectsReorder(folderId, ids);
+    await loadAll();
+  };
+
+  const projectHintClass = (projectId: string) =>
+    dropHint?.kind === "before-project" && dropHint.projectId === projectId
+      ? "shadow-[inset_0_2px_0_0_#60a5fa]"
+      : dropHint?.kind === "after-project" && dropHint.projectId === projectId
+        ? "shadow-[inset_0_-2px_0_0_#60a5fa]"
+        : "";
 
   const resetQuickCreate = () => {
     setCreateKind(null);
@@ -570,7 +668,26 @@ export default function PopoverApp() {
                       return n;
                     })
                   }
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 transition hover:bg-white hover:shadow-sm dark:hover:bg-white/[0.07] pro:hover:bg-[#343746]"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(FOLDER_MIME, folder.id);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragOver={(e) => onDragOverFolder(e, folder.id)}
+                  onDragLeave={() => setDropHint(null)}
+                  onDrop={(e) => onDropOnFolder(e, folder.id)}
+                  className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 transition hover:bg-white hover:shadow-sm dark:hover:bg-white/[0.07] pro:hover:bg-[#343746] ${
+                    dropHint?.kind === "project-into-folder" &&
+                    dropHint.folderId === folder.id
+                      ? "bg-white shadow-sm ring-1 ring-blue-400 dark:bg-white/[0.07] pro:bg-[#343746] pro:ring-[#bd93f9]"
+                      : dropHint?.kind === "before-folder" &&
+                          dropHint.folderId === folder.id
+                        ? "shadow-[inset_0_2px_0_0_#60a5fa]"
+                        : dropHint?.kind === "after-folder" &&
+                            dropHint.folderId === folder.id
+                          ? "shadow-[inset_0_-2px_0_0_#60a5fa]"
+                          : ""
+                  }`}
                 >
                   <span
                     className={`text-[9px] text-neutral-400 transition-transform ${
@@ -620,6 +737,13 @@ export default function PopoverApp() {
                         onContextMenu={(event) =>
                           openProjectMenu(project, event)
                         }
+                        onRowDragOver={(event) =>
+                          onDragOverProject(event, project.id)
+                        }
+                        onRowDrop={(event) =>
+                          onDropOnProject(event, folder.id, project.id)
+                        }
+                        hintClass={projectHintClass(project.id)}
                         indent
                       />
                     ))
@@ -735,6 +859,9 @@ function ProjectRow({
   onStart,
   onOpen,
   onContextMenu,
+  onRowDragOver,
+  onRowDrop,
+  hintClass,
   indent,
   subtitle,
 }: {
@@ -744,9 +871,16 @@ function ProjectRow({
   onStart: () => void;
   onOpen: () => void;
   onContextMenu: (event: MouseEvent) => void;
+  onRowDragOver?: (event: DragEvent) => void;
+  onRowDrop?: (event: DragEvent) => void;
+  hintClass?: string;
   indent?: boolean;
   subtitle?: string;
 }) {
+  const onDragStart = (event: DragEvent) => {
+    event.dataTransfer.setData(PROJECT_MIME, project.id);
+    event.dataTransfer.effectAllowed = "move";
+  };
   const isRunning =
     timer.projectId === project.id && timer.status === "running";
   const isPaused = timer.projectId === project.id && timer.status === "paused";
@@ -754,8 +888,12 @@ function ProjectRow({
 
   return (
     <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onRowDragOver}
+      onDrop={onRowDrop}
       onContextMenu={onContextMenu}
-      className={`group flex items-center gap-2.5 rounded-lg border px-2 py-1.5 transition ${
+      className={`group flex items-center gap-2.5 rounded-lg border px-2 py-1.5 transition ${hintClass ?? ""} ${
         isRunning || isPaused
           ? "border-black/5 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.08] pro:border-[#bd93f9]/50 pro:bg-[#343746]"
           : "border-transparent hover:bg-white hover:shadow-sm dark:hover:bg-white/[0.06] pro:hover:bg-[#343746]"
