@@ -65,6 +65,21 @@
       }
     },
     {
+      "label": "Build: Android APK (release)",
+      "type": "shell",
+      "command": "npm run android:apk && mkdir -p ~/Desktop/MoonyTask && cp src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk ~/Desktop/MoonyTask/MoonyTask-android.apk && echo 'APK copiato in ~/Desktop/MoonyTask/MoonyTask-android.apk'",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "detail": "Genera l'APK Android firmato (arm64) e lo copia in ~/Desktop/MoonyTask.",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
       "label": "Rust target: macOS Intel",
       "type": "shell",
       "command": "rustup",
