@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Folder, Project } from "../lib/types";
+import type { Folder, Project, RateProfile } from "../lib/types";
 import * as api from "../lib/api";
 import { PROJECT_COLORS } from "../lib/colors";
 import Modal from "./Modal";
@@ -27,8 +27,40 @@ export default function ProjectModal({
     editing?.folderId ?? (state.mode === "create" ? state.folderId : ""),
   );
   const [rate, setRate] = useState(String(editing?.hourlyRate ?? 0));
+  const [rateProfileId, setRateProfileId] = useState<string | null>(
+    editing?.rateProfileId ?? null,
+  );
+  const [rateProfiles, setRateProfiles] = useState<RateProfile[]>([]);
   const [color, setColor] = useState<string | null>(editing?.color ?? null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([api.rateProfilesGet(), api.defaultRateProfileGet()]).then(
+      ([profiles, defaultId]) => {
+        if (cancelled) return;
+        setRateProfiles(profiles);
+        if (editing) {
+          setRateProfileId(editing.rateProfileId);
+          return;
+        }
+        const defaultProfile = profiles.find((profile) => profile.id === defaultId);
+        if (defaultProfile) {
+          setRateProfileId(defaultProfile.id);
+          setRate(String(defaultProfile.hourlyRate));
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [editing?.id]);
+
+  const selectRateProfile = (id: string) => {
+    const profile = rateProfiles.find((item) => item.id === id);
+    setRateProfileId(profile?.id ?? null);
+    if (profile) setRate(String(profile.hourlyRate));
+  };
 
   const save = async () => {
     if (!name.trim() || busy) return;
@@ -41,11 +73,18 @@ export default function ProjectModal({
           name: name.trim(),
           folderId,
           hourlyRate,
+          rateProfileId,
           color,
         });
         onSaved(editing.id);
       } else {
-        const p = await api.projectCreate(folderId, name.trim(), hourlyRate, color);
+        const p = await api.projectCreate(
+          folderId,
+          name.trim(),
+          hourlyRate,
+          color,
+          rateProfileId,
+        );
         onSaved(p.id);
       }
     } finally {
@@ -72,8 +111,8 @@ export default function ProjectModal({
           />
         </label>
 
-        <div className="flex gap-3">
-          <label className="block flex-1">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_8rem]">
+          <label className="block min-w-0">
             <span className="mb-1 block text-xs font-medium text-neutral-600">
               {t("projects.folder")}
             </span>
@@ -89,7 +128,24 @@ export default function ProjectModal({
               ))}
             </select>
           </label>
-          <label className="block w-32">
+          <label className="block min-w-0">
+            <span className="mb-1 block text-xs font-medium text-neutral-600">
+              {t("projects.rateProfile")}
+            </span>
+            <select
+              value={rateProfileId ?? ""}
+              onChange={(e) => selectRateProfile(e.target.value)}
+              className="w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+            >
+              <option value="">{t("projects.manualRate")}</option>
+              {rateProfiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
             <span className="mb-1 block text-xs font-medium text-neutral-600">
               {t("projects.hourlyRate")}
             </span>

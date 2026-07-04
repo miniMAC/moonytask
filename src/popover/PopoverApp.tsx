@@ -8,7 +8,13 @@ import {
 import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useTranslation } from "react-i18next";
-import type { Folder, Project, TimerSnapshot } from "../lib/types";
+import type {
+  Folder,
+  Project,
+  RateProfile,
+  TimerSnapshot,
+  WatchSuggestion,
+} from "../lib/types";
 import * as api from "../lib/api";
 import type { ProjectTotal } from "../lib/api";
 import { PROJECT_COLORS, projectColor } from "../lib/colors";
@@ -56,6 +62,9 @@ export default function PopoverApp() {
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [projectMenu, setProjectMenu] = useState<ProjectMenu>(null);
+  const [reminder, setReminder] = useState<WatchSuggestion | null>(null);
+  const [defaultRateProfile, setDefaultRateProfile] =
+    useState<RateProfile | null>(null);
 
   const loadAll = useCallback(async () => {
     const [f, p, tot, snap] = await Promise.all([
@@ -70,8 +79,19 @@ export default function PopoverApp() {
     setTimer(snap);
   }, []);
 
+  const loadRateProfileDefault = useCallback(async () => {
+    const [profiles, defaultId] = await Promise.all([
+      api.rateProfilesGet(),
+      api.defaultRateProfileGet(),
+    ]);
+    setDefaultRateProfile(
+      profiles.find((profile) => profile.id === defaultId) ?? null,
+    );
+  }, []);
+
   useEffect(() => {
     loadAll();
+    loadRateProfileDefault();
     api.settingsGet("language").then((l) => {
       if (l && l !== i18n.language) i18n.changeLanguage(l);
     });
@@ -84,6 +104,16 @@ export default function PopoverApp() {
     const unData = listen("data_changed", loadAll);
     const unSetting = listen<[string, string]>("setting_changed", (e) => {
       if (e.payload[0] === "language") i18n.changeLanguage(e.payload[1]);
+      if (
+        e.payload[0] === "rate_profiles" ||
+        e.payload[0] === "default_rate_profile_id"
+      ) {
+        loadRateProfileDefault();
+      }
+    });
+    const unReminder = listen<WatchSuggestion>("watcher_reminder", (e) => {
+      setReminder(e.payload);
+      window.setTimeout(() => setReminder(null), 10_000);
     });
     // ricarica quando il popover viene mostrato (riprende il focus)
     const unFocus = getCurrentWebviewWindow().onFocusChanged(
@@ -95,9 +125,10 @@ export default function PopoverApp() {
       unTimer.then((f) => f());
       unData.then((f) => f());
       unSetting.then((f) => f());
+      unReminder.then((f) => f());
       unFocus.then((f) => f());
     };
-  }, []);
+  }, [loadAll, loadRateProfileDefault, i18n]);
 
   const active = projects.filter((p) => !p.archived);
   useEffect(() => {
@@ -164,7 +195,7 @@ export default function PopoverApp() {
   const resetQuickCreate = () => {
     setCreateKind(null);
     setNewName("");
-    setNewRate("0");
+    setNewRate(String(defaultRateProfile?.hourlyRate ?? 0));
     setNewColor(null);
     setSaving(false);
   };
@@ -179,7 +210,17 @@ export default function PopoverApp() {
         setNewFolderId(folder.id);
       } else if (createKind === "project" && newFolderId) {
         const hourlyRate = parseFloat(newRate.replace(",", ".")) || 0;
-        await api.projectCreate(newFolderId, newName.trim(), hourlyRate, newColor);
+        const rateProfileId =
+          defaultRateProfile && hourlyRate === defaultRateProfile.hourlyRate
+            ? defaultRateProfile.id
+            : null;
+        await api.projectCreate(
+          newFolderId,
+          newName.trim(),
+          hourlyRate,
+          newColor,
+          rateProfileId,
+        );
         setOpen((current) => new Set(current).add(newFolderId));
       }
       await loadAll();
@@ -195,6 +236,9 @@ export default function PopoverApp() {
     setProjectMenu(null);
     setNewName("");
     setNewColor(null);
+    setNewRate(
+      String(kind === "project" ? (defaultRateProfile?.hourlyRate ?? 0) : 0),
+    );
   };
 
   const openProjectMenu = (project: Project, event: MouseEvent) => {
@@ -309,6 +353,30 @@ export default function PopoverApp() {
           )}
         </div>
       </div>
+
+      {reminder && (
+        <div className="mx-3 mt-3 rounded-lg bg-emerald-500 px-3 py-2 text-[12px] font-semibold text-white shadow-sm pro:bg-[#50fa7b] pro:text-[#282a36]">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="truncate">{t("popover.reminderTitle")}</p>
+              <p className="truncate text-[11px] font-medium opacity-85">
+                {t("popover.reminderBody", { app: reminder.appName })}
+              </p>
+            </div>
+            {reminder.projectId && (
+              <button
+                onClick={async () => {
+                  await startProject(reminder.projectId!);
+                  setReminder(null);
+                }}
+                className="shrink-0 rounded-md bg-white/18 px-2 py-1 text-[11px] hover:bg-white/28 pro:bg-[#282a36]/15 pro:hover:bg-[#282a36]/25"
+              >
+                {t("timer.start")}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* tools */}
       <div className="space-y-2 px-3 pt-3">

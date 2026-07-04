@@ -5,7 +5,6 @@ import type {
   Folder,
   Project,
   TimerSnapshot,
-  WatchSuggestion,
 } from "./lib/types";
 import * as api from "./lib/api";
 import Sidebar, { type View } from "./components/Sidebar";
@@ -15,7 +14,6 @@ import ProjectModal, {
 } from "./components/ProjectModal";
 import FolderModal, { type FolderModalState } from "./components/FolderModal";
 import ConfirmModal from "./components/ConfirmModal";
-import SuggestModal from "./components/SuggestModal";
 import ProjectView from "./views/ProjectView";
 import ReportsView from "./views/ReportsView";
 import SettingsView from "./views/SettingsView";
@@ -34,7 +32,6 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [currency, setCurrency] = useState("EUR");
   const [refreshKey, setRefreshKey] = useState(0);
-  const [suggestion, setSuggestion] = useState<WatchSuggestion | null>(null);
   const [projectModal, setProjectModal] = useState<ProjectModalState | null>(null);
   const [folderModal, setFolderModal] = useState<FolderModalState | null>(null);
   const [confirm, setConfirm] = useState<{
@@ -64,9 +61,6 @@ export default function App() {
         return e.payload;
       });
     });
-    const unSuggest = listen<WatchSuggestion>("watcher_suggest", (e) =>
-      setSuggestion(e.payload),
-    );
     const unData = listen("data_changed", () => {
       reload();
       setRefreshKey((k) => k + 1);
@@ -78,7 +72,6 @@ export default function App() {
     });
     return () => {
       unTimer.then((f) => f());
-      unSuggest.then((f) => f());
       unData.then((f) => f());
       unOpen.then((f) => f());
     };
@@ -95,8 +88,7 @@ export default function App() {
         target.tagName === "SELECT" ||
         projectModal ||
         folderModal ||
-        confirm ||
-        suggestion
+        confirm
       ) {
         return;
       }
@@ -107,7 +99,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [timer.status, selectedId, projectModal, folderModal, confirm, suggestion]);
+  }, [timer.status, selectedId, projectModal, folderModal, confirm]);
 
   const selectedProject = projects.find((p) => p.id === selectedId) ?? null;
 
@@ -234,13 +226,6 @@ export default function App() {
             await confirm.action();
             setConfirm(null);
           }}
-        />
-      )}
-      {suggestion && (
-        <SuggestModal
-          suggestion={suggestion}
-          projects={projects}
-          onClose={() => setSuggestion(null)}
         />
       )}
     </div>

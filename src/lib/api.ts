@@ -3,6 +3,7 @@ import type {
   Folder,
   InstalledApp,
   Project,
+  RateProfile,
   SyncStatus,
   TimeEntry,
   TimerSnapshot,
@@ -25,13 +26,22 @@ export const projectCreate = (
   name: string,
   hourlyRate: number,
   color: string | null,
-) => invoke<Project>("project_create", { folderId, name, hourlyRate, color });
+  rateProfileId: string | null = null,
+) =>
+  invoke<Project>("project_create", {
+    folderId,
+    name,
+    hourlyRate,
+    rateProfileId,
+    color,
+  });
 export const projectUpdate = (p: Project) =>
   invoke<void>("project_update", {
     id: p.id,
     folderId: p.folderId,
     name: p.name,
     hourlyRate: p.hourlyRate,
+    rateProfileId: p.rateProfileId,
     color: p.color,
     archived: p.archived,
   });
@@ -83,12 +93,20 @@ export const watchedAdd = (
   bundleId: string,
   appName: string,
   projectId: string | null,
-) => invoke<WatchedApp>("watched_add", { bundleId, appName, projectId });
+  remindAfterSecs = 60,
+) =>
+  invoke<WatchedApp>("watched_add", {
+    bundleId,
+    appName,
+    projectId,
+    remindAfterSecs,
+  });
 export const watchedUpdate = (
   id: string,
   enabled: number,
   projectId: string | null,
-) => invoke<void>("watched_update", { id, enabled, projectId });
+  remindAfterSecs: number,
+) => invoke<void>("watched_update", { id, enabled, projectId, remindAfterSecs });
 export const watchedRemove = (id: string) =>
   invoke<void>("watched_remove", { id });
 
@@ -97,6 +115,23 @@ export const settingsGet = (key: string) =>
   invoke<string | null>("settings_get", { key });
 export const settingsSet = (key: string, value: string) =>
   invoke<void>("settings_set", { key, value });
+
+// rate profiles
+export const rateProfilesGet = async () => {
+  const raw = await settingsGet("rate_profiles");
+  if (!raw) return [] as RateProfile[];
+  try {
+    const parsed = JSON.parse(raw) as RateProfile[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+export const rateProfilesSet = (profiles: RateProfile[]) =>
+  settingsSet("rate_profiles", JSON.stringify(profiles));
+export const defaultRateProfileGet = () => settingsGet("default_rate_profile_id");
+export const defaultRateProfileSet = (id: string) =>
+  settingsSet("default_rate_profile_id", id);
 
 // sync
 export const syncStatus = () => invoke<SyncStatus>("sync_status");

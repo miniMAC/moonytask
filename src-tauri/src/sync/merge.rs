@@ -35,7 +35,7 @@ pub fn load_local(conn: &Connection) -> Result<Snapshot, String> {
         .map_err(err)?;
 
     let mut stmt = conn
-        .prepare("SELECT id, folder_id, name, hourly_rate, color, archived, updated_at, deleted FROM projects")
+        .prepare("SELECT id, folder_id, name, hourly_rate, rate_profile_id, color, archived, updated_at, deleted FROM projects")
         .map_err(err)?;
     snap.projects = stmt
         .query_map([], |r| {
@@ -44,10 +44,11 @@ pub fn load_local(conn: &Connection) -> Result<Snapshot, String> {
                 folder_id: r.get(1)?,
                 name: r.get(2)?,
                 hourly_rate: r.get(3)?,
-                color: r.get(4)?,
-                archived: r.get(5)?,
-                updated_at: r.get(6)?,
-                deleted: r.get(7)?,
+                rate_profile_id: r.get(4)?,
+                color: r.get(5)?,
+                archived: r.get(6)?,
+                updated_at: r.get(7)?,
+                deleted: r.get(8)?,
             })
         })
         .map_err(err)?
@@ -75,7 +76,7 @@ pub fn load_local(conn: &Connection) -> Result<Snapshot, String> {
         .map_err(err)?;
 
     let mut stmt = conn
-        .prepare("SELECT id, bundle_id, app_name, project_id, enabled, updated_at, deleted FROM watched_apps")
+        .prepare("SELECT id, bundle_id, app_name, project_id, remind_after_secs, enabled, updated_at, deleted FROM watched_apps")
         .map_err(err)?;
     snap.watched_apps = stmt
         .query_map([], |r| {
@@ -84,9 +85,10 @@ pub fn load_local(conn: &Connection) -> Result<Snapshot, String> {
                 bundle_id: r.get(1)?,
                 app_name: r.get(2)?,
                 project_id: r.get(3)?,
-                enabled: r.get(4)?,
-                updated_at: r.get(5)?,
-                deleted: r.get(6)?,
+                remind_after_secs: r.get(4)?,
+                enabled: r.get(5)?,
+                updated_at: r.get(6)?,
+                deleted: r.get(7)?,
             })
         })
         .map_err(err)?
@@ -144,9 +146,9 @@ pub fn apply(conn: &mut Connection, snap: &Snapshot) -> Result<(), String> {
     }
     for p in &snap.projects {
         tx.execute(
-            "INSERT OR REPLACE INTO projects (id, folder_id, name, hourly_rate, color, archived, updated_at, deleted)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            rusqlite::params![p.id, p.folder_id, p.name, p.hourly_rate, p.color, p.archived, p.updated_at, p.deleted],
+            "INSERT OR REPLACE INTO projects (id, folder_id, name, hourly_rate, rate_profile_id, color, archived, updated_at, deleted)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            rusqlite::params![p.id, p.folder_id, p.name, p.hourly_rate, p.rate_profile_id, p.color, p.archived, p.updated_at, p.deleted],
         )
         .map_err(err)?;
     }
@@ -160,9 +162,9 @@ pub fn apply(conn: &mut Connection, snap: &Snapshot) -> Result<(), String> {
     }
     for w in &snap.watched_apps {
         tx.execute(
-            "INSERT OR REPLACE INTO watched_apps (id, bundle_id, app_name, project_id, enabled, updated_at, deleted)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            rusqlite::params![w.id, w.bundle_id, w.app_name, w.project_id, w.enabled, w.updated_at, w.deleted],
+            "INSERT OR REPLACE INTO watched_apps (id, bundle_id, app_name, project_id, remind_after_secs, enabled, updated_at, deleted)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            rusqlite::params![w.id, w.bundle_id, w.app_name, w.project_id, w.remind_after_secs, w.enabled, w.updated_at, w.deleted],
         )
         .map_err(err)?;
     }

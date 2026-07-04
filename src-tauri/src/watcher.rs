@@ -3,10 +3,8 @@ use crate::timer::{Timer, TimerStatus};
 use serde::Serialize;
 use std::collections::HashMap;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_notification::NotificationExt;
 
 const POLL_SECS: u64 = 5;
-const TRIGGER_SECS: i64 = 60;
 const DEFAULT_COOLDOWN_SECS: i64 = 15 * 60;
 
 #[derive(Clone, Serialize)]
@@ -18,7 +16,7 @@ pub struct WatchSuggestion {
 }
 
 /// Thread che osserva l'app in primo piano: se è nella watch list, il timer è
-/// fermo e l'uso continuativo supera 60s, notifica l'utente.
+/// fermo e l'uso continuativo supera la soglia configurata, mostra il popover.
 pub fn spawn(app: AppHandle) {
     std::thread::spawn(move || {
         let mut current_bundle: Option<String> = None;
@@ -60,7 +58,7 @@ pub fn spawn(app: AppHandle) {
                 continuous_secs = 0;
             }
 
-            if !timer_idle || continuous_secs < TRIGGER_SECS {
+            if !timer_idle {
                 continue;
             }
 
@@ -75,6 +73,10 @@ pub fn spawn(app: AppHandle) {
             else {
                 continue;
             };
+
+            if continuous_secs < w.remind_after_secs {
+                continue;
+            }
 
             let now = db::now_secs();
             let cooldown = {
@@ -93,9 +95,9 @@ pub fn spawn(app: AppHandle) {
             }
             last_notified.insert(bundle.clone(), now);
 
-            notify(&app, &w.app_name);
+            crate::tray::show_popover(&app);
             let _ = app.emit(
-                "watcher_suggest",
+                "watcher_reminder",
                 WatchSuggestion {
                     bundle_id: w.bundle_id.clone(),
                     app_name: w.app_name.clone(),
@@ -104,29 +106,4 @@ pub fn spawn(app: AppHandle) {
             );
         }
     });
-}
-
-fn notify(app: &AppHandle, app_name: &str) {
-    let lang = {
-        let db = app.state::<Db>();
-        let conn = db.0.lock().unwrap();
-        db::get_setting(&conn, "language").unwrap_or_else(|| "it".into())
-    };
-    let (title, body) = if lang == "en" {
-        (
-            "TinyTime".to_string(),
-            format!("You've been using {app_name} for a minute. Open TinyTime to start a timer."),
-        )
-    } else {
-        (
-            "TinyTime".to_string(),
-            format!("Stai usando {app_name} da un minuto. Apri TinyTime per avviare un timer."),
-        )
-    };
-    let _ = app
-        .notification()
-        .builder()
-        .title(title)
-        .body(body)
-        .show();
 }

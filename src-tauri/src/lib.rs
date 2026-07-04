@@ -22,6 +22,7 @@ pub fn run() {
             app.manage(timer::Timer(Mutex::new(timer::TimerState::new())));
 
             tray::setup(&handle)?;
+            tray::fit_main_window(&handle);
             timer::spawn_tick_thread(handle.clone());
             watcher::spawn(handle.clone());
             sync::spawn_auto_sync(handle.clone());

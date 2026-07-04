@@ -12,10 +12,20 @@ export interface Project {
   folderId: string;
   name: string;
   hourlyRate: number;
+  rateProfileId: string | null;
   color: string | null;
   archived: number;
   updatedAt: number;
   deleted: number;
+}
+
+export type PaymentType = "hourly" | "retainer" | "fixed";
+
+export interface RateProfile {
+  id: string;
+  name: string;
+  paymentType: PaymentType;
+  hourlyRate: number;
 }
 
 export interface TimeEntry {
@@ -34,6 +44,7 @@ export interface WatchedApp {
   bundleId: string;
   appName: string;
   projectId: string | null;
+  remindAfterSecs: number;
   enabled: number;
   updatedAt: number;
   deleted: number;

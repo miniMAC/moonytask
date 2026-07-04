@@ -17,6 +17,8 @@
     "new": "Nuovo progetto",
     "name": "Nome progetto",
     "hourlyRate": "Costo orario",
+    "rateProfile": "Profilo tariffario",
+    "manualRate": "Manuale",
     "folder": "Cartella",
     "edit": "Modifica progetto",
     "delete": "Elimina progetto",
@@ -78,10 +80,19 @@
     "folderName": "Nome cartella",
     "selectFolder": "Scegli cartella",
     "rate": "€/h",
-    "noResults": "Nessun progetto trovato."
+    "noResults": "Nessun progetto trovato.",
+    "reminderTitle": "Timer non attivo",
+    "reminderBody": "Stai usando {{app}}: vuoi avviare il timer?"
   },
   "settings": {
     "title": "Impostazioni",
+    "tabs": {
+      "general": "Generali",
+      "rates": "Tariffe",
+      "apps": "App",
+      "sync": "Sync"
+    },
+    "general": "Preferenze",
     "language": "Lingua",
     "currency": "Valuta",
     "theme": "Tema",
@@ -89,9 +100,28 @@
     "themeLight": "Chiaro",
     "themeDark": "Scuro",
     "themePro": "TinyTime PRO",
+    "rates": {
+      "title": "Profili tariffari",
+      "help": "Crea profili riutilizzabili con nome, tipo di pagamento e costo orario. Il profilo predefinito viene applicato ai nuovi progetti e puoi cambiarlo nella scheda progetto.",
+      "empty": "Nessun profilo tariffario ancora.",
+      "add": "Aggiungi profilo",
+      "newName": "Standard",
+      "name": "Nome",
+      "paymentType": "Pagamento",
+      "hourlyRate": "Costo orario",
+      "default": "Default",
+      "setDefault": "Imposta default",
+      "payment": {
+        "hourly": "Orario",
+        "retainer": "Retainer",
+        "fixed": "Forfait"
+      }
+    },
     "watchedApps": "App monitorate",
-    "watchedAppsHelp": "Se usi una di queste app per 1 minuto senza un timer attivo, TinyTime ti manda una notifica per ricordarti di avviarlo.",
-    "watchNotifications": "Notifiche di promemoria",
+    "watchedAppsHelp": "Se usi una di queste app senza un timer attivo, TinyTime apre il popover nella menu bar e mostra un promemoria per 10 secondi.",
+    "watchNotifications": "Promemoria nella menu bar",
+    "reminderAfter": "Avvisa dopo",
+    "minutesShort": "min",
     "addApp": "Aggiungi app",
     "searchApps": "Cerca tra le app installate…",
     "linkedProject": "Progetto suggerito",

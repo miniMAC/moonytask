@@ -17,6 +17,8 @@
     "new": "New project",
     "name": "Project name",
     "hourlyRate": "Hourly rate",
+    "rateProfile": "Rate profile",
+    "manualRate": "Manual",
     "folder": "Folder",
     "edit": "Edit project",
     "delete": "Delete project",
@@ -78,10 +80,19 @@
     "folderName": "Folder name",
     "selectFolder": "Choose folder",
     "rate": "$/h",
-    "noResults": "No projects found."
+    "noResults": "No projects found.",
+    "reminderTitle": "Timer is not running",
+    "reminderBody": "You are using {{app}}: start the timer?"
   },
   "settings": {
     "title": "Settings",
+    "tabs": {
+      "general": "General",
+      "rates": "Rates",
+      "apps": "Apps",
+      "sync": "Sync"
+    },
+    "general": "Preferences",
     "language": "Language",
     "currency": "Currency",
     "theme": "Theme",
@@ -89,9 +100,28 @@
     "themeLight": "Light",
     "themeDark": "Dark",
     "themePro": "TinyTime PRO",
+    "rates": {
+      "title": "Rate profiles",
+      "help": "Create reusable profiles with a name, payment type, and hourly rate. The default profile is applied to new projects and can be changed in the project sheet.",
+      "empty": "No rate profiles yet.",
+      "add": "Add profile",
+      "newName": "Standard",
+      "name": "Name",
+      "paymentType": "Payment",
+      "hourlyRate": "Hourly rate",
+      "default": "Default",
+      "setDefault": "Set default",
+      "payment": {
+        "hourly": "Hourly",
+        "retainer": "Retainer",
+        "fixed": "Fixed"
+      }
+    },
     "watchedApps": "Watched apps",
-    "watchedAppsHelp": "If you use one of these apps for 1 minute without an active timer, TinyTime sends you a notification reminding you to start one.",
-    "watchNotifications": "Reminder notifications",
+    "watchedAppsHelp": "If you use one of these apps without an active timer, TinyTime opens the menu bar popover and shows a reminder for 10 seconds.",
+    "watchNotifications": "Menu bar reminders",
+    "reminderAfter": "Remind after",
+    "minutesShort": "min",
     "addApp": "Add app",
     "searchApps": "Search installed apps…",
     "linkedProject": "Suggested project",

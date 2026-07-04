@@ -1,8 +1,8 @@
 use crate::timer::{TimerSnapshot, TimerStatus};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager};
-use tauri_plugin_positioner::{Position, WindowExt};
+use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Size, WebviewWindow};
+use tauri_plugin_positioner::{Position as TrayPosition, WindowExt};
 
 const TRAY_ID: &str = "main-tray";
 
@@ -116,10 +116,41 @@ pub struct TrayMenuItems {
 
 pub fn show_main_window(app: &AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
+        fit_main_window_to_monitor(&win);
         let _ = win.show();
         let _ = win.unminimize();
         let _ = win.set_focus();
     }
+}
+
+pub fn fit_main_window(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        fit_main_window_to_monitor(&win);
+    }
+}
+
+fn fit_main_window_to_monitor(win: &WebviewWindow) {
+    let monitor = win
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| win.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else { return };
+
+    let size = monitor.size();
+    let position = monitor.position();
+    let max_width = size.width.saturating_sub(80).max(860);
+    let max_height = size.height.saturating_sub(80).max(560);
+    let width = ((size.width as f64) * 0.6).round() as u32;
+    let height = ((size.height as f64) * 0.6).round() as u32;
+    let width = width.max(1100).min(max_width);
+    let height = height.max(720).min(max_height);
+
+    let x = position.x + ((size.width.saturating_sub(width) / 2) as i32);
+    let y = position.y + ((size.height.saturating_sub(height) / 2) as i32);
+
+    let _ = win.set_size(Size::Physical(PhysicalSize { width, height }));
+    let _ = win.set_position(Position::Physical(PhysicalPosition { x, y }));
 }
 
 /// Mostra/nasconde il popover ancorato all'icona nella menu bar.
@@ -128,10 +159,17 @@ pub fn toggle_popover(app: &AppHandle) {
     if win.is_visible().unwrap_or(false) {
         let _ = win.hide();
     } else {
-        let _ = win.as_ref().window().move_window(Position::TrayBottomCenter);
+        let _ = win.as_ref().window().move_window(TrayPosition::TrayBottomCenter);
         let _ = win.show();
         let _ = win.set_focus();
     }
+}
+
+pub fn show_popover(app: &AppHandle) {
+    let Some(win) = app.get_webview_window("popover") else { return };
+    let _ = win.as_ref().window().move_window(TrayPosition::TrayBottomCenter);
+    let _ = win.show();
+    let _ = win.set_focus();
 }
 
 #[tauri::command]

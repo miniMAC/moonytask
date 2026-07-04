@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import type {
   InstalledApp,
+  PaymentType,
   Project,
+  RateProfile,
   SyncStatus,
   WatchedApp,
 } from "../lib/types";
@@ -13,9 +15,13 @@ import Modal from "../components/Modal";
 import { PlusIcon, TrashIcon } from "../components/Icons";
 
 const CURRENCIES = ["EUR", "USD", "GBP", "CHF"];
+const SETTINGS_TABS = ["general", "rates", "apps", "sync"] as const;
+const PAYMENT_TYPES: PaymentType[] = ["hourly", "retainer", "fixed"];
 
 const inputCls =
   "rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2]";
+
+type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 interface Props {
   projects: Project[];
@@ -24,15 +30,61 @@ interface Props {
 }
 
 export default function SettingsView(p: Props) {
+  const { t } = useTranslation();
+  const [tab, setTab] = useState<SettingsTab>("general");
+
+  return (
+    <div className="mx-auto max-w-4xl px-8 py-8">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">{t("settings.title")}</h1>
+        <nav className="flex rounded-lg border border-neutral-200 bg-neutral-100 p-1 text-sm dark:border-neutral-700 dark:bg-neutral-900 pro:border-[#44475a] pro:bg-[#21222c]">
+          {SETTINGS_TABS.map((item) => (
+            <button
+              key={item}
+              onClick={() => setTab(item)}
+              className={`rounded-md px-3 py-1.5 font-medium transition ${
+                tab === item
+                  ? "bg-white text-neutral-950 shadow-sm dark:bg-neutral-800 dark:text-white pro:bg-[#44475a] pro:text-[#f8f8f2]"
+                  : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white pro:text-[#b9b9c8] pro:hover:text-[#f8f8f2]"
+              }`}
+            >
+              {t(`settings.tabs.${item}`)}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      <div className="space-y-8">
+        {tab === "general" && (
+          <GeneralSection
+            currency={p.currency}
+            onCurrencyChange={p.onCurrencyChange}
+          />
+        )}
+        {tab === "rates" && <RateProfilesSection />}
+        {tab === "apps" && <WatchedAppsSection projects={p.projects} />}
+        {tab === "sync" && <SyncSection />}
+      </div>
+    </div>
+  );
+}
+
+function GeneralSection({
+  currency,
+  onCurrencyChange,
+}: {
+  currency: string;
+  onCurrencyChange: (c: string) => void;
+}) {
   const { t, i18n } = useTranslation();
   const { pref, setPref } = useTheme();
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8 px-8 py-8">
-      <h1 className="text-xl font-semibold">{t("settings.title")}</h1>
-
-      {/* general */}
-      <section className="flex flex-wrap gap-6">
+    <section>
+      <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+        {t("settings.general")}
+      </h2>
+      <div className="mt-3 flex flex-wrap gap-6">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
             {t("settings.language")}
@@ -69,9 +121,9 @@ export default function SettingsView(p: Props) {
             {t("settings.currency")}
           </span>
           <select
-            value={p.currency}
+            value={currency}
             onChange={(e) => {
-              p.onCurrencyChange(e.target.value);
+              onCurrencyChange(e.target.value);
               api.settingsSet("currency", e.target.value);
             }}
             className={inputCls}
@@ -83,12 +135,172 @@ export default function SettingsView(p: Props) {
             ))}
           </select>
         </label>
-      </section>
-
-      <WatchedAppsSection projects={p.projects} />
-      <SyncSection />
-    </div>
+      </div>
+    </section>
   );
+}
+
+// ---------- rate profiles ----------
+
+function RateProfilesSection() {
+  const { t } = useTranslation();
+  const [profiles, setProfiles] = useState<RateProfile[]>([]);
+  const [defaultId, setDefaultId] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([api.rateProfilesGet(), api.defaultRateProfileGet()]).then(
+      ([loadedProfiles, loadedDefault]) => {
+        setProfiles(loadedProfiles);
+        setDefaultId(
+          loadedProfiles.some((profile) => profile.id === loadedDefault)
+            ? loadedDefault
+            : null,
+        );
+      },
+    );
+  }, []);
+
+  const saveProfiles = (nextProfiles: RateProfile[], nextDefault = defaultId) => {
+    const validDefault = nextDefault
+      ? nextProfiles.some((profile) => profile.id === nextDefault)
+        ? nextDefault
+        : null
+      : null;
+    setProfiles(nextProfiles);
+    setDefaultId(validDefault);
+    api.rateProfilesSet(nextProfiles);
+    api.defaultRateProfileSet(validDefault ?? "");
+  };
+
+  const updateProfile = (id: string, patch: Partial<RateProfile>) => {
+    saveProfiles(
+      profiles.map((profile) =>
+        profile.id === id ? { ...profile, ...patch } : profile,
+      ),
+    );
+  };
+
+  const addProfile = () => {
+    const profile: RateProfile = {
+      id: newLocalId(),
+      name: t("settings.rates.newName"),
+      paymentType: "hourly",
+      hourlyRate: 0,
+    };
+    saveProfiles([...profiles, profile], defaultId ?? profile.id);
+  };
+
+  const removeProfile = (id: string) => {
+    const nextProfiles = profiles.filter((profile) => profile.id !== id);
+    const nextDefault =
+      defaultId === id ? (nextProfiles[0]?.id ?? null) : defaultId;
+    saveProfiles(nextProfiles, nextDefault);
+  };
+
+  return (
+    <section>
+      <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+        {t("settings.rates.title")}
+      </h2>
+      <p className="mt-1 max-w-2xl text-xs text-neutral-500">
+        {t("settings.rates.help")}
+      </p>
+
+      <div className="mt-4 space-y-2">
+        {profiles.length === 0 && (
+          <p className="text-xs text-neutral-400">
+            {t("settings.rates.empty")}
+          </p>
+        )}
+        {profiles.map((profile) => (
+          <div
+            key={profile.id}
+            className="grid gap-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-700 md:grid-cols-[minmax(0,1.2fr)_170px_130px_auto_auto]"
+          >
+            <label className="block min-w-0">
+              <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                {t("settings.rates.name")}
+              </span>
+              <input
+                value={profile.name}
+                onChange={(e) =>
+                  updateProfile(profile.id, { name: e.target.value })
+                }
+                className={`w-full ${inputCls}`}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                {t("settings.rates.paymentType")}
+              </span>
+              <select
+                value={profile.paymentType}
+                onChange={(e) =>
+                  updateProfile(profile.id, {
+                    paymentType: e.target.value as PaymentType,
+                  })
+                }
+                className={`w-full ${inputCls}`}
+              >
+                {PAYMENT_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {t(`settings.rates.payment.${type}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                {t("settings.rates.hourlyRate")}
+              </span>
+              <input
+                inputMode="decimal"
+                value={String(profile.hourlyRate)}
+                onChange={(e) =>
+                  updateProfile(profile.id, {
+                    hourlyRate:
+                      parseFloat(e.target.value.replace(",", ".")) || 0,
+                  })
+                }
+                className={`w-full ${inputCls}`}
+              />
+            </label>
+            <button
+              onClick={() => saveProfiles(profiles, profile.id)}
+              className={`self-end rounded-md border px-3 py-1.5 text-sm font-medium ${
+                defaultId === profile.id
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 pro:border-[#50fa7b] pro:bg-[#50fa7b]/15 pro:text-[#50fa7b]"
+                  : "border-neutral-300 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:text-[#b9b9c8] pro:hover:bg-[#343746]"
+              }`}
+            >
+              {defaultId === profile.id
+                ? t("settings.rates.default")
+                : t("settings.rates.setDefault")}
+            </button>
+            <button
+              onClick={() => removeProfile(profile.id)}
+              className="self-end rounded-md p-2 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+              title={t("common.delete")}
+            >
+              <TrashIcon size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={addProfile}
+        className="mt-3 flex items-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+      >
+        <PlusIcon size={14} />
+        {t("settings.rates.add")}
+      </button>
+    </section>
+  );
+}
+
+function newLocalId() {
+  return window.crypto?.randomUUID?.() ?? `rate-${Date.now()}`;
 }
 
 // ---------- watched apps ----------
@@ -136,14 +348,19 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
         {watched.map((w) => (
           <div
             key={w.id}
-            className="flex items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-700"
+            className="grid items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-700 md:grid-cols-[auto_minmax(0,1fr)_minmax(170px,220px)_150px_auto]"
           >
             <input
               type="checkbox"
               checked={w.enabled === 1}
               onChange={(e) =>
                 api
-                  .watchedUpdate(w.id, e.target.checked ? 1 : 0, w.projectId)
+                  .watchedUpdate(
+                    w.id,
+                    e.target.checked ? 1 : 0,
+                    w.projectId,
+                    w.remindAfterSecs,
+                  )
                   .then(load)
               }
             />
@@ -155,10 +372,15 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
               value={w.projectId ?? ""}
               onChange={(e) =>
                 api
-                  .watchedUpdate(w.id, w.enabled, e.target.value || null)
+                  .watchedUpdate(
+                    w.id,
+                    w.enabled,
+                    e.target.value || null,
+                    w.remindAfterSecs,
+                  )
                   .then(load)
               }
-              className={`max-w-44 text-xs ${inputCls}`}
+              className={`w-full text-xs ${inputCls}`}
               title={t("settings.linkedProject")}
             >
               <option value="">{t("settings.noLinkedProject")}</option>
@@ -170,6 +392,33 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
                   </option>
                 ))}
             </select>
+            <label className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+              <span className="whitespace-nowrap">
+                {t("settings.reminderAfter")}
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={1440}
+                value={Math.max(1, Math.round(w.remindAfterSecs / 60))}
+                onChange={(e) => {
+                  const minutes = Math.max(
+                    1,
+                    parseInt(e.target.value, 10) || 1,
+                  );
+                  api
+                    .watchedUpdate(
+                      w.id,
+                      w.enabled,
+                      w.projectId,
+                      minutes * 60,
+                    )
+                    .then(load);
+                }}
+                className={`w-16 text-xs ${inputCls}`}
+              />
+              <span>{t("settings.minutesShort")}</span>
+            </label>
             <button
               onClick={() => api.watchedRemove(w.id).then(load)}
               className="rounded p-1 text-neutral-400 hover:text-red-600"
@@ -193,7 +442,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
           existing={watched.map((w) => w.bundleId)}
           onClose={() => setPickerOpen(false)}
           onPick={async (app) => {
-            await api.watchedAdd(app.bundleId, app.name, null);
+            await api.watchedAdd(app.bundleId, app.name, null, 60);
             setPickerOpen(false);
             load();
           }}

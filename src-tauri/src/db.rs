@@ -36,6 +36,7 @@ pub fn init(app: &AppHandle) -> Result<Connection, Box<dyn std::error::Error>> {
             folder_id TEXT NOT NULL,
             name TEXT NOT NULL,
             hourly_rate REAL NOT NULL DEFAULT 0,
+            rate_profile_id TEXT,
             color TEXT,
             archived INTEGER NOT NULL DEFAULT 0,
             updated_at INTEGER NOT NULL,
@@ -58,6 +59,7 @@ pub fn init(app: &AppHandle) -> Result<Connection, Box<dyn std::error::Error>> {
             bundle_id TEXT NOT NULL,
             app_name TEXT NOT NULL,
             project_id TEXT,
+            remind_after_secs INTEGER NOT NULL DEFAULT 60,
             enabled INTEGER NOT NULL DEFAULT 1,
             updated_at INTEGER NOT NULL,
             deleted INTEGER NOT NULL DEFAULT 0
@@ -69,6 +71,11 @@ pub fn init(app: &AppHandle) -> Result<Connection, Box<dyn std::error::Error>> {
     )?;
     // migrazione additiva: colore delle cartelle (ignora l'errore se già presente)
     let _ = conn.execute("ALTER TABLE folders ADD COLUMN color TEXT", []);
+    let _ = conn.execute("ALTER TABLE projects ADD COLUMN rate_profile_id TEXT", []);
+    let _ = conn.execute(
+        "ALTER TABLE watched_apps ADD COLUMN remind_after_secs INTEGER NOT NULL DEFAULT 60",
+        [],
+    );
     Ok(conn)
 }
 
@@ -93,6 +100,8 @@ pub struct Project {
     pub folder_id: String,
     pub name: String,
     pub hourly_rate: f64,
+    #[serde(default)]
+    pub rate_profile_id: Option<String>,
     pub color: Option<String>,
     pub archived: i64,
     pub updated_at: i64,
@@ -119,9 +128,15 @@ pub struct WatchedApp {
     pub bundle_id: String,
     pub app_name: String,
     pub project_id: Option<String>,
+    #[serde(default = "default_remind_after_secs")]
+    pub remind_after_secs: i64,
     pub enabled: i64,
     pub updated_at: i64,
     pub deleted: i64,
+}
+
+fn default_remind_after_secs() -> i64 {
+    60
 }
 
 #[derive(Serialize)]
@@ -313,7 +328,7 @@ pub fn folder_delete(db: State<Db>, id: String) -> Result<(), String> {
 pub fn projects_list(db: State<Db>) -> Result<Vec<Project>, String> {
     let conn = db.0.lock().unwrap();
     let mut stmt = conn
-        .prepare("SELECT id, folder_id, name, hourly_rate, color, archived, updated_at, deleted FROM projects WHERE deleted = 0 ORDER BY name")
+        .prepare("SELECT id, folder_id, name, hourly_rate, rate_profile_id, color, archived, updated_at, deleted FROM projects WHERE deleted = 0 ORDER BY name")
         .map_err(err)?;
     let rows = stmt
         .query_map([], |r| {
@@ -322,10 +337,11 @@ pub fn projects_list(db: State<Db>) -> Result<Vec<Project>, String> {
                 folder_id: r.get(1)?,
                 name: r.get(2)?,
                 hourly_rate: r.get(3)?,
-                color: r.get(4)?,
-                archived: r.get(5)?,
-                updated_at: r.get(6)?,
-                deleted: r.get(7)?,
+                rate_profile_id: r.get(4)?,
+                color: r.get(5)?,
+                archived: r.get(6)?,
+                updated_at: r.get(7)?,
+                deleted: r.get(8)?,
             })
         })
         .map_err(err)?
@@ -340,6 +356,7 @@ pub fn project_create(
     folder_id: String,
     name: String,
     hourly_rate: f64,
+    rate_profile_id: Option<String>,
     color: Option<String>,
 ) -> Result<Project, String> {
     let conn = db.0.lock().unwrap();
@@ -348,15 +365,24 @@ pub fn project_create(
         folder_id,
         name,
         hourly_rate,
+        rate_profile_id,
         color,
         archived: 0,
         updated_at: now_secs(),
         deleted: 0,
     };
     conn.execute(
-        "INSERT INTO projects (id, folder_id, name, hourly_rate, color, archived, updated_at, deleted)
-         VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, 0)",
-        rusqlite::params![p.id, p.folder_id, p.name, p.hourly_rate, p.color, p.updated_at],
+        "INSERT INTO projects (id, folder_id, name, hourly_rate, rate_profile_id, color, archived, updated_at, deleted)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, 0)",
+        rusqlite::params![
+            p.id,
+            p.folder_id,
+            p.name,
+            p.hourly_rate,
+            p.rate_profile_id,
+            p.color,
+            p.updated_at
+        ],
     )
     .map_err(err)?;
     crate::sync::mark_dirty();
@@ -370,13 +396,23 @@ pub fn project_update(
     folder_id: String,
     name: String,
     hourly_rate: f64,
+    rate_profile_id: Option<String>,
     color: Option<String>,
     archived: i64,
 ) -> Result<(), String> {
     let conn = db.0.lock().unwrap();
     conn.execute(
-        "UPDATE projects SET folder_id = ?2, name = ?3, hourly_rate = ?4, color = ?5, archived = ?6, updated_at = ?7 WHERE id = ?1",
-        rusqlite::params![id, folder_id, name, hourly_rate, color, archived, now_secs()],
+        "UPDATE projects SET folder_id = ?2, name = ?3, hourly_rate = ?4, rate_profile_id = ?5, color = ?6, archived = ?7, updated_at = ?8 WHERE id = ?1",
+        rusqlite::params![
+            id,
+            folder_id,
+            name,
+            hourly_rate,
+            rate_profile_id,
+            color,
+            archived,
+            now_secs()
+        ],
     )
     .map_err(err)?;
     crate::sync::mark_dirty();
@@ -618,7 +654,7 @@ fn query_folders_all(conn: &Connection) -> rusqlite::Result<Vec<Folder>> {
 
 fn query_projects_all(conn: &Connection) -> rusqlite::Result<Vec<Project>> {
     let mut stmt = conn.prepare(
-        "SELECT id, folder_id, name, hourly_rate, color, archived, updated_at, deleted
+        "SELECT id, folder_id, name, hourly_rate, rate_profile_id, color, archived, updated_at, deleted
          FROM projects ORDER BY deleted, name",
     )?;
     let rows = stmt
@@ -628,10 +664,11 @@ fn query_projects_all(conn: &Connection) -> rusqlite::Result<Vec<Project>> {
                 folder_id: r.get(1)?,
                 name: r.get(2)?,
                 hourly_rate: r.get(3)?,
-                color: r.get(4)?,
-                archived: r.get(5)?,
-                updated_at: r.get(6)?,
-                deleted: r.get(7)?,
+                rate_profile_id: r.get(4)?,
+                color: r.get(5)?,
+                archived: r.get(6)?,
+                updated_at: r.get(7)?,
+                deleted: r.get(8)?,
             })
         })?
         .collect();
@@ -662,7 +699,7 @@ fn query_entries_all(conn: &Connection) -> rusqlite::Result<Vec<TimeEntry>> {
 
 fn query_watched_all(conn: &Connection) -> rusqlite::Result<Vec<WatchedApp>> {
     let mut stmt = conn.prepare(
-        "SELECT id, bundle_id, app_name, project_id, enabled, updated_at, deleted
+        "SELECT id, bundle_id, app_name, project_id, remind_after_secs, enabled, updated_at, deleted
          FROM watched_apps ORDER BY deleted, app_name",
     )?;
     let rows = stmt
@@ -672,9 +709,10 @@ fn query_watched_all(conn: &Connection) -> rusqlite::Result<Vec<WatchedApp>> {
                 bundle_id: r.get(1)?,
                 app_name: r.get(2)?,
                 project_id: r.get(3)?,
-                enabled: r.get(4)?,
-                updated_at: r.get(5)?,
-                deleted: r.get(6)?,
+                remind_after_secs: r.get(4)?,
+                enabled: r.get(5)?,
+                updated_at: r.get(6)?,
+                deleted: r.get(7)?,
             })
         })?
         .collect();
@@ -698,7 +736,7 @@ fn export_data_csv(data: &ExportData) -> String {
     let mut out = String::new();
     writeln!(
         out,
-        "record_type,id,folder_id,folder_name,project_id,project_name,name,color,hourly_rate,archived,position,started_at,ended_at,duration_secs,note,bundle_id,app_name,enabled,setting_key,setting_value,updated_at,deleted"
+        "record_type,id,folder_id,folder_name,project_id,project_name,name,color,hourly_rate,rate_profile_id,archived,position,started_at,ended_at,duration_secs,note,bundle_id,app_name,enabled,remind_after_secs,setting_key,setting_value,updated_at,deleted"
     )
     .unwrap();
 
@@ -727,7 +765,9 @@ fn export_data_csv(data: &ExportData) -> String {
                 f.color.as_deref().unwrap_or(""),
                 "",
                 "",
+                "",
                 &f.position.to_string(),
+                "",
                 "",
                 "",
                 "",
@@ -760,7 +800,9 @@ fn export_data_csv(data: &ExportData) -> String {
                 &p.name,
                 p.color.as_deref().unwrap_or(""),
                 &p.hourly_rate.to_string(),
+                p.rate_profile_id.as_deref().unwrap_or(""),
                 &p.archived.to_string(),
+                "",
                 "",
                 "",
                 "",
@@ -799,10 +841,12 @@ fn export_data_csv(data: &ExportData) -> String {
                 "",
                 "",
                 "",
+                "",
                 &e.started_at.to_string(),
                 &e.ended_at.to_string(),
                 &e.duration_secs.to_string(),
                 e.note.as_deref().unwrap_or(""),
+                "",
                 "",
                 "",
                 "",
@@ -839,9 +883,11 @@ fn export_data_csv(data: &ExportData) -> String {
                 "",
                 "",
                 "",
+                "",
                 &w.bundle_id,
                 &w.app_name,
                 &w.enabled.to_string(),
+                &w.remind_after_secs.to_string(),
                 "",
                 "",
                 &w.updated_at.to_string(),
@@ -855,7 +901,7 @@ fn export_data_csv(data: &ExportData) -> String {
             &mut out,
             &[
                 "setting", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
-                &s.key, &s.value, "", "",
+                "", "", &s.key, &s.value, "", "",
             ],
         );
     }
@@ -921,7 +967,7 @@ pub fn watched_list(db: State<Db>) -> Result<Vec<WatchedApp>, String> {
 
 pub fn watched_list_inner(conn: &Connection) -> rusqlite::Result<Vec<WatchedApp>> {
     let mut stmt = conn.prepare(
-        "SELECT id, bundle_id, app_name, project_id, enabled, updated_at, deleted
+        "SELECT id, bundle_id, app_name, project_id, remind_after_secs, enabled, updated_at, deleted
          FROM watched_apps WHERE deleted = 0 ORDER BY app_name",
     )?;
     let rows = stmt
@@ -931,9 +977,10 @@ pub fn watched_list_inner(conn: &Connection) -> rusqlite::Result<Vec<WatchedApp>
                 bundle_id: r.get(1)?,
                 app_name: r.get(2)?,
                 project_id: r.get(3)?,
-                enabled: r.get(4)?,
-                updated_at: r.get(5)?,
-                deleted: r.get(6)?,
+                remind_after_secs: r.get(4)?,
+                enabled: r.get(5)?,
+                updated_at: r.get(6)?,
+                deleted: r.get(7)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -946,6 +993,7 @@ pub fn watched_add(
     bundle_id: String,
     app_name: String,
     project_id: Option<String>,
+    remind_after_secs: Option<i64>,
 ) -> Result<WatchedApp, String> {
     let conn = db.0.lock().unwrap();
     // riattiva l'eventuale riga soft-deleted per lo stesso bundle id
@@ -961,16 +1009,25 @@ pub fn watched_add(
         bundle_id,
         app_name,
         project_id,
+        remind_after_secs: remind_after_secs.unwrap_or_else(default_remind_after_secs),
         enabled: 1,
         updated_at: now_secs(),
         deleted: 0,
     };
     conn.execute(
-        "INSERT INTO watched_apps (id, bundle_id, app_name, project_id, enabled, updated_at, deleted)
-         VALUES (?1, ?2, ?3, ?4, 1, ?5, 0)
+        "INSERT INTO watched_apps (id, bundle_id, app_name, project_id, remind_after_secs, enabled, updated_at, deleted)
+         VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, 0)
          ON CONFLICT(id) DO UPDATE SET bundle_id = excluded.bundle_id, app_name = excluded.app_name,
-            project_id = excluded.project_id, enabled = 1, updated_at = excluded.updated_at, deleted = 0",
-        rusqlite::params![w.id, w.bundle_id, w.app_name, w.project_id, w.updated_at],
+            project_id = excluded.project_id, remind_after_secs = excluded.remind_after_secs,
+            enabled = 1, updated_at = excluded.updated_at, deleted = 0",
+        rusqlite::params![
+            w.id,
+            w.bundle_id,
+            w.app_name,
+            w.project_id,
+            w.remind_after_secs,
+            w.updated_at
+        ],
     )
     .map_err(err)?;
     crate::sync::mark_dirty();
@@ -983,11 +1040,13 @@ pub fn watched_update(
     id: String,
     enabled: i64,
     project_id: Option<String>,
+    remind_after_secs: i64,
 ) -> Result<(), String> {
     let conn = db.0.lock().unwrap();
+    let remind_after_secs = remind_after_secs.clamp(10, 24 * 60 * 60);
     conn.execute(
-        "UPDATE watched_apps SET enabled = ?2, project_id = ?3, updated_at = ?4 WHERE id = ?1",
-        rusqlite::params![id, enabled, project_id, now_secs()],
+        "UPDATE watched_apps SET enabled = ?2, project_id = ?3, remind_after_secs = ?4, updated_at = ?5 WHERE id = ?1",
+        rusqlite::params![id, enabled, project_id, remind_after_secs, now_secs()],
     )
     .map_err(err)?;
     crate::sync::mark_dirty();
