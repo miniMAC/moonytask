@@ -9,6 +9,7 @@ import "./index.css";
 
 const isPopover = getCurrentWebviewWindow().label === "popover";
 if (isPopover) document.body.classList.add("popover-window");
+else document.body.classList.add("app-window");
 
 window.addEventListener(
   "contextmenu",

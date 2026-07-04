@@ -204,20 +204,21 @@ export default function ReportsView(p: Props) {
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">{t("reports.title")}</h1>
         {pdfMessage && (
-          <p className="truncate text-xs font-medium text-neutral-500 dark:text-neutral-400">
+          <p className="truncate text-sm font-medium text-neutral-500 dark:text-neutral-400">
             {pdfMessage}
           </p>
         )}
       </div>
 
       <div className="mt-5 rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900/40 pro:border-[#44475a] pro:bg-[#21222c]">
-        <div className="grid grid-cols-1 gap-2 lg:grid-cols-[auto_minmax(240px,280px)_minmax(180px,1fr)_minmax(180px,1fr)_72px]">
-          <div className="flex h-10 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-neutral-700 dark:bg-neutral-800/70 pro:border-[#44475a] pro:bg-[#282a36]">
+        {/* i controlli vanno a capo quando la finestra è stretta, niente overflow */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex h-11 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-neutral-700 dark:bg-neutral-800/70 pro:border-[#44475a] pro:bg-[#282a36]">
             {(["today", "week", "month", "custom"] as Preset[]).map((pr) => (
               <button
                 key={pr}
                 onClick={() => setPreset(pr)}
-                className={`min-w-[78px] rounded-md px-3 text-[13px] transition ${
+                className={`rounded-md px-4 text-base transition ${
                   preset === pr
                     ? "bg-neutral-900 font-semibold text-white shadow-sm dark:bg-white dark:text-neutral-900 pro:bg-[#44475a] pro:text-[#f8f8f2]"
                     : "text-neutral-600 hover:bg-white dark:text-neutral-300 dark:hover:bg-neutral-700 pro:text-[#b9b9c8] pro:hover:bg-[#343746]"
@@ -228,27 +229,23 @@ export default function ReportsView(p: Props) {
             ))}
           </div>
 
-          <div
-            className={`grid h-10 grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-lg border border-neutral-200 bg-white px-2 dark:border-neutral-700 dark:bg-neutral-800/70 pro:border-[#44475a] pro:bg-[#282a36] ${
-              preset === "custom" ? "" : "opacity-50"
-            }`}
-          >
-            <input
-              type="date"
-              value={customFrom}
-              disabled={preset !== "custom"}
-              onChange={(e) => setCustomFrom(e.target.value)}
-              className="min-w-0 bg-transparent text-[13px] outline-none disabled:cursor-default"
-            />
-            <span className="text-neutral-400">→</span>
-            <input
-              type="date"
-              value={customTo}
-              disabled={preset !== "custom"}
-              onChange={(e) => setCustomTo(e.target.value)}
-              className="min-w-0 bg-transparent text-[13px] outline-none disabled:cursor-default"
-            />
-          </div>
+          {preset === "custom" && (
+            <div className="flex h-11 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 dark:border-neutral-700 dark:bg-neutral-800/70 pro:border-[#44475a] pro:bg-[#282a36]">
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="!min-h-0 bg-transparent text-base outline-none"
+              />
+              <span className="text-neutral-400">→</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="!min-h-0 bg-transparent text-base outline-none"
+              />
+            </div>
+          )}
 
           <select
             value={folderId}
@@ -256,7 +253,7 @@ export default function ReportsView(p: Props) {
               setFolderId(e.target.value);
               setProjectId("all");
             }}
-            className="h-10 min-w-0 rounded-lg border border-neutral-200 bg-white px-3 text-[13px] outline-none dark:border-neutral-700 dark:bg-neutral-800/70 pro:border-[#44475a] pro:bg-[#282a36]"
+            className="h-11 w-56 max-w-full rounded-lg border border-neutral-200 bg-white text-base outline-none dark:border-neutral-700 dark:bg-neutral-800/70 pro:border-[#44475a] pro:bg-[#282a36]"
           >
             <option value="all">{t("reports.allFolders")}</option>
             {p.folders.map((f) => (
@@ -268,7 +265,7 @@ export default function ReportsView(p: Props) {
           <select
             value={projectId}
             onChange={(e) => setProjectId(e.target.value)}
-            className="h-10 min-w-0 rounded-lg border border-neutral-200 bg-white px-3 text-[13px] outline-none dark:border-neutral-700 dark:bg-neutral-800/70 pro:border-[#44475a] pro:bg-[#282a36]"
+            className="h-11 w-56 max-w-full rounded-lg border border-neutral-200 bg-white text-base outline-none dark:border-neutral-700 dark:bg-neutral-800/70 pro:border-[#44475a] pro:bg-[#282a36]"
           >
             <option value="all">{t("reports.allProjects")}</option>
             {visibleFolderProjects.map((pr) => (
@@ -281,7 +278,7 @@ export default function ReportsView(p: Props) {
             onClick={exportPdf}
             disabled={pdfExporting || !selectedProject}
             title={!selectedProject ? t("reports.pdfProjectOnly") : undefined}
-            className="h-10 rounded-lg border border-neutral-200 bg-neutral-950 px-3 text-[13px] font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-50 dark:border-neutral-700 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 pro:border-[#50fa7b]/40 pro:bg-[#50fa7b] pro:text-[#282a36]"
+            className="h-11 rounded-lg border border-neutral-200 bg-neutral-950 px-5 text-base font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-50 dark:border-neutral-700 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 pro:border-[#50fa7b]/40 pro:bg-[#50fa7b] pro:text-[#282a36]"
           >
             {pdfExporting ? "..." : t("reports.pdf")}
           </button>
@@ -302,13 +299,13 @@ export default function ReportsView(p: Props) {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="py-10 text-center text-sm text-neutral-500">
+        <p className="py-10 text-center text-base text-neutral-500">
           {t("reports.noData")}
         </p>
       ) : (
         <>
           {/* time per day */}
-          <h2 className="mb-2 mt-8 text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+          <h2 className="mb-2 mt-8 text-base font-semibold text-neutral-700 dark:text-neutral-300">
             {t("reports.byDay")}
           </h2>
           <div className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-700">
@@ -344,12 +341,12 @@ export default function ReportsView(p: Props) {
           </div>
 
           {/* by project */}
-          <h2 className="mb-2 mt-8 text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+          <h2 className="mb-2 mt-8 text-base font-semibold text-neutral-700 dark:text-neutral-300">
             {t("reports.byProject")}
           </h2>
           <div className="space-y-2 rounded-xl border border-neutral-200 p-4 dark:border-neutral-700">
             {byProject.map(({ project, secs, money }) => (
-              <div key={project!.id} className="flex items-center gap-3 text-sm">
+              <div key={project!.id} className="flex items-center gap-3 text-base">
                 <span
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{
@@ -377,12 +374,12 @@ export default function ReportsView(p: Props) {
           </div>
 
           {/* table */}
-          <h2 className="mb-2 mt-8 text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+          <h2 className="mb-2 mt-8 text-base font-semibold text-neutral-700 dark:text-neutral-300">
             {t("reports.day")} / {t("reports.time")} / {t("reports.cost")}
           </h2>
-          <table className="w-full overflow-hidden rounded-xl border border-neutral-200 text-sm dark:border-neutral-700">
+          <table className="w-full overflow-hidden rounded-xl border border-neutral-200 text-base dark:border-neutral-700">
             <thead>
-              <tr className="bg-neutral-50 text-left text-xs text-neutral-500 dark:bg-neutral-800/60">
+              <tr className="bg-neutral-50 text-left text-sm text-neutral-500 dark:bg-neutral-800/60">
                 <th className="px-4 py-2 font-medium">{t("reports.day")}</th>
                 <th className="px-4 py-2 text-right font-medium">
                   {t("reports.time")}
@@ -417,7 +414,7 @@ export default function ReportsView(p: Props) {
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-700">
-      <p className="text-xs text-neutral-500">{label}</p>
+      <p className="text-sm text-neutral-500">{label}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
     </div>
   );
@@ -437,7 +434,7 @@ function DayTooltip({
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs shadow-md dark:border-neutral-700 dark:bg-neutral-800">
+    <div className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm shadow-md dark:border-neutral-700 dark:bg-neutral-800">
       <p className="font-medium">{d.label}</p>
       <p className="mt-0.5 tabular-nums">{fmtDuration(d.secs)}</p>
       <p className="tabular-nums text-neutral-500">

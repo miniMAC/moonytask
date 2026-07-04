@@ -71,6 +71,7 @@ pub fn run() {
             db::watched_remove,
             db::watcher_snooze,
             db::settings_get,
+            db::select_pdf_export_dir,
             db::settings_set,
             timer::timer_start,
             timer::timer_pause,

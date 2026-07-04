@@ -17,7 +17,7 @@ import type {
 } from "../lib/types";
 import * as api from "../lib/api";
 import type { ProjectTotal } from "../lib/api";
-import { PROJECT_COLORS, projectColor } from "../lib/colors";
+import { PROJECT_COLORS, projectColor, vividColor } from "../lib/colors";
 import { useTheme } from "../lib/theme";
 import { fmtClock, fmtHM } from "../lib/time";
 import {
@@ -218,6 +218,8 @@ export default function PopoverApp() {
         const folder = await api.folderCreate(newName.trim(), newColor);
         setOpen((current) => new Set(current).add(folder.id));
         setNewFolderId(folder.id);
+        setTab("all");
+        setQuery("");
       } else if (createKind === "project" && newFolderId) {
         const hourlyRate = parseFloat(newRate.replace(",", ".")) || 0;
         const rateProfileId =
@@ -232,6 +234,8 @@ export default function PopoverApp() {
           rateProfileId,
         );
         setOpen((current) => new Set(current).add(newFolderId));
+        setTab("all");
+        setQuery("");
       }
       await loadAll();
       resetQuickCreate();
@@ -289,9 +293,7 @@ export default function PopoverApp() {
     const folderName = folderById.get(project.folderId)?.name ?? "";
     return `${project.name} ${folderName}`.toLowerCase().includes(queryNorm);
   });
-  const headerBackground = isPro
-    ? "linear-gradient(145deg, rgba(189,147,249,0.28), transparent 34%), linear-gradient(145deg, #21222c, #282a36 72%)"
-    : `linear-gradient(145deg, ${colorWithAlpha(headerColor, 0.26)}, transparent 34%), linear-gradient(145deg, #252527, #111112 72%)`;
+  const headerBackground = isPro ? "#21222c" : "#1c1c1e";
   const headerActionLabel =
     timer.status === "running"
       ? t("timer.pause")
@@ -326,12 +328,8 @@ export default function PopoverApp() {
               else if (timer.status === "running") api.timerPause();
               else api.timerResume();
             }}
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.34),0_12px_30px_rgba(0,0,0,0.28)] ring-1 ring-white/20 transition hover:scale-[1.03] hover:brightness-110 active:scale-95 disabled:opacity-50"
-            style={{
-              background:
-                `linear-gradient(160deg, ${colorWithAlpha(headerColor, 0.94)}, ` +
-                `${colorWithAlpha(headerColor, 0.68)})`,
-            }}
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl text-white shadow-md transition hover:brightness-110 active:scale-95 disabled:opacity-50"
+            style={{ backgroundColor: vividColor(headerColor) }}
             disabled={!headerProject}
             aria-label={headerActionLabel}
           >
@@ -355,7 +353,7 @@ export default function PopoverApp() {
                 className="h-2 w-2 shrink-0 rounded-full"
                 style={{ backgroundColor: headerColor }}
               />
-              <p className="truncate text-[11px] font-semibold uppercase text-white/48">
+              <p className="truncate text-[12px] font-semibold uppercase text-white/48">
                 {headerFolder?.name ?? "—"}
               </p>
             </div>
@@ -368,7 +366,7 @@ export default function PopoverApp() {
             <button
               title={t("timer.stop")}
               onClick={() => api.timerStop()}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.12] text-white shadow-sm ring-1 ring-white/[0.16] transition hover:bg-red-500/90 active:scale-95"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.12] text-white shadow-sm transition hover:bg-red-500 active:scale-95"
             >
               <StopIcon size={14} />
             </button>
@@ -377,11 +375,11 @@ export default function PopoverApp() {
       </div>
 
       {reminder && (
-        <div className="mx-3 mt-3 rounded-lg bg-emerald-500 px-3 py-2 text-[12px] font-semibold text-white shadow-sm pro:bg-[#50fa7b] pro:text-[#282a36]">
+        <div className="mx-3 mt-3 rounded-lg bg-emerald-500 px-3 py-2 text-[13px] font-semibold text-white shadow-sm pro:bg-[#50fa7b] pro:text-[#282a36]">
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
               <p className="truncate">{t("popover.reminderTitle")}</p>
-              <p className="truncate text-[11px] font-medium opacity-85">
+              <p className="truncate text-[12px] font-medium opacity-85">
                 {t("popover.reminderBody", { app: reminder.appName })}
               </p>
             </div>
@@ -393,26 +391,26 @@ export default function PopoverApp() {
                   await startProject(reminder.projectId!);
                   setReminder(null);
                 }}
-                className="rounded-md bg-white/20 px-2 py-1 text-[11px] hover:bg-white/30 pro:bg-[#282a36]/15 pro:hover:bg-[#282a36]/25"
+                className="rounded-md bg-white/20 px-2 py-1 text-[12px] hover:bg-white/30 pro:bg-[#282a36]/15 pro:hover:bg-[#282a36]/25"
               >
                 {t("timer.start")}
               </button>
             )}
             <button
               onClick={() => snoozeReminder(5)}
-              className="rounded-md bg-white/14 px-2 py-1 text-[11px] hover:bg-white/24 pro:bg-[#282a36]/10 pro:hover:bg-[#282a36]/20"
+              className="rounded-md bg-white/14 px-2 py-1 text-[12px] hover:bg-white/24 pro:bg-[#282a36]/10 pro:hover:bg-[#282a36]/20"
             >
               {t("popover.snooze5")}
             </button>
             <button
               onClick={() => snoozeReminder(15)}
-              className="rounded-md bg-white/14 px-2 py-1 text-[11px] hover:bg-white/24 pro:bg-[#282a36]/10 pro:hover:bg-[#282a36]/20"
+              className="rounded-md bg-white/14 px-2 py-1 text-[12px] hover:bg-white/24 pro:bg-[#282a36]/10 pro:hover:bg-[#282a36]/20"
             >
               {t("popover.snooze15")}
             </button>
             <button
               onClick={() => snoozeReminder("today")}
-              className="rounded-md bg-white/14 px-2 py-1 text-[11px] hover:bg-white/24 pro:bg-[#282a36]/10 pro:hover:bg-[#282a36]/20"
+              className="rounded-md bg-white/14 px-2 py-1 text-[12px] hover:bg-white/24 pro:bg-[#282a36]/10 pro:hover:bg-[#282a36]/20"
             >
               {t("popover.ignoreToday")}
             </button>
@@ -426,18 +424,18 @@ export default function PopoverApp() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("popover.search")}
-          className="w-full rounded-lg border border-black/[0.08] bg-white px-3 py-2 text-[13px] font-medium text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-blue-500 dark:border-white/10 dark:bg-neutral-900 dark:text-white pro:border-[#44475a] pro:bg-[#21222c] pro:text-[#f8f8f2] pro:placeholder:text-[#b9b9c8] pro:focus:border-[#bd93f9]"
+          className="w-full rounded-lg border border-black/[0.08] bg-white px-3 py-2 text-[15px] font-medium text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-blue-500 dark:border-white/10 dark:bg-neutral-900 dark:text-white pro:border-[#44475a] pro:bg-[#21222c] pro:text-[#f8f8f2] pro:placeholder:text-[#b9b9c8] pro:focus:border-[#bd93f9]"
         />
 
         {exportMessage && (
-          <p className="truncate px-1 text-[11px] font-medium text-neutral-500 dark:text-neutral-400 pro:text-[#b9b9c8]">
+          <p className="truncate px-1 text-[12px] font-medium text-neutral-500 dark:text-neutral-400 pro:text-[#b9b9c8]">
             {exportMessage}
           </p>
         )}
 
         {createKind && (
           <div className="rounded-lg bg-white p-2 shadow-sm dark:bg-neutral-900 pro:bg-[#21222c]">
-            <p className="mb-2 text-[11px] font-semibold uppercase text-neutral-400 pro:text-[#bd93f9]">
+            <p className="mb-2 text-[12px] font-semibold uppercase text-neutral-400 pro:text-[#bd93f9]">
               {t("popover.quickCreate")}
             </p>
             <div className="space-y-2">
@@ -451,14 +449,14 @@ export default function PopoverApp() {
                     ? t("popover.projectName")
                     : t("popover.folderName")
                 }
-                className="w-full rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-[13px] outline-none focus:border-blue-500 dark:border-white/10 dark:bg-neutral-950 pro:border-[#44475a] pro:bg-[#282a36] pro:text-[#f8f8f2] pro:placeholder:text-[#b9b9c8] pro:focus:border-[#bd93f9]"
+                className="w-full rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-[15px] outline-none focus:border-blue-500 dark:border-white/10 dark:bg-neutral-950 pro:border-[#44475a] pro:bg-[#282a36] pro:text-[#f8f8f2] pro:placeholder:text-[#b9b9c8] pro:focus:border-[#bd93f9]"
               />
               {createKind === "project" && (
                 <div className="grid grid-cols-[1fr_62px] gap-2">
                   <select
                     value={newFolderId}
                     onChange={(e) => setNewFolderId(e.target.value)}
-                    className="min-w-0 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-[12px] outline-none dark:border-white/10 dark:bg-neutral-950 pro:border-[#44475a] pro:bg-[#282a36] pro:text-[#f8f8f2]"
+                    className="min-w-0 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-[13px] outline-none dark:border-white/10 dark:bg-neutral-950 pro:border-[#44475a] pro:bg-[#282a36] pro:text-[#f8f8f2]"
                   >
                     {folders.map((folder) => (
                       <option key={folder.id} value={folder.id}>
@@ -471,7 +469,7 @@ export default function PopoverApp() {
                     value={newRate}
                     onChange={(e) => setNewRate(e.target.value)}
                     placeholder={t("popover.rate")}
-                    className="rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-[12px] outline-none dark:border-white/10 dark:bg-neutral-950 pro:border-[#44475a] pro:bg-[#282a36] pro:text-[#f8f8f2]"
+                    className="rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-[13px] outline-none dark:border-white/10 dark:bg-neutral-950 pro:border-[#44475a] pro:bg-[#282a36] pro:text-[#f8f8f2]"
                   />
                 </div>
               )}
@@ -493,7 +491,7 @@ export default function PopoverApp() {
                 <div className="flex gap-1">
                   <button
                     onClick={resetQuickCreate}
-                    className="rounded-md px-2 py-1 text-[12px] font-medium text-neutral-500 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 pro:text-[#b9b9c8] pro:hover:bg-[#343746]"
+                    className="rounded-md px-2 py-1 text-[13px] font-medium text-neutral-500 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 pro:text-[#b9b9c8] pro:hover:bg-[#343746]"
                   >
                     {t("common.cancel")}
                   </button>
@@ -504,7 +502,7 @@ export default function PopoverApp() {
                       saving ||
                       (createKind === "project" && !newFolderId)
                     }
-                    className="rounded-md bg-neutral-950 px-2.5 py-1 text-[12px] font-semibold text-white disabled:opacity-45 dark:bg-white dark:text-neutral-950 pro:bg-[#bd93f9] pro:text-[#282a36]"
+                    className="rounded-md bg-neutral-950 px-2.5 py-1 text-[13px] font-semibold text-white disabled:opacity-45 dark:bg-white dark:text-neutral-950 pro:bg-[#bd93f9] pro:text-[#282a36]"
                   >
                     {t("common.save")}
                   </button>
@@ -523,7 +521,7 @@ export default function PopoverApp() {
               <button
                 key={tb}
                 onClick={() => setTab(tb)}
-                className={`flex-1 rounded-md py-1.5 text-[12px] font-semibold transition ${
+                className={`flex-1 rounded-md py-1.5 text-[13px] font-semibold transition ${
                   tab === tb
                     ? "bg-white text-neutral-950 shadow-sm ring-1 ring-black/5 dark:bg-neutral-800 dark:text-white dark:ring-white/10 pro:bg-[#44475a] pro:text-[#f8f8f2]"
                     : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white pro:text-[#b9b9c8] pro:hover:text-[#f8f8f2]"
@@ -560,7 +558,6 @@ export default function PopoverApp() {
         ) : tab === "all" ? (
           folders.map((folder) => {
             const items = active.filter((p) => p.folderId === folder.id);
-            if (items.length === 0) return null;
             const expanded = open.has(folder.id);
             return (
               <div key={folder.id} className="mb-1">
@@ -595,29 +592,37 @@ export default function PopoverApp() {
                     <FolderIcon size={16} />
                   </span>
                   <span className="min-w-0 flex-1 text-left">
-                    <span className="block truncate text-[13px] font-semibold text-neutral-900 dark:text-white pro:text-[#f8f8f2]">
+                    <span className="block truncate text-[15px] font-semibold text-neutral-900 dark:text-white pro:text-[#f8f8f2]">
                       {folder.name}
                     </span>
-                    <span className="block text-[11px] text-neutral-400 pro:text-[#b9b9c8]">
+                    <span className="block text-[12px] text-neutral-400 pro:text-[#b9b9c8]">
                       {items.length}
                     </span>
                   </span>
-                  <span className="rounded-full bg-black/[0.04] px-2 py-1 text-[12px] font-medium tabular-nums text-neutral-500 dark:bg-white/[0.07] dark:text-neutral-300 pro:bg-[#21222c] pro:text-[#8be9fd]">
+                  <span className="rounded-full bg-black/[0.04] px-2 py-1 text-[13px] font-medium tabular-nums text-neutral-500 dark:bg-white/[0.07] dark:text-neutral-300 pro:bg-[#21222c] pro:text-[#8be9fd]">
                     {fmtHM(folderTotal(folder.id))}
                   </span>
                 </button>
                 {expanded &&
-                  items.map((project) => (
-                    <ProjectRow
-                      key={project.id}
-                      project={project}
-                      timer={timer}
-                      total={projectTotal(project.id)}
-                      onStart={() => startProject(project.id)}
-                      onOpen={() => openProjectInMain(project.id)}
-                      onContextMenu={(event) => openProjectMenu(project, event)}
-                      indent
-                    />
+                  (items.length === 0 ? (
+                    <p className="ml-16 rounded-lg px-2 py-2 text-[13px] font-medium text-neutral-400 pro:text-[#b9b9c8]">
+                      {t("projects.empty")}
+                    </p>
+                  ) : (
+                    items.map((project) => (
+                      <ProjectRow
+                        key={project.id}
+                        project={project}
+                        timer={timer}
+                        total={projectTotal(project.id)}
+                        onStart={() => startProject(project.id)}
+                        onOpen={() => openProjectInMain(project.id)}
+                        onContextMenu={(event) =>
+                          openProjectMenu(project, event)
+                        }
+                        indent
+                      />
+                    ))
                   ))}
               </div>
             );
@@ -649,10 +654,10 @@ export default function PopoverApp() {
             event.preventDefault();
             event.stopPropagation();
           }}
-          className="fixed z-50 w-36 overflow-hidden rounded-lg bg-white py-1 text-[12px] font-semibold text-neutral-800 shadow-xl ring-1 ring-black/10 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-white/10 pro:bg-[#21222c] pro:text-[#f8f8f2] pro:ring-[#44475a]"
+          className="fixed z-50 w-36 overflow-hidden rounded-lg bg-white py-1 text-[13px] font-semibold text-neutral-800 shadow-xl ring-1 ring-black/10 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-white/10 pro:bg-[#21222c] pro:text-[#f8f8f2] pro:ring-[#44475a]"
           style={{ left: projectMenu.x, top: projectMenu.y }}
         >
-          <p className="truncate px-3 py-1.5 text-[11px] font-semibold text-neutral-400 pro:text-[#bd93f9]">
+          <p className="truncate px-3 py-1.5 text-[12px] font-semibold text-neutral-400 pro:text-[#bd93f9]">
             {projectMenu.project.name}
           </p>
           <button
@@ -683,7 +688,7 @@ export default function PopoverApp() {
               setProjectMenu(null);
               setCreateMenuOpen((open) => !open);
             }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-950 text-white transition hover:bg-neutral-800 active:scale-95 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 pro:bg-[#50fa7b] pro:text-[#282a36] pro:hover:bg-[#8cff9f]"
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/[0.06] text-neutral-600 transition hover:bg-black/[0.12] hover:text-neutral-900 active:scale-95 dark:bg-white/[0.08] dark:text-neutral-300 dark:hover:bg-white/[0.15] dark:hover:text-white pro:bg-[#343746] pro:text-[#b9b9c8] pro:hover:bg-[#44475a] pro:hover:text-[#f8f8f2]"
           >
             <PlusIcon size={16} />
           </button>
@@ -694,7 +699,7 @@ export default function PopoverApp() {
                 event.preventDefault();
                 event.stopPropagation();
               }}
-              className="absolute bottom-10 left-0 z-50 w-40 overflow-hidden rounded-lg bg-white py-1 text-[12px] font-semibold text-neutral-800 shadow-xl ring-1 ring-black/10 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-white/10 pro:bg-[#21222c] pro:text-[#f8f8f2] pro:ring-[#44475a]"
+              className="absolute bottom-10 left-0 z-50 w-40 overflow-hidden rounded-lg bg-white py-1 text-[13px] font-semibold text-neutral-800 shadow-xl ring-1 ring-black/10 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-white/10 pro:bg-[#21222c] pro:text-[#f8f8f2] pro:ring-[#44475a]"
             >
               <button
                 onClick={() => openQuickCreate("project")}
@@ -714,7 +719,7 @@ export default function PopoverApp() {
         </div>
         <button
           onClick={() => api.openMain()}
-          className="min-w-0 flex-1 rounded-lg py-2 text-[12px] font-semibold text-neutral-600 transition hover:bg-black/[0.045] hover:text-neutral-950 dark:text-neutral-300 dark:hover:bg-white/[0.08] dark:hover:text-white pro:text-[#f8f8f2] pro:hover:bg-[#343746]"
+          className="min-w-0 flex-1 rounded-lg py-2 text-[13px] font-semibold text-neutral-600 transition hover:bg-black/[0.045] hover:text-neutral-950 dark:text-neutral-300 dark:hover:bg-white/[0.08] dark:hover:text-white pro:text-[#f8f8f2] pro:hover:bg-[#343746]"
         >
           {t("popover.open")}
         </button>
@@ -764,29 +769,25 @@ function ProjectRow({
           else if (isPaused) api.timerResume();
           else onStart();
         }}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_5px_12px_rgba(0,0,0,0.16)] transition hover:scale-105 active:scale-95"
-        style={{
-          background:
-            `linear-gradient(160deg, ${colorWithAlpha(color, 0.95)}, ` +
-            `${colorWithAlpha(color, 0.68)})`,
-        }}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white shadow-sm transition hover:brightness-110 active:scale-95"
+        style={{ backgroundColor: vividColor(color) }}
       >
         {isRunning ? <PauseIcon size={12} /> : <PlayIcon size={12} />}
       </button>
       <button
         onClick={onOpen}
-        className={`min-w-0 flex-1 text-left text-[13px] text-neutral-800 dark:text-neutral-100 pro:text-[#f8f8f2] ${
+        className={`min-w-0 flex-1 text-left text-[15px] text-neutral-800 dark:text-neutral-100 pro:text-[#f8f8f2] ${
           isRunning || isPaused ? "font-semibold" : "font-medium"
         }`}
       >
         <span className="block truncate">{project.name}</span>
         {subtitle && (
-          <span className="block truncate text-[11px] font-medium text-neutral-400 pro:text-[#b9b9c8]">
+          <span className="block truncate text-[12px] font-medium text-neutral-400 pro:text-[#b9b9c8]">
             {subtitle}
           </span>
         )}
       </button>
-      <span className="rounded-full px-1.5 py-0.5 text-[12px] font-medium tabular-nums text-neutral-500 dark:text-neutral-300 pro:text-[#8be9fd]">
+      <span className="rounded-full px-1.5 py-0.5 text-[13px] font-medium tabular-nums text-neutral-500 dark:text-neutral-300 pro:text-[#8be9fd]">
         {fmtHM(total)}
       </span>
     </div>

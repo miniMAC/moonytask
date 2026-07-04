@@ -216,7 +216,7 @@ export default function App() {
             />
           ) : (
             <div className="flex h-full items-center justify-center">
-              <p className="text-sm text-neutral-400">{t("projects.select")}</p>
+              <p className="text-base text-neutral-400">{t("projects.select")}</p>
             </div>
           )}
         </main>
@@ -296,7 +296,7 @@ function EntryNoteModal({
   return (
     <Modal title={t("timer.noteTitle")} onClose={() => onClose(null)}>
       <div className="space-y-3">
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        <p className="text-base text-neutral-500 dark:text-neutral-400">
           {t("timer.noteBody")}
         </p>
         <textarea
@@ -304,18 +304,18 @@ function EntryNoteModal({
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={4}
-          className="w-full resize-none rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+          className="w-full resize-none rounded-md border border-neutral-300 bg-white px-3 py-2 text-base outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
         />
         <div className="flex justify-end gap-2 pt-1">
           <button
             onClick={() => onClose(null)}
-            className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            className="h-11 rounded-lg px-5 text-base text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
           >
             {t("timer.noteSkip")}
           </button>
           <button
             onClick={() => onClose(note.trim())}
-            className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+            className="h-11 rounded-lg bg-blue-600 px-6 text-base font-medium text-white hover:bg-blue-700"
           >
             {t("common.save")}
           </button>

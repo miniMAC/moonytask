@@ -18,10 +18,10 @@ export default function TimerBar({
     <div className="flex items-center gap-4 border-t border-neutral-200 bg-neutral-900 px-5 py-3 text-white dark:border-neutral-800 dark:bg-black/60 pro:border-[#44475a] pro:bg-[#21222c]">
       <button
         onClick={() => timer.projectId && onOpenProject(timer.projectId)}
-        className="min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline"
+        className="min-w-0 flex-1 truncate text-left text-base font-medium hover:underline"
       >
         {timer.projectName}
-        <span className="ml-2 text-xs font-normal text-neutral-400">
+        <span className="ml-2 text-sm font-normal text-neutral-400">
           {timer.status === "running" ? t("timer.running") : t("timer.paused")}
         </span>
       </button>
@@ -32,7 +32,7 @@ export default function TimerBar({
         <button
           title={t("timer.pause")}
           onClick={() => api.timerPause()}
-          className="rounded-full bg-white/15 p-2.5 hover:bg-white/25"
+          className="rounded-lg bg-white/15 p-2.5 hover:bg-white/25"
         >
           <PauseIcon />
         </button>
@@ -40,7 +40,7 @@ export default function TimerBar({
         <button
           title={t("timer.resume")}
           onClick={() => api.timerResume()}
-          className="rounded-full bg-white/15 p-2.5 hover:bg-white/25"
+          className="rounded-lg bg-white/15 p-2.5 hover:bg-white/25"
         >
           <PlayIcon />
         </button>
@@ -48,7 +48,7 @@ export default function TimerBar({
       <button
         title={t("timer.stop")}
         onClick={() => api.timerStop()}
-        className="rounded-full bg-red-500/80 p-2.5 hover:bg-red-500"
+        className="rounded-lg bg-red-500 p-2.5 hover:bg-red-400"
       >
         <StopIcon />
       </button>

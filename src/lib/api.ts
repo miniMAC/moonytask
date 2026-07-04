@@ -141,6 +141,8 @@ export const watcherSnooze = (bundleId: string, untilEpoch: number) =>
 // settings
 export const settingsGet = (key: string) =>
   invoke<string | null>("settings_get", { key });
+export const selectPdfExportDir = (current: string | null) =>
+  invoke<string | null>("select_pdf_export_dir", { current });
 export const settingsSet = (key: string, value: string) =>
   invoke<void>("settings_set", { key, value });
 

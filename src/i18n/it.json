@@ -48,7 +48,9 @@
     "selectedEntries": "{{count}} selezionati",
     "mergeEntries": "Unisci",
     "addEntryNote": "Aggiungi nota",
-    "editEntryNote": "Modifica nota"
+    "editEntryNote": "Modifica nota",
+    "exportPdf": "PDF",
+    "exportPdfHelp": "Esporta il PDF di tutto il periodo"
   },
   "timer": {
     "start": "Avvia",
@@ -131,6 +133,7 @@
     "pdfExportDir": "Cartella export PDF",
     "pdfExportDirPlaceholder": "Vuoto = Downloads",
     "pdfExportDirHelp": "Percorso della cartella dove salvare i PDF dei progetti. Puoi usare anche ~/Documents/TinyTime.",
+    "chooseFolder": "Scegli…",
     "rates": {
       "title": "Profili tariffari",
       "help": "Crea profili riutilizzabili con nome, tipo di pagamento e costo orario. Il profilo predefinito viene applicato ai nuovi progetti e puoi cambiarlo nella scheda progetto.",
@@ -176,14 +179,9 @@
       "syncing": "Sincronizzazione…",
       "lastSync": "Ultima sync: {{time}}",
       "error": "Errore: {{error}}"
-    }
-  },
-  "suggest": {
-    "title": "Vuoi avviare un timer?",
-    "body": "Stai usando {{app}} da un minuto senza un timer attivo.",
-    "project": "Progetto",
-    "start": "Avvia timer",
-    "dismiss": "Non ora"
+    },
+    "pdfTotalsOnly": "Nel PDF mostra solo i totali",
+    "pdfTotalsOnlyHelp": "Se attivo, il PDF contiene solo il riepilogo (tempo, costi, giorni) senza la tabella giorno per giorno."
   },
   "common": {
     "save": "Salva",

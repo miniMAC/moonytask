@@ -48,7 +48,9 @@
     "selectedEntries": "{{count}} selected",
     "mergeEntries": "Merge",
     "addEntryNote": "Add note",
-    "editEntryNote": "Edit note"
+    "editEntryNote": "Edit note",
+    "exportPdf": "PDF",
+    "exportPdfHelp": "Export the all-time PDF"
   },
   "timer": {
     "start": "Start",
@@ -131,6 +133,7 @@
     "pdfExportDir": "PDF export folder",
     "pdfExportDirPlaceholder": "Empty = Downloads",
     "pdfExportDirHelp": "Folder path where project PDFs are saved. You can also use ~/Documents/TinyTime.",
+    "chooseFolder": "Choose…",
     "rates": {
       "title": "Rate profiles",
       "help": "Create reusable profiles with a name, payment type, and hourly rate. The default profile is applied to new projects and can be changed in the project sheet.",
@@ -176,14 +179,9 @@
       "syncing": "Syncing…",
       "lastSync": "Last sync: {{time}}",
       "error": "Error: {{error}}"
-    }
-  },
-  "suggest": {
-    "title": "Start a timer?",
-    "body": "You've been using {{app}} for a minute without an active timer.",
-    "project": "Project",
-    "start": "Start timer",
-    "dismiss": "Not now"
+    },
+    "pdfTotalsOnly": "Show only totals in the PDF",
+    "pdfTotalsOnlyHelp": "When enabled, the PDF contains only the summary (time, costs, days) without the day-by-day table."
   },
   "common": {
     "save": "Save",

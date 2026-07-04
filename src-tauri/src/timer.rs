@@ -70,20 +70,21 @@ pub fn emit_state(app: &AppHandle) {
     crate::tray::refresh(app, &snap);
 }
 
+/// Sotto questa durata un segmento è considerato un avvio accidentale e scartato.
+const MIN_SEGMENT_SECS: i64 = 15;
+
 /// Chiude il segmento corrente scrivendolo su DB. Da chiamare con i lock già presi.
+/// I segmenti più corti di 15 secondi non vengono registrati (né mostrati nel totale).
 fn close_segment(conn: &rusqlite::Connection, t: &mut TimerState) -> Option<db::TimeEntry> {
     if let (Some(start), Some(pid)) = (t.segment_start, t.project_id.clone()) {
         let now = db::now_secs();
-        let entry = if now > start {
-            db::insert_time_entry(conn, &pid, start, now).ok()
-        } else {
-            None
-        };
-        if now > start {
-            t.accumulated += now - start;
-        }
         t.segment_start = None;
-        return entry;
+        let duration = now - start;
+        if duration >= MIN_SEGMENT_SECS {
+            t.accumulated += duration;
+            return db::insert_time_entry(conn, &pid, start, now).ok();
+        }
+        return None;
     }
     None
 }

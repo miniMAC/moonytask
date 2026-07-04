@@ -2,9 +2,10 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
+use std::process::Command;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 pub struct Db(pub Mutex<Connection>);
 
@@ -261,7 +262,12 @@ pub fn folders_list(db: State<Db>) -> Result<Vec<Folder>, String> {
 }
 
 #[tauri::command]
-pub fn folder_create(db: State<Db>, name: String, color: Option<String>) -> Result<Folder, String> {
+pub fn folder_create(
+    app: AppHandle,
+    db: State<Db>,
+    name: String,
+    color: Option<String>,
+) -> Result<Folder, String> {
     let conn = db.0.lock().unwrap();
     let f = Folder {
         id: new_id(),
@@ -283,11 +289,13 @@ pub fn folder_create(db: State<Db>, name: String, color: Option<String>) -> Resu
     )
     .map_err(err)?;
     crate::sync::mark_dirty();
+    let _ = app.emit("data_changed", ());
     Ok(f)
 }
 
 #[tauri::command]
 pub fn folder_update(
+    app: AppHandle,
     db: State<Db>,
     id: String,
     name: String,
@@ -300,6 +308,7 @@ pub fn folder_update(
     )
     .map_err(err)?;
     crate::sync::mark_dirty();
+    let _ = app.emit("data_changed", ());
     Ok(())
 }
 
@@ -335,7 +344,7 @@ pub fn project_totals(db: State<Db>) -> Result<Vec<ProjectTotal>, String> {
 }
 
 #[tauri::command]
-pub fn folder_delete(db: State<Db>, id: String) -> Result<(), String> {
+pub fn folder_delete(app: AppHandle, db: State<Db>, id: String) -> Result<(), String> {
     let conn = db.0.lock().unwrap();
     let count: i64 = conn
         .query_row(
@@ -353,6 +362,7 @@ pub fn folder_delete(db: State<Db>, id: String) -> Result<(), String> {
     )
     .map_err(err)?;
     crate::sync::mark_dirty();
+    let _ = app.emit("data_changed", ());
     Ok(())
 }
 
@@ -386,6 +396,7 @@ pub fn projects_list(db: State<Db>) -> Result<Vec<Project>, String> {
 
 #[tauri::command]
 pub fn project_create(
+    app: AppHandle,
     db: State<Db>,
     folder_id: String,
     name: String,
@@ -420,6 +431,7 @@ pub fn project_create(
     )
     .map_err(err)?;
     crate::sync::mark_dirty();
+    let _ = app.emit("data_changed", ());
     Ok(p)
 }
 
@@ -457,7 +469,7 @@ pub fn project_update(
 }
 
 #[tauri::command]
-pub fn project_delete(db: State<Db>, id: String) -> Result<(), String> {
+pub fn project_delete(app: AppHandle, db: State<Db>, id: String) -> Result<(), String> {
     let conn = db.0.lock().unwrap();
     conn.execute(
         "UPDATE projects SET deleted = 1, updated_at = ?2 WHERE id = ?1",
@@ -465,6 +477,7 @@ pub fn project_delete(db: State<Db>, id: String) -> Result<(), String> {
     )
     .map_err(err)?;
     crate::sync::mark_dirty();
+    let _ = app.emit("data_changed", ());
     Ok(())
 }
 
@@ -849,11 +862,14 @@ pub fn report_export_pdf(
         return Err("project_required".into());
     }
 
-    let (data, export_dir) = {
+    let (data, export_dir, totals_only) = {
         let conn = db.0.lock().unwrap();
         (
             export_data_inner(&conn).map_err(err)?,
             get_setting(&conn, "pdf_export_dir"),
+            get_setting(&conn, "pdf_totals_only")
+                .map(|v| v == "1")
+                .unwrap_or(false),
         )
     };
     let project_by_id = data
@@ -924,40 +940,81 @@ pub fn report_export_pdf(
     }
 
     let project_label = selected_project.name.clone();
+    let en = locale.to_lowercase().starts_with("en");
+    let all_time = from <= 0;
 
-    let mut lines = vec![
-        project_label.clone(),
+    let mut meta = vec![if all_time {
+        if en { "Period: all time".into() } else { "Periodo: tutto".to_string() }
+    } else {
         format!(
-            "Periodo: {} - {}",
+            "{}: {} - {}",
+            if en { "Period" } else { "Periodo" },
             format_epoch_date(from),
             format_epoch_date(to.saturating_sub(1))
-        ),
-        String::new(),
-        format!("Tempo periodo: {}", fmt_pdf_duration(period_secs)),
-        format!(
-            "Costo periodo: {}",
-            fmt_pdf_money(period_money, &currency, &locale)
-        ),
-        format!(
-            "Costo totale dall'inizio: {}",
+        )
+    }];
+    meta.push(String::new());
+    meta.push(format!(
+        "{}: {}",
+        match (en, all_time) {
+            (true, true) => "Total time",
+            (true, false) => "Period time",
+            (false, true) => "Tempo totale",
+            (false, false) => "Tempo periodo",
+        },
+        fmt_pdf_duration(period_secs)
+    ));
+    meta.push(format!(
+        "{}: {}",
+        match (en, all_time) {
+            (true, true) => "Total cost",
+            (true, false) => "Period cost",
+            (false, true) => "Costo totale",
+            (false, false) => "Costo periodo",
+        },
+        fmt_pdf_money(period_money, &currency, &locale)
+    ));
+    if !all_time {
+        meta.push(format!(
+            "{}: {}",
+            if en { "Total cost since start" } else { "Costo totale dall'inizio" },
             fmt_pdf_money(total_money, &currency, &locale)
-        ),
-        format!("Giorni lavorati: {days}"),
-        String::new(),
-    ];
-    if by_day.is_empty() {
-        lines.push("Nessun dato nel periodo selezionato.".to_string());
-    }
-    lines.push(String::new());
-    lines.push("Giorno / Tempo / Costo".to_string());
-    for (day, (secs, money)) in by_day.iter().rev() {
-        lines.push(format!(
-            "{}  |  {}  |  {}",
-            day,
-            fmt_pdf_duration(*secs),
-            fmt_pdf_money(*money, &currency, &locale)
         ));
     }
+    meta.push(format!(
+        "{}: {days}",
+        if en { "Days worked" } else { "Giorni lavorati" }
+    ));
+
+    let table = if by_day.is_empty() {
+        meta.push(String::new());
+        meta.push(if en {
+            "No data in the selected period.".into()
+        } else {
+            "Nessun dato nel periodo selezionato.".to_string()
+        });
+        None
+    } else if totals_only {
+        None
+    } else {
+        let headers: Vec<String> = if en {
+            vec!["Day".into(), "Time".into(), "Cost".into()]
+        } else {
+            vec!["Giorno".into(), "Tempo".into(), "Costo".into()]
+        };
+        let rows: Vec<Vec<String>> = by_day
+            .iter()
+            .rev()
+            .map(|(day, (secs, money))| {
+                vec![
+                    day.clone(),
+                    fmt_pdf_duration(*secs),
+                    fmt_pdf_money(*money, &currency, &locale),
+                ]
+            })
+            .collect();
+        Some((headers, rows))
+    };
 
     let dir = export_dir
         .as_deref()
@@ -979,7 +1036,7 @@ pub fn report_export_pdf(
         safe_file_stem(&project_label),
         now_secs()
     ));
-    write_simple_pdf(&path, &lines).map_err(err)?;
+    write_report_pdf(&path, &project_label, &meta, table).map_err(err)?;
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -1001,62 +1058,126 @@ fn expand_user_path(value: &str) -> Result<std::path::PathBuf, std::io::Error> {
     Ok(std::path::PathBuf::from(value))
 }
 
-fn write_simple_pdf(path: &std::path::Path, lines: &[String]) -> std::io::Result<()> {
-    let lines_per_page = 44usize;
-    let pages = lines.chunks(lines_per_page).collect::<Vec<_>>();
-    let page_count = pages.len().max(1);
+fn write_report_pdf(
+    path: &std::path::Path,
+    title: &str,
+    meta: &[String],
+    table: Option<(Vec<String>, Vec<Vec<String>>)>,
+) -> std::io::Result<()> {
+    const LEFT: f64 = 54.0;
+    const RIGHT: f64 = 541.0;
+    const TOP: f64 = 788.0;
+    const BOTTOM: f64 = 60.0;
+    const ROW_H: f64 = 22.0;
+
+    fn put_text(buf: &mut String, x: f64, y: f64, size: f64, bold: bool, s: &str) {
+        buf.push_str(&format!(
+            "BT /{} {} Tf {:.1} {:.1} Td ({}) Tj ET\n",
+            if bold { "F2" } else { "F1" },
+            size,
+            x,
+            y,
+            pdf_escape(s)
+        ));
+    }
+
+    /// Disegna una riga di tabella (bordi cella + testo) con il lato alto a y_top.
+    fn put_row(
+        buf: &mut String,
+        y_top: f64,
+        cells: &[String],
+        widths: &[f64],
+        bold: bool,
+        fill: bool,
+    ) {
+        let total: f64 = widths.iter().sum();
+        if fill {
+            buf.push_str(&format!(
+                "0.93 g {:.1} {:.1} {:.1} {:.1} re f 0 g\n",
+                LEFT,
+                y_top - ROW_H,
+                total,
+                ROW_H
+            ));
+        }
+        let mut x = LEFT;
+        for (i, cell) in cells.iter().enumerate() {
+            let w = widths[i.min(widths.len() - 1)];
+            buf.push_str(&format!(
+                "0.75 G 0.7 w {:.1} {:.1} {:.1} {:.1} re S\n",
+                x,
+                y_top - ROW_H,
+                w,
+                ROW_H
+            ));
+            put_text(buf, x + 8.0, y_top - ROW_H + 7.0, 10.5, bold, cell);
+            x += w;
+        }
+    }
+
+    let mut pages: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    let mut y = TOP;
+
+    put_text(&mut cur, LEFT, y, 18.0, true, title);
+    y -= 32.0;
+    for line in meta {
+        if line.is_empty() {
+            y -= 8.0;
+            continue;
+        }
+        put_text(&mut cur, LEFT, y, 11.0, false, line);
+        y -= 16.0;
+    }
+    y -= 10.0;
+
+    if let Some((headers, rows)) = table {
+        let total = RIGHT - LEFT;
+        let widths: Vec<f64> = if headers.len() == 3 {
+            vec![total * 0.42, total * 0.28, total * 0.30]
+        } else {
+            vec![total / headers.len().max(1) as f64; headers.len().max(1)]
+        };
+
+        put_row(&mut cur, y, &headers, &widths, true, true);
+        y -= ROW_H;
+        for row in &rows {
+            if y - ROW_H < BOTTOM {
+                pages.push(std::mem::take(&mut cur));
+                y = TOP;
+                put_row(&mut cur, y, &headers, &widths, true, true);
+                y -= ROW_H;
+            }
+            put_row(&mut cur, y, row, &widths, false, false);
+            y -= ROW_H;
+        }
+    }
+    pages.push(cur);
+
+    // struttura PDF: 1 catalog, 2 pages, 3 Helvetica, 4 Helvetica-Bold, poi coppie pagina/contenuto
     let mut objects = vec![
         "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
         String::new(),
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string(),
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>".to_string(),
     ];
-
     let mut kids = Vec::new();
-    for (idx, page_lines) in pages.iter().enumerate() {
-        let page_id = 4 + idx * 2;
+    for (idx, stream) in pages.iter().enumerate() {
+        let page_id = 5 + idx * 2;
         let content_id = page_id + 1;
         kids.push(format!("{page_id} 0 R"));
         objects.push(format!(
-            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents {content_id} 0 R >>"
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents {content_id} 0 R >>"
         ));
-
-        let mut stream = String::from("BT /F1 11 Tf 54 790 Td 16 TL\n");
-        for (line_idx, line) in page_lines.iter().enumerate() {
-            if idx == 0 && line_idx == 0 {
-                stream.push_str("/F1 18 Tf ");
-            } else if idx == 0 && line_idx == 1 {
-                stream.push_str("/F1 11 Tf ");
-            }
-            stream.push('(');
-            stream.push_str(&pdf_escape(line));
-            stream.push_str(") Tj T*\n");
-        }
-        stream.push_str("ET");
         objects.push(format!(
             "<< /Length {} >>\nstream\n{}\nendstream",
             stream.as_bytes().len(),
             stream
         ));
     }
-
-    if pages.is_empty() {
-        let page_id = 4;
-        let content_id = 5;
-        kids.push(format!("{page_id} 0 R"));
-        objects.push(format!(
-            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents {content_id} 0 R >>"
-        ));
-        let stream = "BT /F1 18 Tf 54 790 Td (TinyTime Report) Tj ET";
-        objects.push(format!(
-            "<< /Length {} >>\nstream\n{}\nendstream",
-            stream.as_bytes().len(),
-            stream
-        ));
-    }
-
     objects[1] = format!(
         "<< /Type /Pages /Count {} /Kids [{}] >>",
-        page_count,
+        pages.len(),
         kids.join(" ")
     );
 
@@ -1081,6 +1202,7 @@ fn write_simple_pdf(path: &std::path::Path, lines: &[String]) -> std::io::Result
     ));
     std::fs::write(path, out)
 }
+
 
 fn pdf_escape(value: &str) -> String {
     value
@@ -1712,6 +1834,11 @@ pub fn settings_get(db: State<Db>, key: String) -> Result<Option<String>, String
 }
 
 #[tauri::command]
+pub fn select_pdf_export_dir(current: Option<String>) -> Result<Option<String>, String> {
+    select_folder_dialog(current.as_deref())
+}
+
+#[tauri::command]
 pub fn settings_set(
     app: tauri::AppHandle,
     db: State<Db>,
@@ -1725,4 +1852,94 @@ pub fn settings_set(
     use tauri::Emitter;
     let _ = app.emit("setting_changed", (key, value));
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn select_folder_dialog(current: Option<&str>) -> Result<Option<String>, String> {
+    let default_location = current
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .and_then(|value| expand_user_path(value).ok())
+        .filter(|path| path.is_dir())
+        .map(|path| {
+            format!(
+                " default location (POSIX file \"{}\")",
+                escape_applescript_string(&path.to_string_lossy())
+            )
+        })
+        .unwrap_or_default();
+
+    let script = format!(
+        "set pickedFolder to choose folder with prompt \"Scegli la cartella per salvare i PDF\"{}\nPOSIX path of pickedFolder",
+        default_location
+    );
+    let output = Command::new("/usr/bin/osascript")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .map_err(err)?;
+
+    if output.status.success() {
+        let selected = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let value = if selected == "/" {
+            selected
+        } else {
+            selected.trim_end_matches('/').to_string()
+        };
+        return Ok((!value.is_empty()).then_some(value));
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if stderr.contains("User canceled") || stderr.contains("annullato") {
+        return Ok(None);
+    }
+    Err(stderr.trim().to_string())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn select_folder_dialog(_current: Option<&str>) -> Result<Option<String>, String> {
+    Err("folder_dialog_not_supported".into())
+}
+
+fn escape_applescript_string(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', " ")
+        .replace('\r', " ")
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn report_pdf_renders() {
+        let path = std::env::temp_dir().join("tinytime-test-report.pdf");
+        let meta = vec![
+            "Periodo: tutto".to_string(),
+            String::new(),
+            "Tempo totale: 12h 30m".to_string(),
+            "Costo totale: 512,35 EUR".to_string(),
+            "Giorni lavorati: 6".to_string(),
+        ];
+        let rows: Vec<Vec<String>> = (0..40)
+            .map(|i| {
+                vec![
+                    format!("2026-07-{:02}", (i % 28) + 1),
+                    "1h 05m".to_string(),
+                    "27,08 EUR".to_string(),
+                ]
+            })
+            .collect();
+        super::write_report_pdf(
+            &path,
+            "App mobile",
+            &meta,
+            Some((
+                vec!["Giorno".into(), "Tempo".into(), "Costo".into()],
+                rows,
+            )),
+        )
+        .unwrap();
+        assert!(path.metadata().unwrap().len() > 500);
+    }
 }

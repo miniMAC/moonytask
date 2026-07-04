@@ -1,0 +1,57 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b2b33"/>
+      <stop offset="0.55" stop-color="#202027"/>
+      <stop offset="1" stop-color="#141419"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f2e3ae"/>
+      <stop offset="1" stop-color="#d9b96a"/>
+    </linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#232330"/>
+      <stop offset="1" stop-color="#191921"/>
+    </linearGradient>
+  </defs>
+
+  <!-- sfondo squircle scuro con margine (stile Big Sur) -->
+  <rect x="60" y="60" width="904" height="904" rx="204" fill="url(#bg)"/>
+  <rect x="60" y="60" width="904" height="904" rx="204" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="3"/>
+
+  <!-- pulsanti del cronometro in alto -->
+  <rect x="410" y="140" width="72" height="40" rx="20" fill="#4a4a58"/>
+  <rect x="476" y="118" width="86" height="66" rx="22" fill="url(#gold)"/>
+  <rect x="556" y="140" width="72" height="40" rx="20" fill="#4a4a58"/>
+
+  <!-- corpo orologio -->
+  <circle cx="512" cy="575" r="330" fill="#101016"/>
+  <circle cx="512" cy="575" r="300" fill="url(#face)"/>
+
+  <!-- tacche -->
+  <g stroke="#3c3c4c" stroke-width="10" stroke-linecap="round">
+    <line x1="512" y1="330" x2="512" y2="368"/>
+    <line x1="634.5" y1="362.8" x2="615.5" y2="395.7"/>
+    <line x1="724.2" y1="452.5" x2="691.3" y2="471.5"/>
+    <line x1="757" y1="575" x2="719" y2="575"/>
+    <line x1="724.2" y1="697.5" x2="691.3" y2="678.5"/>
+    <line x1="634.5" y1="787.2" x2="615.5" y2="754.3"/>
+    <line x1="512" y1="820" x2="512" y2="782"/>
+    <line x1="389.5" y1="787.2" x2="408.5" y2="754.3"/>
+    <line x1="299.8" y1="697.5" x2="332.7" y2="678.5"/>
+    <line x1="267" y1="575" x2="305" y2="575"/>
+    <line x1="299.8" y1="452.5" x2="332.7" y2="471.5"/>
+    <line x1="389.5" y1="362.8" x2="408.5" y2="395.7"/>
+  </g>
+
+  <!-- arco dorato (progresso) con gap in alto a sinistra -->
+  <g fill="none" stroke="url(#gold)" stroke-width="36" stroke-linecap="round">
+    <path d="M 530.9 306.6 A 269 269 0 1 1 280.1 425.4"/>
+  </g>
+
+  <!-- prompt >_ -->
+  <g stroke="#f5e9c8" stroke-width="58" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M 408 470 L 520 575 L 408 680"/>
+    <line x1="578" y1="680" x2="668" y2="680"/>
+  </g>
+</svg>

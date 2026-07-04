@@ -44,6 +44,8 @@ export default function ProjectView(p: Props) {
   const [payments, setPayments] = useState<ProjectPayment[]>([]);
   const [manualOpen, setManualOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfMsg, setPdfMsg] = useState<string | null>(null);
   const [noteEntry, setNoteEntry] = useState<TimeEntry | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(
     () => new Set(),
@@ -114,6 +116,29 @@ export default function ProjectView(p: Props) {
     load();
   };
 
+  // esporta il PDF dell'intero storico del progetto, senza scegliere un periodo
+  const exportAllTimePdf = async () => {
+    if (pdfBusy) return;
+    setPdfBusy(true);
+    setPdfMsg(null);
+    try {
+      await api.reportExportPdf({
+        from: 0,
+        to: Math.floor(Date.now() / 1000) + 86400,
+        folderId: "all",
+        projectId: p.project.id,
+        currency: p.currency,
+        locale,
+      });
+      setPdfMsg(t("reports.pdfExported"));
+    } catch {
+      setPdfMsg(t("reports.pdfFailed"));
+    } finally {
+      setPdfBusy(false);
+      window.setTimeout(() => setPdfMsg(null), 4000);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-3xl px-8 py-8">
       <div className="flex items-start justify-between">
@@ -127,7 +152,7 @@ export default function ProjectView(p: Props) {
             />
             <h1 className="text-xl font-semibold">{p.project.name}</h1>
           </div>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 text-base text-neutral-500">
             {p.folder?.name}
             {p.project.hourlyRate > 0 && (
               <>
@@ -138,7 +163,20 @@ export default function ProjectView(p: Props) {
             )}
           </p>
         </div>
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
+          {pdfMsg && (
+            <span className="mr-1 max-w-48 truncate text-sm text-neutral-500">
+              {pdfMsg}
+            </span>
+          )}
+          <button
+            onClick={exportAllTimePdf}
+            disabled={pdfBusy}
+            title={t("projects.exportPdfHelp")}
+            className="h-11 rounded-lg border border-neutral-300 px-5 text-base font-semibold hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+          >
+            {pdfBusy ? "..." : t("projects.exportPdf")}
+          </button>
           <button
             title={t("projects.edit")}
             onClick={p.onEdit}
@@ -164,7 +202,7 @@ export default function ProjectView(p: Props) {
         {!mine || p.timer.status === "idle" ? (
           <button
             onClick={() => api.timerStart(p.project.id)}
-            className="flex items-center gap-2 rounded-full bg-green-600 px-6 py-3 font-medium text-white hover:bg-green-700"
+            className="flex items-center gap-2 rounded-xl bg-green-500 px-6 py-3 font-semibold text-white hover:bg-green-400"
           >
             <PlayIcon />
             {t("timer.start")}
@@ -174,7 +212,7 @@ export default function ProjectView(p: Props) {
             {p.timer.status === "running" ? (
               <button
                 onClick={() => api.timerPause()}
-                className="flex items-center gap-2 rounded-full bg-amber-500 px-5 py-3 font-medium text-white hover:bg-amber-600"
+                className="flex items-center gap-2 rounded-xl bg-amber-400 px-5 py-3 font-semibold text-white hover:bg-amber-300"
               >
                 <PauseIcon />
                 {t("timer.pause")}
@@ -182,7 +220,7 @@ export default function ProjectView(p: Props) {
             ) : (
               <button
                 onClick={() => api.timerResume()}
-                className="flex items-center gap-2 rounded-full bg-green-600 px-5 py-3 font-medium text-white hover:bg-green-700"
+                className="flex items-center gap-2 rounded-xl bg-green-500 px-5 py-3 font-semibold text-white hover:bg-green-400"
               >
                 <PlayIcon />
                 {t("timer.resume")}
@@ -190,7 +228,7 @@ export default function ProjectView(p: Props) {
             )}
             <button
               onClick={() => api.timerStop()}
-              className="flex items-center gap-2 rounded-full bg-red-600 px-5 py-3 font-medium text-white hover:bg-red-700"
+              className="flex items-center gap-2 rounded-xl bg-red-500 px-5 py-3 font-semibold text-white hover:bg-red-400"
             >
               <StopIcon />
               {t("timer.stop")}
@@ -241,12 +279,12 @@ export default function ProjectView(p: Props) {
 
       <div className="mt-6 rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900/30 pro:border-[#44475a] pro:bg-[#21222c]">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+          <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
             {t("projects.payments")}
           </h2>
           <button
             onClick={() => setPaymentOpen(true)}
-            className="flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+            className="flex items-center gap-1 rounded-md border border-neutral-200 px-4 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
           >
             <PlusIcon size={13} />
             {t("projects.markPaid")}
@@ -273,11 +311,11 @@ export default function ProjectView(p: Props) {
           />
         </div>
         {payments.length === 0 ? (
-          <p className="mt-4 text-sm text-neutral-500">
+          <p className="mt-4 text-base text-neutral-500">
             {t("projects.noPayments")}
           </p>
         ) : (
-          <ul className="mt-4 divide-y divide-neutral-100 overflow-hidden rounded-lg border border-neutral-200 text-sm dark:divide-neutral-800 dark:border-neutral-700 pro:divide-[#44475a] pro:border-[#44475a]">
+          <ul className="mt-4 divide-y divide-neutral-100 overflow-hidden rounded-lg border border-neutral-200 text-base dark:divide-neutral-800 dark:border-neutral-700 pro:divide-[#44475a] pro:border-[#44475a]">
             {payments.slice(0, 5).map((payment) => (
               <li
                 key={payment.id}
@@ -287,7 +325,7 @@ export default function ProjectView(p: Props) {
                   <span className="block truncate font-medium">
                     {t("projects.paidThrough")} {fmtDate(payment.paidThroughAt, locale)}
                   </span>
-                  <span className="block truncate text-xs text-neutral-500">
+                  <span className="block truncate text-sm text-neutral-500">
                     {t("projects.paidAt")} {fmtDate(payment.paidAt, locale)}
                     {payment.note ? ` · ${payment.note}` : ""}
                   </span>
@@ -307,25 +345,25 @@ export default function ProjectView(p: Props) {
       {/* entries */}
       <div className="mt-8">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+          <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
             {t("projects.recentEntries")}
           </h2>
           <div className="flex flex-wrap items-center gap-2">
             {selectedCount > 0 && (
               <div className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900/40 pro:border-[#44475a] pro:bg-[#21222c]">
-                <span className="px-1 text-xs font-medium text-neutral-500 pro:text-[#b9b9c8]">
+                <span className="px-1 text-sm font-medium text-neutral-500 pro:text-[#b9b9c8]">
                   {t("projects.selectedEntries", { count: selectedCount })}
                 </span>
                 <button
                   onClick={() => setSelectedEntryIds(new Set())}
-                  className="rounded-md px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 pro:hover:bg-[#343746]"
+                  className="rounded-md px-3 py-1.5 text-base text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 pro:hover:bg-[#343746]"
                 >
                   {t("common.cancel")}
                 </button>
                 <button
                   onClick={mergeSelectedEntries}
                   disabled={selectedCount < 2}
-                  className="rounded-md bg-neutral-950 px-2.5 py-1 text-xs font-semibold text-white hover:bg-neutral-800 disabled:opacity-40 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 pro:bg-[#50fa7b] pro:text-[#282a36]"
+                  className="rounded-md bg-neutral-950 px-2.5 py-1 text-sm font-semibold text-white hover:bg-neutral-800 disabled:opacity-40 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 pro:bg-[#50fa7b] pro:text-[#282a36]"
                 >
                   {t("projects.mergeEntries")}
                 </button>
@@ -333,7 +371,7 @@ export default function ProjectView(p: Props) {
             )}
             <button
               onClick={() => setManualOpen(true)}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              className="flex items-center gap-1 rounded-md px-3 py-1.5 text-base text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
             >
               <PlusIcon size={13} />
               {t("projects.addManual")}
@@ -341,7 +379,7 @@ export default function ProjectView(p: Props) {
           </div>
         </div>
         {entries.length === 0 ? (
-          <p className="py-4 text-sm text-neutral-500">
+          <p className="py-4 text-base text-neutral-500">
             {t("projects.noEntries")}
           </p>
         ) : (
@@ -352,7 +390,7 @@ export default function ProjectView(p: Props) {
               <li
                 key={e.id}
                 onClick={() => setNoteEntry(e)}
-                className={`group grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-2.5 text-sm transition ${
+                className={`group grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-2.5 text-base transition ${
                   selected
                     ? "bg-blue-50 dark:bg-blue-950/30 pro:bg-[#44475a]/50"
                     : "hover:bg-neutral-50 dark:hover:bg-neutral-800/60 pro:hover:bg-[#343746]"
@@ -369,7 +407,7 @@ export default function ProjectView(p: Props) {
                 <span className="min-w-0 text-neutral-700 dark:text-neutral-300">
                   <span className="block truncate">{fmtDateTime(e.startedAt, locale)}</span>
                   {e.note && (
-                    <span className="block truncate text-xs text-neutral-400">
+                    <span className="block truncate text-sm text-neutral-400">
                       {e.note}
                     </span>
                   )}
@@ -449,10 +487,10 @@ function ProjectStatTile({
 }) {
   return (
     <div className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-700 pro:border-[#44475a]">
-      <p className="text-xs text-neutral-500 pro:text-[#b9b9c8]">{label}</p>
+      <p className="text-sm text-neutral-500 pro:text-[#b9b9c8]">{label}</p>
       <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
       {detail && (
-        <p className="text-xs text-neutral-500 pro:text-[#b9b9c8]">{detail}</p>
+        <p className="text-sm text-neutral-500 pro:text-[#b9b9c8]">{detail}</p>
       )}
     </div>
   );
@@ -489,48 +527,48 @@ function ManualEntryModal({
       <div className="space-y-3">
         <div className="flex gap-3">
           <label className="block flex-1">
-            <span className="mb-1 block text-xs font-medium text-neutral-600">
+            <span className="mb-1 block text-sm font-medium text-neutral-600">
               {t("projects.date")}
             </span>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+              className="w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-base outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
             />
           </label>
           <label className="block w-40">
-            <span className="mb-1 block text-xs font-medium text-neutral-600">
+            <span className="mb-1 block text-sm font-medium text-neutral-600">
               {t("projects.durationMinutes")}
             </span>
             <input
               inputMode="numeric"
               value={minutes}
               onChange={(e) => setMinutes(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+              className="w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-base outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
             />
           </label>
         </div>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-neutral-600">
+          <span className="mb-1 block text-sm font-medium text-neutral-600">
             {t("projects.note")}
           </span>
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+            className="w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-base outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
           />
         </label>
         <div className="flex justify-end gap-2 pt-2">
           <button
             onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            className="h-11 rounded-lg px-5 text-base text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
           >
             {t("common.cancel")}
           </button>
           <button
             onClick={save}
-            className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+            className="h-11 rounded-lg bg-blue-600 px-6 text-base font-medium text-white hover:bg-blue-700"
           >
             {t("common.add")}
           </button>
@@ -565,7 +603,7 @@ function EntryNoteModal({
     >
       <div className="space-y-3">
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-300">
+          <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-300">
             {fmtDateTime(entry.startedAt, locale)}
           </span>
           <textarea
@@ -573,19 +611,19 @@ function EntryNoteModal({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={4}
-            className="w-full resize-none rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+            className="w-full resize-none rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-base outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
           />
         </label>
         <div className="flex justify-end gap-2 pt-2">
           <button
             onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            className="h-11 rounded-lg px-5 text-base text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
           >
             {t("common.cancel")}
           </button>
           <button
             onClick={save}
-            className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+            className="h-11 rounded-lg bg-blue-600 px-6 text-base font-medium text-white hover:bg-blue-700"
           >
             {t("common.save")}
           </button>
@@ -622,37 +660,37 @@ function PaymentModal({
     <Modal title={t("projects.markPaid")} onClose={onClose}>
       <div className="space-y-3">
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-300">
+          <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-300">
             {t("projects.paymentThroughDate")}
           </span>
           <input
             type="date"
             value={paidThroughDate}
             onChange={(e) => setPaidThroughDate(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+            className="w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-base outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-300">
+          <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-300">
             {t("projects.paymentNote")}
           </span>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
-            className="w-full resize-none rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+            className="w-full resize-none rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-base outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
           />
         </label>
         <div className="flex justify-end gap-2 pt-2">
           <button
             onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            className="h-11 rounded-lg px-5 text-base text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
           >
             {t("common.cancel")}
           </button>
           <button
             onClick={save}
-            className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+            className="h-11 rounded-lg bg-blue-600 px-6 text-base font-medium text-white hover:bg-blue-700"
           >
             {t("projects.paymentCreate")}
           </button>

@@ -32,16 +32,16 @@ export default function Sidebar(p: Props) {
   const { t } = useTranslation();
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 pro:border-[#44475a] pro:bg-[#21222c]">
+    <aside className="flex w-72 shrink-0 flex-col border-r border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 pro:border-[#44475a] pro:bg-[#21222c]">
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
-        <span className="text-sm font-bold tracking-wide text-neutral-700 dark:text-neutral-200 pro:text-[#f8f8f2]">
+        <span className="text-base font-bold tracking-wide text-neutral-700 dark:text-neutral-200 pro:text-[#f8f8f2]">
           TinyTime
         </span>
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-2">
         <div className="mb-1 flex items-center justify-between px-2 pt-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 pro:text-[#bd93f9]">
+          <span className="text-sm font-semibold uppercase tracking-wider text-neutral-500 pro:text-[#bd93f9]">
             {t("folders.title")}
           </span>
           <button
@@ -54,7 +54,7 @@ export default function Sidebar(p: Props) {
         </div>
 
         {p.folders.length === 0 && (
-          <p className="px-2 py-3 text-xs text-neutral-500">
+          <p className="px-2 py-3 text-sm text-neutral-500">
             {t("folders.empty")}
           </p>
         )}
@@ -69,7 +69,7 @@ export default function Sidebar(p: Props) {
                 <span style={{ color: folder.color ?? undefined }}>
                   <FolderIcon size={13} />
                 </span>
-                <span className="flex-1 truncate text-[13px] font-medium">
+                <span className="flex-1 truncate text-base font-medium">
                   {folder.name}
                 </span>
                 <span className="hidden gap-0.5 group-hover:flex">
@@ -107,7 +107,7 @@ export default function Sidebar(p: Props) {
                   <div
                     key={project.id}
                     onClick={() => p.onSelectProject(project.id)}
-                    className={`group ml-3 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[13px] ${
+                    className={`group ml-3 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-base ${
                       active
                         ? "bg-white font-medium shadow-sm dark:bg-neutral-800 pro:bg-[#44475a] pro:text-[#f8f8f2]"
                         : "text-neutral-700 hover:bg-neutral-200/60 dark:text-neutral-300 dark:hover:bg-neutral-800/60 pro:text-[#d7d7e2] pro:hover:bg-[#343746]"
@@ -147,7 +147,7 @@ export default function Sidebar(p: Props) {
                 );
               })}
               {items.length === 0 && (
-                <p className="ml-5 py-1 text-xs text-neutral-400 dark:text-neutral-600">
+                <p className="ml-5 py-1 text-sm text-neutral-400 dark:text-neutral-600">
                   {t("projects.empty")}
                 </p>
               )}
@@ -166,7 +166,7 @@ export default function Sidebar(p: Props) {
           <button
             key={v}
             onClick={() => p.onNav(v)}
-            className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] ${
+            className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-base ${
               p.view === v
                 ? "bg-white font-medium shadow-sm dark:bg-neutral-800 pro:bg-[#44475a] pro:text-[#f8f8f2]"
                 : "text-neutral-600 hover:bg-neutral-200/60 dark:text-neutral-300 dark:hover:bg-neutral-800/60 pro:text-[#d7d7e2] pro:hover:bg-[#343746]"

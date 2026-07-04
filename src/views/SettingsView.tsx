@@ -19,9 +19,9 @@ const SETTINGS_TABS = ["general", "rates", "apps", "sync"] as const;
 const PAYMENT_TYPES: PaymentType[] = ["hourly", "retainer", "fixed"];
 
 const inputCls =
-  "rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2]";
+  "h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2]";
 const rateFieldCls =
-  "h-11 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2] pro:focus:border-[#bd93f9]";
+  "h-11 w-full rounded-md border border-neutral-300 bg-white px-3 text-base outline-none transition focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2] pro:focus:border-[#bd93f9]";
 const rateGridCls =
   "grid min-w-[820px] grid-cols-[minmax(240px,1fr)_180px_150px_170px_44px] gap-3";
 
@@ -41,7 +41,7 @@ export default function SettingsView(p: Props) {
     <div className="mx-auto max-w-4xl px-8 py-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">{t("settings.title")}</h1>
-        <nav className="flex rounded-lg border border-neutral-200 bg-neutral-100 p-1 text-sm dark:border-neutral-700 dark:bg-neutral-900 pro:border-[#44475a] pro:bg-[#21222c]">
+        <nav className="flex rounded-lg border border-neutral-200 bg-neutral-100 p-1 text-base dark:border-neutral-700 dark:bg-neutral-900 pro:border-[#44475a] pro:bg-[#21222c]">
           {SETTINGS_TABS.map((item) => (
             <button
               key={item}
@@ -84,9 +84,14 @@ function GeneralSection({
   const { pref, setPref } = useTheme();
   const [pdfDir, setPdfDir] = useState("");
   const [pdfSaved, setPdfSaved] = useState(false);
+  const [pdfSelecting, setPdfSelecting] = useState(false);
+  const [pdfTotalsOnly, setPdfTotalsOnly] = useState(false);
 
   useEffect(() => {
     api.settingsGet("pdf_export_dir").then((value) => setPdfDir(value ?? ""));
+    api
+      .settingsGet("pdf_totals_only")
+      .then((value) => setPdfTotalsOnly(value === "1"));
   }, []);
 
   const savePdfDir = async () => {
@@ -95,14 +100,29 @@ function GeneralSection({
     window.setTimeout(() => setPdfSaved(false), 1600);
   };
 
+  const choosePdfDir = async () => {
+    if (pdfSelecting) return;
+    setPdfSelecting(true);
+    try {
+      const selected = await api.selectPdfExportDir(pdfDir.trim() || null);
+      if (selected === null) return;
+      setPdfDir(selected);
+      await api.settingsSet("pdf_export_dir", selected);
+      setPdfSaved(true);
+      window.setTimeout(() => setPdfSaved(false), 1600);
+    } finally {
+      setPdfSelecting(false);
+    }
+  };
+
   return (
     <section>
-      <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+      <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
         {t("settings.general")}
       </h2>
       <div className="mt-3 flex flex-wrap gap-6">
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+          <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
             {t("settings.language")}
           </span>
           <select
@@ -118,7 +138,7 @@ function GeneralSection({
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+          <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
             {t("settings.theme")}
           </span>
           <select
@@ -133,7 +153,7 @@ function GeneralSection({
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+          <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
             {t("settings.currency")}
           </span>
           <select
@@ -154,7 +174,7 @@ function GeneralSection({
       </div>
       <div className="mt-6 max-w-2xl">
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+          <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
             {t("settings.pdfExportDir")}
           </span>
           <div className="flex gap-2">
@@ -166,15 +186,38 @@ function GeneralSection({
               className={`min-w-0 flex-1 ${inputCls}`}
             />
             <button
+              onClick={choosePdfDir}
+              disabled={pdfSelecting}
+              className="h-11 rounded-lg border border-neutral-300 px-5 text-base font-medium hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+            >
+              {pdfSelecting
+                ? t("common.loading")
+                : t("settings.chooseFolder")}
+            </button>
+            <button
               onClick={savePdfDir}
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+              className="h-11 rounded-lg border border-neutral-300 px-5 text-base font-medium hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
             >
               {pdfSaved ? t("common.saved") : t("common.save")}
             </button>
           </div>
         </label>
-        <p className="mt-1.5 text-xs text-neutral-500">
+        <p className="mt-1.5 text-sm text-neutral-500">
           {t("settings.pdfExportDirHelp")}
+        </p>
+        <label className="mt-4 flex items-center gap-2 text-base">
+          <input
+            type="checkbox"
+            checked={pdfTotalsOnly}
+            onChange={(e) => {
+              setPdfTotalsOnly(e.target.checked);
+              api.settingsSet("pdf_totals_only", e.target.checked ? "1" : "0");
+            }}
+          />
+          {t("settings.pdfTotalsOnly")}
+        </label>
+        <p className="mt-1 text-sm text-neutral-500">
+          {t("settings.pdfTotalsOnlyHelp")}
         </p>
       </div>
     </section>
@@ -240,16 +283,16 @@ function RateProfilesSection({ projects }: { projects: Project[] }) {
 
   return (
     <section>
-      <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+      <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
         {t("settings.rates.title")}
       </h2>
-      <p className="mt-1 max-w-2xl text-xs text-neutral-500">
+      <p className="mt-1 max-w-2xl text-sm text-neutral-500">
         {t("settings.rates.help")}
       </p>
 
       <div className="mt-4 overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-700 pro:border-[#44475a]">
         <div
-          className={`${rateGridCls} bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-normal text-neutral-500 dark:bg-neutral-900/40 dark:text-neutral-400 pro:bg-[#21222c] pro:text-[#bd93f9]`}
+          className={`${rateGridCls} bg-neutral-50 px-4 py-3 text-sm font-semibold uppercase tracking-normal text-neutral-500 dark:bg-neutral-900/40 dark:text-neutral-400 pro:bg-[#21222c] pro:text-[#bd93f9]`}
         >
           <span>{t("settings.rates.name")}</span>
           <span>{t("settings.rates.paymentType")}</span>
@@ -260,7 +303,7 @@ function RateProfilesSection({ projects }: { projects: Project[] }) {
 
         <div className="divide-y divide-neutral-200 dark:divide-neutral-700 pro:divide-[#44475a]">
         {profiles.length === 0 && (
-          <p className="px-4 py-5 text-xs text-neutral-400">
+          <p className="px-4 py-5 text-sm text-neutral-400">
             {t("settings.rates.empty")}
           </p>
         )}
@@ -319,7 +362,7 @@ function RateProfilesSection({ projects }: { projects: Project[] }) {
             </label>
             <button
               onClick={() => saveProfiles(profiles, profile.id)}
-              className={`h-11 w-full rounded-md border px-3 text-sm font-semibold transition ${
+              className={`h-11 w-full rounded-md border px-3 text-base font-semibold transition ${
                 defaultId === profile.id
                   ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 pro:border-[#50fa7b] pro:bg-[#50fa7b]/15 pro:text-[#50fa7b]"
                   : "border-neutral-300 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:text-[#b9b9c8] pro:hover:bg-[#343746]"
@@ -343,7 +386,7 @@ function RateProfilesSection({ projects }: { projects: Project[] }) {
 
       <button
         onClick={addProfile}
-        className="mt-3 flex items-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+        className="mt-3 flex items-center gap-1.5 h-11 rounded-lg border border-neutral-300 px-5 text-base hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
       >
         <PlusIcon size={14} />
         {t("settings.rates.add")}
@@ -406,22 +449,22 @@ function ProjectRatesSection({
 
   return (
     <section className="mt-8">
-      <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+      <h3 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
         {t("settings.rates.projectTitle")}
       </h3>
-      <p className="mt-1 max-w-2xl text-xs text-neutral-500">
+      <p className="mt-1 max-w-2xl text-sm text-neutral-500">
         {t("settings.rates.projectHelp")}
       </p>
 
       <div className="mt-4 overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-700 pro:border-[#44475a]">
-        <div className="grid min-w-[720px] grid-cols-[minmax(260px,1fr)_220px_160px] gap-3 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-normal text-neutral-500 dark:bg-neutral-900/40 dark:text-neutral-400 pro:bg-[#21222c] pro:text-[#bd93f9]">
+        <div className="grid min-w-[720px] grid-cols-[minmax(260px,1fr)_220px_160px] gap-3 bg-neutral-50 px-4 py-3 text-sm font-semibold uppercase tracking-normal text-neutral-500 dark:bg-neutral-900/40 dark:text-neutral-400 pro:bg-[#21222c] pro:text-[#bd93f9]">
           <span>{t("reports.project")}</span>
           <span>{t("projects.rateProfile")}</span>
           <span>{t("projects.hourlyRate")}</span>
         </div>
         <div className="divide-y divide-neutral-200 dark:divide-neutral-700 pro:divide-[#44475a]">
           {rows.length === 0 && (
-            <p className="px-4 py-5 text-xs text-neutral-400">
+            <p className="px-4 py-5 text-sm text-neutral-400">
               {t("projects.empty")}
             </p>
           )}
@@ -430,7 +473,7 @@ function ProjectRatesSection({
               key={project.id}
               className="grid min-w-[720px] grid-cols-[minmax(260px,1fr)_220px_160px] items-center gap-3 px-4 py-3"
             >
-              <span className="truncate text-sm font-medium">{project.name}</span>
+              <span className="truncate text-base font-medium">{project.name}</span>
               <select
                 value={project.rateProfileId ?? ""}
                 onChange={(e) => selectProfile(project, e.target.value)}
@@ -491,14 +534,14 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
 
   return (
     <section>
-      <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+      <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
         {t("settings.watchedApps")}
       </h2>
-      <p className="mt-1 text-xs text-neutral-500">
+      <p className="mt-1 text-sm text-neutral-500">
         {t("settings.watchedAppsHelp")}
       </p>
 
-      <label className="mt-3 flex items-center gap-2 text-sm">
+      <label className="mt-3 flex items-center gap-2 text-base">
         <input
           type="checkbox"
           checked={notifOn}
@@ -512,12 +555,12 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
 
       <div className="mt-3 space-y-1.5">
         {watched.length === 0 && (
-          <p className="text-xs text-neutral-400">{t("settings.noWatched")}</p>
+          <p className="text-sm text-neutral-400">{t("settings.noWatched")}</p>
         )}
         {watched.map((w) => (
           <div
             key={w.id}
-            className="grid items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-700 md:grid-cols-[auto_minmax(0,1fr)_minmax(170px,220px)_150px_auto]"
+            className="grid items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 text-base dark:border-neutral-700 md:grid-cols-[auto_minmax(0,1fr)_minmax(170px,220px)_150px_auto]"
           >
             <input
               type="checkbox"
@@ -535,7 +578,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
             />
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{w.appName}</p>
-              <p className="truncate text-xs text-neutral-400">{w.bundleId}</p>
+              <p className="truncate text-sm text-neutral-400">{w.bundleId}</p>
             </div>
             <select
               value={w.projectId ?? ""}
@@ -549,7 +592,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
                   )
                   .then(load)
               }
-              className={`w-full text-xs ${inputCls}`}
+              className={`w-full text-sm ${inputCls}`}
               title={t("settings.linkedProject")}
             >
               <option value="">{t("settings.noLinkedProject")}</option>
@@ -561,7 +604,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
                   </option>
                 ))}
             </select>
-            <label className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+            <label className="flex items-center gap-1.5 text-sm text-neutral-500 dark:text-neutral-400">
               <span className="whitespace-nowrap">
                 {t("settings.reminderAfter")}
               </span>
@@ -584,7 +627,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
                     )
                     .then(load);
                 }}
-                className={`w-16 text-xs ${inputCls}`}
+                className={`w-16 text-sm ${inputCls}`}
               />
               <span>{t("settings.minutesShort")}</span>
             </label>
@@ -600,7 +643,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
 
       <button
         onClick={() => setPickerOpen(true)}
-        className="mt-3 flex items-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
+        className="mt-3 flex items-center gap-1.5 h-11 rounded-lg border border-neutral-300 px-5 text-base hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
       >
         <PlusIcon size={14} />
         {t("settings.addApp")}
@@ -655,7 +698,7 @@ function AppPickerModal({
       />
       <div className="mt-2 max-h-72 overflow-y-auto">
         {apps === null ? (
-          <p className="py-4 text-center text-sm text-neutral-400">
+          <p className="py-4 text-center text-base text-neutral-400">
             {t("common.loading")}
           </p>
         ) : (
@@ -663,10 +706,10 @@ function AppPickerModal({
             <button
               key={a.bundleId}
               onClick={() => onPick(a)}
-              className="block w-full rounded-md px-2.5 py-1.5 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700"
+              className="block w-full rounded-md px-2.5 py-1.5 text-left text-base hover:bg-neutral-100 dark:hover:bg-neutral-700"
             >
               <span className="font-medium">{a.name}</span>
-              <span className="ml-2 text-xs text-neutral-400">
+              <span className="ml-2 text-sm text-neutral-400">
                 {a.bundleId}
               </span>
             </button>
@@ -714,20 +757,20 @@ function SyncSection() {
 
   return (
     <section>
-      <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+      <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
         {t("settings.sync.title")}
       </h2>
-      <p className="mt-1 text-xs text-neutral-500">{t("settings.sync.help")}</p>
+      <p className="mt-1 text-sm text-neutral-500">{t("settings.sync.help")}</p>
 
       {!status.configured ? (
-        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
           {t("settings.sync.notConfigured")}
         </p>
       ) : (
         <div className="mt-3 space-y-2">
           {status.connected ? (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-800 dark:bg-green-950/60 dark:text-green-300">
+              <span className="rounded-full bg-green-100 px-2.5 py-1 text-sm font-medium text-green-800 dark:bg-green-950/60 dark:text-green-300">
                 {status.email
                   ? t("settings.sync.connectedAs", { email: status.email })
                   : t("settings.sync.connected")}
@@ -745,7 +788,7 @@ function SyncSection() {
                   }
                 }}
                 disabled={busy || status.inProgress}
-                className="rounded-md border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
+                className="h-11 rounded-lg border border-neutral-300 px-5 text-base hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
               >
                 {busy || status.inProgress
                   ? t("settings.sync.syncing")
@@ -753,14 +796,14 @@ function SyncSection() {
               </button>
               <button
                 onClick={() => api.syncLogout().then(refresh)}
-                className="rounded-md border border-neutral-300 px-3 py-1 text-xs text-red-600 hover:bg-red-50 dark:border-neutral-600 dark:hover:bg-red-950/40"
+                className="h-11 rounded-lg border border-neutral-300 px-5 text-base text-red-600 hover:bg-red-50 dark:border-neutral-600 dark:hover:bg-red-950/40"
               >
                 {t("settings.sync.disconnect")}
               </button>
             </div>
           ) : (
             <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              <label className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
                 {t("settings.sync.emailLabel")}
               </label>
               <div className="flex gap-2">
@@ -775,26 +818,26 @@ function SyncSection() {
                 <button
                   onClick={doLogin}
                   disabled={busy || !email.trim()}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="h-11 rounded-lg bg-blue-600 px-6 text-base font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                 >
                   {busy ? t("settings.sync.syncing") : t("settings.sync.connect")}
                 </button>
               </div>
-              <p className="mt-1.5 text-xs text-neutral-400">
+              <p className="mt-1.5 text-sm text-neutral-400">
                 {t("settings.sync.connectHelp")}
               </p>
             </div>
           )}
 
           {status.lastSync && (
-            <p className="text-xs text-neutral-400">
+            <p className="text-sm text-neutral-400">
               {t("settings.sync.lastSync", {
                 time: new Date(status.lastSync * 1000).toLocaleString(locale),
               })}
             </p>
           )}
           {status.lastError && (
-            <p className="text-xs text-red-600 dark:text-red-400">
+            <p className="text-sm text-red-600 dark:text-red-400">
               {t("settings.sync.error", { error: status.lastError })}
             </p>
           )}
