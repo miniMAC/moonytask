@@ -20,6 +20,10 @@ const PAYMENT_TYPES: PaymentType[] = ["hourly", "retainer", "fixed"];
 
 const inputCls =
   "rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2]";
+const rateFieldCls =
+  "h-11 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2] pro:focus:border-[#bd93f9]";
+const rateGridCls =
+  "grid min-w-[820px] grid-cols-[minmax(240px,1fr)_180px_150px_170px_44px] gap-3";
 
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
@@ -206,19 +210,30 @@ function RateProfilesSection() {
         {t("settings.rates.help")}
       </p>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-700 pro:border-[#44475a]">
+        <div
+          className={`${rateGridCls} bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-normal text-neutral-500 dark:bg-neutral-900/40 dark:text-neutral-400 pro:bg-[#21222c] pro:text-[#bd93f9]`}
+        >
+          <span>{t("settings.rates.name")}</span>
+          <span>{t("settings.rates.paymentType")}</span>
+          <span>{t("settings.rates.hourlyRate")}</span>
+          <span>{t("settings.rates.defaultColumn")}</span>
+          <span className="sr-only">{t("common.delete")}</span>
+        </div>
+
+        <div className="divide-y divide-neutral-200 dark:divide-neutral-700 pro:divide-[#44475a]">
         {profiles.length === 0 && (
-          <p className="text-xs text-neutral-400">
+          <p className="px-4 py-5 text-xs text-neutral-400">
             {t("settings.rates.empty")}
           </p>
         )}
         {profiles.map((profile) => (
           <div
             key={profile.id}
-            className="grid gap-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-700 md:grid-cols-[minmax(0,1.2fr)_170px_130px_auto_auto]"
+            className={`${rateGridCls} items-center px-4 py-3`}
           >
             <label className="block min-w-0">
-              <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              <span className="sr-only">
                 {t("settings.rates.name")}
               </span>
               <input
@@ -226,11 +241,11 @@ function RateProfilesSection() {
                 onChange={(e) =>
                   updateProfile(profile.id, { name: e.target.value })
                 }
-                className={`w-full ${inputCls}`}
+                className={rateFieldCls}
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              <span className="sr-only">
                 {t("settings.rates.paymentType")}
               </span>
               <select
@@ -240,7 +255,7 @@ function RateProfilesSection() {
                     paymentType: e.target.value as PaymentType,
                   })
                 }
-                className={`w-full ${inputCls}`}
+                className={rateFieldCls}
               >
                 {PAYMENT_TYPES.map((type) => (
                   <option key={type} value={type}>
@@ -250,7 +265,7 @@ function RateProfilesSection() {
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              <span className="sr-only">
                 {t("settings.rates.hourlyRate")}
               </span>
               <input
@@ -262,12 +277,12 @@ function RateProfilesSection() {
                       parseFloat(e.target.value.replace(",", ".")) || 0,
                   })
                 }
-                className={`w-full ${inputCls}`}
+                className={rateFieldCls}
               />
             </label>
             <button
               onClick={() => saveProfiles(profiles, profile.id)}
-              className={`self-end rounded-md border px-3 py-1.5 text-sm font-medium ${
+              className={`h-11 w-full rounded-md border px-3 text-sm font-semibold transition ${
                 defaultId === profile.id
                   ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 pro:border-[#50fa7b] pro:bg-[#50fa7b]/15 pro:text-[#50fa7b]"
                   : "border-neutral-300 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:text-[#b9b9c8] pro:hover:bg-[#343746]"
@@ -279,13 +294,14 @@ function RateProfilesSection() {
             </button>
             <button
               onClick={() => removeProfile(profile.id)}
-              className="self-end rounded-md p-2 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+              className="flex h-11 w-11 items-center justify-center rounded-md text-neutral-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
               title={t("common.delete")}
             >
               <TrashIcon size={16} />
             </button>
           </div>
         ))}
+        </div>
       </div>
 
       <button

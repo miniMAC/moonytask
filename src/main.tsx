@@ -10,6 +10,14 @@ import "./index.css";
 const isPopover = getCurrentWebviewWindow().label === "popover";
 if (isPopover) document.body.classList.add("popover-window");
 
+window.addEventListener(
+  "contextmenu",
+  (event) => {
+    event.preventDefault();
+  },
+  { capture: true },
+);
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ThemeProvider>{isPopover ? <PopoverApp /> : <App />}</ThemeProvider>

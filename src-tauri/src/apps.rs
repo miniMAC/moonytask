@@ -30,7 +30,9 @@ fn read_app_bundle(path: &Path) -> Option<InstalledApp> {
 
 #[cfg(target_os = "macos")]
 fn scan_dir(dir: &Path, out: &mut BTreeMap<String, InstalledApp>, depth: u8) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().map(|e| e == "app").unwrap_or(false) {

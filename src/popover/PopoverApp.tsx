@@ -243,6 +243,7 @@ export default function PopoverApp() {
 
   const openProjectMenu = (project: Project, event: MouseEvent) => {
     event.preventDefault();
+    event.stopPropagation();
     setCreateMenuOpen(false);
     setProjectMenu({
       project,
@@ -289,7 +290,18 @@ export default function PopoverApp() {
         : t("timer.start");
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden rounded-[14px] bg-neutral-50 text-neutral-950 shadow-[0_18px_44px_rgba(0,0,0,0.22)] dark:bg-neutral-950 dark:text-white pro:bg-[#282a36]">
+    <div
+      onMouseDown={() => {
+        setProjectMenu(null);
+        setCreateMenuOpen(false);
+      }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        setProjectMenu(null);
+        setCreateMenuOpen(false);
+      }}
+      className="flex h-screen flex-col overflow-hidden rounded-[14px] bg-neutral-50 text-neutral-950 shadow-[0_18px_44px_rgba(0,0,0,0.22)] dark:bg-neutral-950 dark:text-white pro:bg-[#282a36]"
+    >
       {/* header */}
       <div
         className="relative overflow-hidden px-4 pb-4 pt-4 text-white"
@@ -602,6 +614,11 @@ export default function PopoverApp() {
 
       {projectMenu && (
         <div
+          onMouseDown={(event) => event.stopPropagation()}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
           className="fixed z-50 w-36 overflow-hidden rounded-lg bg-white py-1 text-[12px] font-semibold text-neutral-800 shadow-xl ring-1 ring-black/10 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-white/10 pro:bg-[#21222c] pro:text-[#f8f8f2] pro:ring-[#44475a]"
           style={{ left: projectMenu.x, top: projectMenu.y }}
         >
@@ -630,7 +647,9 @@ export default function PopoverApp() {
         <div className="relative">
           <button
             title={t("popover.quickCreate")}
-            onClick={() => {
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
               setProjectMenu(null);
               setCreateMenuOpen((open) => !open);
             }}
@@ -639,7 +658,14 @@ export default function PopoverApp() {
             <PlusIcon size={16} />
           </button>
           {createMenuOpen && (
-            <div className="absolute bottom-10 left-0 z-50 w-40 overflow-hidden rounded-lg bg-white py-1 text-[12px] font-semibold text-neutral-800 shadow-xl ring-1 ring-black/10 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-white/10 pro:bg-[#21222c] pro:text-[#f8f8f2] pro:ring-[#44475a]">
+            <div
+              onMouseDown={(event) => event.stopPropagation()}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              className="absolute bottom-10 left-0 z-50 w-40 overflow-hidden rounded-lg bg-white py-1 text-[12px] font-semibold text-neutral-800 shadow-xl ring-1 ring-black/10 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-white/10 pro:bg-[#21222c] pro:text-[#f8f8f2] pro:ring-[#44475a]"
+            >
               <button
                 onClick={() => openQuickCreate("project")}
                 disabled={folders.length === 0}

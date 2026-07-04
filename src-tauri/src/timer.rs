@@ -29,10 +29,7 @@ impl TimerState {
     }
 
     pub fn elapsed(&self) -> i64 {
-        let running = self
-            .segment_start
-            .map(|s| db::now_secs() - s)
-            .unwrap_or(0);
+        let running = self.segment_start.map(|s| db::now_secs() - s).unwrap_or(0);
         self.accumulated + running
     }
 }
@@ -54,11 +51,9 @@ pub fn snapshot(app: &AppHandle) -> TimerSnapshot {
     let t = timer.0.lock().unwrap();
     let name = t.project_id.as_ref().and_then(|pid| {
         let conn = db.0.lock().unwrap();
-        conn.query_row(
-            "SELECT name FROM projects WHERE id = ?1",
-            [pid],
-            |r| r.get::<_, String>(0),
-        )
+        conn.query_row("SELECT name FROM projects WHERE id = ?1", [pid], |r| {
+            r.get::<_, String>(0)
+        })
         .ok()
     });
     TimerSnapshot {
@@ -88,7 +83,12 @@ fn close_segment(conn: &rusqlite::Connection, t: &mut TimerState) {
 }
 
 #[tauri::command]
-pub fn timer_start(app: AppHandle, timer: State<Timer>, db: State<Db>, project_id: String) -> Result<(), String> {
+pub fn timer_start(
+    app: AppHandle,
+    timer: State<Timer>,
+    db: State<Db>,
+    project_id: String,
+) -> Result<(), String> {
     {
         let mut t = timer.0.lock().unwrap();
         let conn = db.0.lock().unwrap();

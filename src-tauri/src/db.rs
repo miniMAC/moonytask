@@ -591,10 +591,7 @@ fn export_data_inner(conn: &Connection) -> rusqlite::Result<ExportData> {
     })
 }
 
-fn project_export_data_inner(
-    conn: &Connection,
-    project_id: &str,
-) -> rusqlite::Result<ExportData> {
+fn project_export_data_inner(conn: &Connection, project_id: &str) -> rusqlite::Result<ExportData> {
     let all = export_data_inner(conn)?;
     let Some(project) = all
         .projects
@@ -617,9 +614,7 @@ fn project_export_data_inner(
     let watched_apps = all
         .watched_apps
         .into_iter()
-        .filter(|app| {
-            app.project_id.as_deref() == Some(project.id.as_str()) && app.deleted == 0
-        })
+        .filter(|app| app.project_id.as_deref() == Some(project.id.as_str()) && app.deleted == 0)
         .collect();
 
     Ok(ExportData {
@@ -900,8 +895,8 @@ fn export_data_csv(data: &ExportData) -> String {
         csv_row(
             &mut out,
             &[
-                "setting", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
-                "", "", &s.key, &s.value, "", "",
+                "setting", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+                "", &s.key, &s.value, "", "",
             ],
         );
     }

@@ -69,8 +69,7 @@ pub fn upload(token: &str, file_id: Option<&str>, body: &str) -> Result<String, 
         }
         None => {
             let boundary = "tinytime_boundary_7f3a";
-            let metadata =
-                format!("{{\"name\":\"{FILE_NAME}\",\"parents\":[\"appDataFolder\"]}}");
+            let metadata = format!("{{\"name\":\"{FILE_NAME}\",\"parents\":[\"appDataFolder\"]}}");
             let multipart = format!(
                 "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{metadata}\r\n--{boundary}\r\nContent-Type: application/json\r\n\r\n{body}\r\n--{boundary}--"
             );

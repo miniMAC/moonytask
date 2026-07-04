@@ -109,6 +109,7 @@
       "name": "Nome",
       "paymentType": "Pagamento",
       "hourlyRate": "Costo orario",
+      "defaultColumn": "Predefinito",
       "default": "Default",
       "setDefault": "Imposta default",
       "payment": {

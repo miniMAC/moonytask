@@ -109,6 +109,7 @@
       "name": "Name",
       "paymentType": "Payment",
       "hourlyRate": "Hourly rate",
+      "defaultColumn": "Default",
       "default": "Default",
       "setDefault": "Set default",
       "payment": {

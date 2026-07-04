@@ -76,8 +76,7 @@ fn emit_status(app: &AppHandle) {
 }
 
 fn perform_sync(app: &AppHandle) -> Result<(), String> {
-    let (client_id, client_secret) =
-        credentials(app).ok_or("not_configured")?;
+    let (client_id, client_secret) = credentials(app).ok_or("not_configured")?;
     let token = oauth::valid_access_token(&client_id, &client_secret)?;
 
     let file_id = drive::find_file(&token)?;

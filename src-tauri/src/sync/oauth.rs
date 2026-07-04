@@ -69,11 +69,7 @@ pub fn login(
     login_hint: Option<&str>,
 ) -> Result<(StoredTokens, Option<String>), String> {
     let server = tiny_http::Server::http("127.0.0.1:0").map_err(|e| e.to_string())?;
-    let port = server
-        .server_addr()
-        .to_ip()
-        .ok_or("no addr")?
-        .port();
+    let port = server.server_addr().to_ip().ok_or("no addr")?.port();
     let redirect_uri = format!("http://127.0.0.1:{port}");
 
     let verifier = random_verifier();

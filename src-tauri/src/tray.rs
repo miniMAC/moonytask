@@ -1,4 +1,5 @@
 use crate::timer::{TimerSnapshot, TimerStatus};
+use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Size, WebviewWindow};
@@ -7,7 +8,12 @@ use tauri_plugin_positioner::{Position as TrayPosition, WindowExt};
 const TRAY_ID: &str = "main-tray";
 
 fn fmt_hms(total: i64) -> String {
-    format!("{:02}:{:02}:{:02}", total / 3600, (total % 3600) / 60, total % 60)
+    format!(
+        "{:02}:{:02}:{:02}",
+        total / 3600,
+        (total % 3600) / 60,
+        total % 60
+    )
 }
 
 fn labels(app: &AppHandle) -> (String, String, String, String, String) {
@@ -54,7 +60,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     )?;
 
     TrayIconBuilder::with_id(TRAY_ID)
-        .icon(app.default_window_icon().unwrap().clone())
+        .icon(tray_icon(app))
         .icon_as_template(true)
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -81,11 +87,8 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
                     };
                     match status {
                         TimerStatus::Running => {
-                            let _ = crate::timer::timer_pause(
-                                app.clone(),
-                                app.state(),
-                                app.state(),
-                            );
+                            let _ =
+                                crate::timer::timer_pause(app.clone(), app.state(), app.state());
                         }
                         TimerStatus::Paused => {
                             let _ = crate::timer::timer_resume(app.clone(), app.state());
@@ -105,8 +108,15 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
         .build(app)?;
 
     // memorizza gli item per aggiornarli dopo
-    app.manage(TrayMenuItems { pause: pause_i, stop: stop_i });
+    app.manage(TrayMenuItems {
+        pause: pause_i,
+        stop: stop_i,
+    });
     Ok(())
+}
+
+fn tray_icon(_app: &AppHandle) -> Image<'static> {
+    Image::from_bytes(include_bytes!("../icons/tray/32x32.png")).expect("valid tray icon")
 }
 
 pub struct TrayMenuItems {
@@ -155,21 +165,52 @@ fn fit_main_window_to_monitor(win: &WebviewWindow) {
 
 /// Mostra/nasconde il popover ancorato all'icona nella menu bar.
 pub fn toggle_popover(app: &AppHandle) {
-    let Some(win) = app.get_webview_window("popover") else { return };
+    let Some(win) = app.get_webview_window("popover") else {
+        return;
+    };
     if win.is_visible().unwrap_or(false) {
         let _ = win.hide();
     } else {
-        let _ = win.as_ref().window().move_window(TrayPosition::TrayBottomCenter);
+        fit_popover_to_monitor(&win);
+        let _ = win
+            .as_ref()
+            .window()
+            .move_window(TrayPosition::TrayBottomCenter);
         let _ = win.show();
         let _ = win.set_focus();
     }
 }
 
 pub fn show_popover(app: &AppHandle) {
-    let Some(win) = app.get_webview_window("popover") else { return };
-    let _ = win.as_ref().window().move_window(TrayPosition::TrayBottomCenter);
+    let Some(win) = app.get_webview_window("popover") else {
+        return;
+    };
+    fit_popover_to_monitor(&win);
+    let _ = win
+        .as_ref()
+        .window()
+        .move_window(TrayPosition::TrayBottomCenter);
     let _ = win.show();
     let _ = win.set_focus();
+}
+
+fn fit_popover_to_monitor(win: &WebviewWindow) {
+    let monitor = win
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| win.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else { return };
+
+    let size = monitor.size();
+    let max_width = size.width.saturating_sub(40).max(560);
+    let max_height = size.height.saturating_sub(60).max(500);
+    let width = 700.min(max_width);
+    let height = (((size.height as f64) * 0.5).round() as u32)
+        .max(620)
+        .min(max_height);
+
+    let _ = win.set_size(Size::Physical(PhysicalSize { width, height }));
 }
 
 #[tauri::command]
@@ -189,13 +230,24 @@ pub fn hide_popover(app: AppHandle) {
 
 /// Aggiorna titolo tray e voci di menu in base allo stato del timer.
 pub fn refresh(app: &AppHandle, snap: &TimerSnapshot) {
-    let Some(tray) = app.tray_by_id(TRAY_ID) else { return };
+    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+        return;
+    };
     let title = match snap.status {
         TimerStatus::Idle => None,
         _ => {
             let name = snap.project_name.clone().unwrap_or_default();
-            let pause_mark = if snap.status == TimerStatus::Paused { "⏸ " } else { "" };
-            Some(format!("{}{} · {}", pause_mark, fmt_hms(snap.elapsed_secs), name))
+            let pause_mark = if snap.status == TimerStatus::Paused {
+                "⏸ "
+            } else {
+                ""
+            };
+            Some(format!(
+                "{}{} · {}",
+                pause_mark,
+                fmt_hms(snap.elapsed_secs),
+                name
+            ))
         }
     };
     let _ = tray.set_title(title.as_deref());
