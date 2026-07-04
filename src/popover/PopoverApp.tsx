@@ -410,8 +410,9 @@ export default function PopoverApp() {
         setProjectMenu(null);
         setCreateMenuOpen(false);
       }}
-      className="flex h-screen flex-col overflow-hidden rounded-[14px] bg-neutral-50 text-neutral-950 shadow-[0_18px_44px_rgba(0,0,0,0.22)] dark:bg-neutral-950 dark:text-white pro:bg-[#282a36]"
+      className="h-screen p-2.5"
     >
+      <div className="flex h-full flex-col overflow-hidden rounded-[14px] bg-neutral-50 text-neutral-950 shadow-[0_1px_5px_rgba(0,0,0,0.18)] ring-1 ring-black/10 dark:bg-neutral-950 dark:text-white dark:ring-white/10 pro:bg-[#282a36]">
       {/* header */}
       <div
         className="relative overflow-hidden px-4 pb-4 pt-4 text-white"
@@ -847,6 +848,7 @@ export default function PopoverApp() {
         >
           {t("popover.open")}
         </button>
+      </div>
       </div>
     </div>
   );

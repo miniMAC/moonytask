@@ -33,7 +33,7 @@
         "skipTaskbar": true,
         "visibleOnAllWorkspaces": true,
         "visible": false,
-        "shadow": true
+        "shadow": false
       }
     ],
     "security": {
