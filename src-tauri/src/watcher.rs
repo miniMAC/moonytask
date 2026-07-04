@@ -79,6 +79,22 @@ pub fn spawn(app: AppHandle) {
             }
 
             let now = db::now_secs();
+            let snoozed_until = {
+                let db = app.state::<Db>();
+                let conn = db.0.lock().unwrap();
+                db::get_setting(&conn, &format!("watch_snooze_until:{bundle}"))
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(0)
+            };
+            if now < snoozed_until {
+                continue;
+            }
+            let resumed_from_snooze = snoozed_until > 0
+                && last_notified
+                    .get(&bundle)
+                    .map(|last| *last < snoozed_until)
+                    .unwrap_or(false);
+
             let cooldown = {
                 let db = app.state::<Db>();
                 let conn = db.0.lock().unwrap();
@@ -86,10 +102,11 @@ pub fn spawn(app: AppHandle) {
                     .and_then(|v| v.parse().ok())
                     .unwrap_or(DEFAULT_COOLDOWN_SECS)
             };
-            if last_notified
-                .get(&bundle)
-                .map(|t| now - t < cooldown)
-                .unwrap_or(false)
+            if !resumed_from_snooze
+                && last_notified
+                    .get(&bundle)
+                    .map(|t| now - t < cooldown)
+                    .unwrap_or(false)
             {
                 continue;
             }

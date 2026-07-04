@@ -33,7 +33,22 @@
     "addManual": "Aggiungi tempo manualmente",
     "date": "Data",
     "durationMinutes": "Durata (minuti)",
-    "note": "Nota (opzionale)"
+    "note": "Nota (opzionale)",
+    "totalCost": "Costo totale",
+    "payments": "Pagamenti",
+    "markPaid": "Segna pagato fino a…",
+    "paidThrough": "Saldato fino a",
+    "paidAt": "Pagato il",
+    "amountDue": "Da pagare",
+    "noPayments": "Nessun pagamento salvato.",
+    "paymentNote": "Nota pagamento",
+    "paymentThroughDate": "Saldo fino a",
+    "paymentCreate": "Salva pagamento",
+    "selectEntry": "Seleziona registrazione",
+    "selectedEntries": "{{count}} selezionati",
+    "mergeEntries": "Unisci",
+    "addEntryNote": "Aggiungi nota",
+    "editEntryNote": "Modifica nota"
   },
   "timer": {
     "start": "Avvia",
@@ -41,7 +56,10 @@
     "resume": "Riprendi",
     "stop": "Stop",
     "running": "In corso",
-    "paused": "In pausa"
+    "paused": "In pausa",
+    "noteTitle": "Aggiungi una nota?",
+    "noteBody": "Puoi descrivere cosa hai fatto in questo segmento di lavoro. È facoltativo.",
+    "noteSkip": "Salta"
   },
   "reports": {
     "title": "Report",
@@ -55,6 +73,9 @@
     "allFolders": "Tutte le cartelle",
     "totalTime": "Tempo totale",
     "totalCost": "Costo stimato",
+    "periodTime": "Tempo periodo",
+    "periodCost": "Costo periodo",
+    "lifetimeCost": "Costo totale dall'inizio",
     "daysWorked": "Giorni lavorati",
     "byDay": "Tempo per giorno",
     "byProject": "Ripartizione per progetto",
@@ -62,7 +83,11 @@
     "project": "Progetto",
     "time": "Tempo",
     "cost": "Costo",
-    "noData": "Nessuna registrazione nel periodo selezionato."
+    "noData": "Nessuna registrazione nel periodo selezionato.",
+    "pdf": "PDF",
+    "pdfExported": "PDF esportato",
+    "pdfFailed": "Export PDF non riuscito",
+    "pdfProjectOnly": "Seleziona un progetto per esportare il PDF"
   },
   "popover": {
     "all": "Tutti",
@@ -82,7 +107,10 @@
     "rate": "€/h",
     "noResults": "Nessun progetto trovato.",
     "reminderTitle": "Timer non attivo",
-    "reminderBody": "Stai usando {{app}}: vuoi avviare il timer?"
+    "reminderBody": "Stai usando {{app}}: vuoi avviare il timer?",
+    "snooze5": "Tra 5 min",
+    "snooze15": "Tra 15 min",
+    "ignoreToday": "Ignora oggi"
   },
   "settings": {
     "title": "Impostazioni",
@@ -100,6 +128,9 @@
     "themeLight": "Chiaro",
     "themeDark": "Scuro",
     "themePro": "TinyTime PRO",
+    "pdfExportDir": "Cartella export PDF",
+    "pdfExportDirPlaceholder": "Vuoto = Downloads",
+    "pdfExportDirHelp": "Percorso della cartella dove salvare i PDF dei progetti. Puoi usare anche ~/Documents/TinyTime.",
     "rates": {
       "title": "Profili tariffari",
       "help": "Crea profili riutilizzabili con nome, tipo di pagamento e costo orario. Il profilo predefinito viene applicato ai nuovi progetti e puoi cambiarlo nella scheda progetto.",
@@ -112,6 +143,8 @@
       "defaultColumn": "Predefinito",
       "default": "Default",
       "setDefault": "Imposta default",
+      "projectTitle": "Tariffe per progetto",
+      "projectHelp": "Assegna un profilo o un costo orario manuale a ogni progetto. I report usano sempre la tariffa del progetto.",
       "payment": {
         "hourly": "Orario",
         "retainer": "Retainer",
@@ -158,6 +191,7 @@
     "add": "Aggiungi",
     "delete": "Elimina",
     "close": "Chiudi",
+    "saved": "Salvato",
     "hours": "ore",
     "loading": "Caricamento…"
   }

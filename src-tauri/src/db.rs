@@ -1,5 +1,6 @@
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -54,6 +55,16 @@ pub fn init(app: &AppHandle) -> Result<Connection, Box<dyn std::error::Error>> {
         );
         CREATE INDEX IF NOT EXISTS idx_entries_started ON time_entries(started_at);
         CREATE INDEX IF NOT EXISTS idx_entries_project ON time_entries(project_id);
+        CREATE TABLE IF NOT EXISTS project_payments (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            paid_at INTEGER NOT NULL,
+            paid_through_at INTEGER NOT NULL,
+            note TEXT,
+            updated_at INTEGER NOT NULL,
+            deleted INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_payments_project ON project_payments(project_id);
         CREATE TABLE IF NOT EXISTS watched_apps (
             id TEXT PRIMARY KEY,
             bundle_id TEXT NOT NULL,
@@ -123,6 +134,18 @@ pub struct TimeEntry {
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct ProjectPayment {
+    pub id: String,
+    pub project_id: String,
+    pub paid_at: i64,
+    pub paid_through_at: i64,
+    pub note: Option<String>,
+    pub updated_at: i64,
+    pub deleted: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct WatchedApp {
     pub id: String,
     pub bundle_id: String,
@@ -153,6 +176,7 @@ pub struct ExportData {
     pub folders: Vec<Folder>,
     pub projects: Vec<Project>,
     pub time_entries: Vec<TimeEntry>,
+    pub project_payments: Vec<ProjectPayment>,
     pub watched_apps: Vec<WatchedApp>,
     pub settings: Vec<SettingRow>,
 }
@@ -164,21 +188,31 @@ pub fn insert_time_entry(
     project_id: &str,
     started_at: i64,
     ended_at: i64,
-) -> rusqlite::Result<()> {
+) -> rusqlite::Result<TimeEntry> {
+    let entry = TimeEntry {
+        id: new_id(),
+        project_id: project_id.to_string(),
+        started_at,
+        ended_at,
+        duration_secs: ended_at - started_at,
+        note: None,
+        updated_at: now_secs(),
+        deleted: 0,
+    };
     conn.execute(
         "INSERT INTO time_entries (id, project_id, started_at, ended_at, duration_secs, note, updated_at, deleted)
          VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, 0)",
         rusqlite::params![
-            new_id(),
-            project_id,
-            started_at,
-            ended_at,
-            ended_at - started_at,
-            now_secs()
+            &entry.id,
+            &entry.project_id,
+            entry.started_at,
+            entry.ended_at,
+            entry.duration_secs,
+            entry.updated_at
         ],
     )?;
     crate::sync::mark_dirty();
-    Ok(())
+    Ok(entry)
 }
 
 pub fn get_setting(conn: &Connection, key: &str) -> Option<String> {
@@ -391,6 +425,7 @@ pub fn project_create(
 
 #[tauri::command]
 pub fn project_update(
+    app: AppHandle,
     db: State<Db>,
     id: String,
     folder_id: String,
@@ -416,6 +451,8 @@ pub fn project_update(
     )
     .map_err(err)?;
     crate::sync::mark_dirty();
+    use tauri::Emitter;
+    let _ = app.emit("data_changed", ());
     Ok(())
 }
 
@@ -477,6 +514,135 @@ pub fn entry_delete(db: State<Db>, id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn entry_update_note(db: State<Db>, id: String, note: Option<String>) -> Result<(), String> {
+    let conn = db.0.lock().unwrap();
+    let clean_note = note.and_then(|value| {
+        let trimmed = value.trim().to_string();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
+    });
+    conn.execute(
+        "UPDATE time_entries SET note = ?2, updated_at = ?3 WHERE id = ?1",
+        rusqlite::params![id, clean_note, now_secs()],
+    )
+    .map_err(err)?;
+    crate::sync::mark_dirty();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn entries_merge(db: State<Db>, ids: Vec<String>) -> Result<TimeEntry, String> {
+    let mut unique_ids = Vec::new();
+    let mut seen = HashSet::new();
+    for id in ids {
+        if seen.insert(id.clone()) {
+            unique_ids.push(id);
+        }
+    }
+    if unique_ids.len() < 2 {
+        return Err("not_enough_entries".into());
+    }
+
+    let mut conn = db.0.lock().unwrap();
+    let entries = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, project_id, started_at, ended_at, duration_secs, note, updated_at, deleted
+                 FROM time_entries
+                 WHERE deleted = 0 AND id = ?1",
+            )
+            .map_err(err)?;
+        let mut entries = Vec::new();
+        for id in &unique_ids {
+            let entry = stmt
+                .query_row([id], |r| {
+                    Ok(TimeEntry {
+                        id: r.get(0)?,
+                        project_id: r.get(1)?,
+                        started_at: r.get(2)?,
+                        ended_at: r.get(3)?,
+                        duration_secs: r.get(4)?,
+                        note: r.get(5)?,
+                        updated_at: r.get(6)?,
+                        deleted: r.get(7)?,
+                    })
+                })
+                .map_err(|_| "entry_not_found".to_string())?;
+            entries.push(entry);
+        }
+        entries
+    };
+
+    let project_id = entries[0].project_id.clone();
+    if entries.iter().any(|entry| entry.project_id != project_id) {
+        return Err("entries_must_share_project".into());
+    }
+
+    let started_at = entries
+        .iter()
+        .map(|entry| entry.started_at)
+        .min()
+        .unwrap_or(0);
+    let ended_at = entries
+        .iter()
+        .map(|entry| entry.ended_at)
+        .max()
+        .unwrap_or(started_at);
+    let duration_secs = entries.iter().map(|entry| entry.duration_secs).sum::<i64>();
+    let notes = entries
+        .iter()
+        .filter_map(|entry| entry.note.as_deref())
+        .map(str::trim)
+        .filter(|note| !note.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let now = now_secs();
+    let merged = TimeEntry {
+        id: new_id(),
+        project_id,
+        started_at,
+        ended_at,
+        duration_secs,
+        note: if notes.is_empty() {
+            None
+        } else {
+            Some(notes.join("\n"))
+        },
+        updated_at: now,
+        deleted: 0,
+    };
+
+    let tx = conn.transaction().map_err(err)?;
+    tx.execute(
+        "INSERT INTO time_entries (id, project_id, started_at, ended_at, duration_secs, note, updated_at, deleted)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0)",
+        rusqlite::params![
+            &merged.id,
+            &merged.project_id,
+            merged.started_at,
+            merged.ended_at,
+            merged.duration_secs,
+            &merged.note,
+            merged.updated_at
+        ],
+    )
+    .map_err(err)?;
+    for id in &unique_ids {
+        tx.execute(
+            "UPDATE time_entries SET deleted = 1, updated_at = ?2 WHERE id = ?1",
+            rusqlite::params![id, now],
+        )
+        .map_err(err)?;
+    }
+    tx.commit().map_err(err)?;
+    crate::sync::mark_dirty();
+    Ok(merged)
+}
+
+#[tauri::command]
 pub fn entry_add_manual(
     db: State<Db>,
     project_id: String,
@@ -497,6 +663,94 @@ pub fn entry_add_manual(
             note,
             now_secs()
         ],
+    )
+    .map_err(err)?;
+    crate::sync::mark_dirty();
+    Ok(())
+}
+
+// ---------- commands: project payments ----------
+
+#[tauri::command]
+pub fn project_payments_list(
+    db: State<Db>,
+    project_id: String,
+) -> Result<Vec<ProjectPayment>, String> {
+    let conn = db.0.lock().unwrap();
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, project_id, paid_at, paid_through_at, note, updated_at, deleted
+             FROM project_payments
+             WHERE deleted = 0 AND project_id = ?1
+             ORDER BY paid_through_at DESC, paid_at DESC",
+        )
+        .map_err(err)?;
+    let rows = stmt
+        .query_map([project_id], |r| {
+            Ok(ProjectPayment {
+                id: r.get(0)?,
+                project_id: r.get(1)?,
+                paid_at: r.get(2)?,
+                paid_through_at: r.get(3)?,
+                note: r.get(4)?,
+                updated_at: r.get(5)?,
+                deleted: r.get(6)?,
+            })
+        })
+        .map_err(err)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(err)?;
+    Ok(rows)
+}
+
+#[tauri::command]
+pub fn project_payment_create(
+    db: State<Db>,
+    project_id: String,
+    paid_at: i64,
+    paid_through_at: i64,
+    note: Option<String>,
+) -> Result<ProjectPayment, String> {
+    let conn = db.0.lock().unwrap();
+    let payment = ProjectPayment {
+        id: new_id(),
+        project_id,
+        paid_at,
+        paid_through_at,
+        note: note.and_then(|value| {
+            let trimmed = value.trim().to_string();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            }
+        }),
+        updated_at: now_secs(),
+        deleted: 0,
+    };
+    conn.execute(
+        "INSERT INTO project_payments (id, project_id, paid_at, paid_through_at, note, updated_at, deleted)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0)",
+        rusqlite::params![
+            &payment.id,
+            &payment.project_id,
+            payment.paid_at,
+            payment.paid_through_at,
+            &payment.note,
+            payment.updated_at
+        ],
+    )
+    .map_err(err)?;
+    crate::sync::mark_dirty();
+    Ok(payment)
+}
+
+#[tauri::command]
+pub fn project_payment_delete(db: State<Db>, id: String) -> Result<(), String> {
+    let conn = db.0.lock().unwrap();
+    conn.execute(
+        "UPDATE project_payments SET deleted = 1, updated_at = ?2 WHERE id = ?1",
+        rusqlite::params![id, now_secs()],
     )
     .map_err(err)?;
     crate::sync::mark_dirty();
@@ -580,12 +834,317 @@ pub fn project_export(
     Ok(path.to_string_lossy().to_string())
 }
 
+#[tauri::command]
+pub fn report_export_pdf(
+    app: AppHandle,
+    db: State<Db>,
+    from: i64,
+    to: i64,
+    folder_id: String,
+    project_id: String,
+    currency: String,
+    locale: String,
+) -> Result<String, String> {
+    if project_id == "all" {
+        return Err("project_required".into());
+    }
+
+    let (data, export_dir) = {
+        let conn = db.0.lock().unwrap();
+        (
+            export_data_inner(&conn).map_err(err)?,
+            get_setting(&conn, "pdf_export_dir"),
+        )
+    };
+    let project_by_id = data
+        .projects
+        .iter()
+        .filter(|project| project.deleted == 0)
+        .map(|project| (project.id.as_str(), project))
+        .collect::<HashMap<_, _>>();
+    let Some(selected_project) = project_by_id.get(project_id.as_str()) else {
+        return Err("project_not_found".into());
+    };
+    if folder_id != "all" && selected_project.folder_id != folder_id {
+        return Err("project_not_in_folder".into());
+    }
+
+    let allowed_project = |project: &Project| project.deleted == 0 && project.id == project_id;
+    let cost = |entry: &TimeEntry| {
+        project_by_id
+            .get(entry.project_id.as_str())
+            .map(|project| (project.hourly_rate * entry.duration_secs as f64) / 3600.0)
+            .unwrap_or(0.0)
+    };
+
+    let period_entries = data
+        .time_entries
+        .iter()
+        .filter(|entry| {
+            entry.deleted == 0
+                && entry.started_at >= from
+                && entry.started_at < to
+                && project_by_id
+                    .get(entry.project_id.as_str())
+                    .map(|project| allowed_project(project))
+                    .unwrap_or(false)
+        })
+        .collect::<Vec<_>>();
+    let all_entries = data
+        .time_entries
+        .iter()
+        .filter(|entry| {
+            entry.deleted == 0
+                && project_by_id
+                    .get(entry.project_id.as_str())
+                    .map(|project| allowed_project(project))
+                    .unwrap_or(false)
+        })
+        .collect::<Vec<_>>();
+
+    let period_secs = period_entries
+        .iter()
+        .map(|entry| entry.duration_secs)
+        .sum::<i64>();
+    let period_money = period_entries.iter().map(|entry| cost(entry)).sum::<f64>();
+    let total_money = all_entries.iter().map(|entry| cost(entry)).sum::<f64>();
+    let days = period_entries
+        .iter()
+        .map(|entry| epoch_day_key(entry.started_at))
+        .collect::<HashSet<_>>()
+        .len();
+
+    let mut by_day: BTreeMap<String, (i64, f64)> = BTreeMap::new();
+    for entry in &period_entries {
+        let row = by_day
+            .entry(epoch_day_key(entry.started_at))
+            .or_insert((0, 0.0));
+        row.0 += entry.duration_secs;
+        row.1 += cost(entry);
+    }
+
+    let project_label = selected_project.name.clone();
+
+    let mut lines = vec![
+        project_label.clone(),
+        format!(
+            "Periodo: {} - {}",
+            format_epoch_date(from),
+            format_epoch_date(to.saturating_sub(1))
+        ),
+        String::new(),
+        format!("Tempo periodo: {}", fmt_pdf_duration(period_secs)),
+        format!(
+            "Costo periodo: {}",
+            fmt_pdf_money(period_money, &currency, &locale)
+        ),
+        format!(
+            "Costo totale dall'inizio: {}",
+            fmt_pdf_money(total_money, &currency, &locale)
+        ),
+        format!("Giorni lavorati: {days}"),
+        String::new(),
+    ];
+    if by_day.is_empty() {
+        lines.push("Nessun dato nel periodo selezionato.".to_string());
+    }
+    lines.push(String::new());
+    lines.push("Giorno / Tempo / Costo".to_string());
+    for (day, (secs, money)) in by_day.iter().rev() {
+        lines.push(format!(
+            "{}  |  {}  |  {}",
+            day,
+            fmt_pdf_duration(*secs),
+            fmt_pdf_money(*money, &currency, &locale)
+        ));
+    }
+
+    let dir = export_dir
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(expand_user_path)
+        .transpose()
+        .map_err(err)?
+        .map(Ok)
+        .unwrap_or_else(|| {
+            app.path()
+                .download_dir()
+                .or_else(|_| app.path().app_data_dir())
+        })
+        .map_err(err)?;
+    std::fs::create_dir_all(&dir).map_err(err)?;
+    let path = dir.join(format!(
+        "tinytime-{}-report-{}.pdf",
+        safe_file_stem(&project_label),
+        now_secs()
+    ));
+    write_simple_pdf(&path, &lines).map_err(err)?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+fn expand_user_path(value: &str) -> Result<std::path::PathBuf, std::io::Error> {
+    if value == "~" {
+        return std::env::var_os("HOME")
+            .map(std::path::PathBuf::from)
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "home_not_found"));
+    }
+    if let Some(rest) = value.strip_prefix("~/") {
+        let Some(home) = std::env::var_os("HOME") else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "home_not_found",
+            ));
+        };
+        return Ok(std::path::PathBuf::from(home).join(rest));
+    }
+    Ok(std::path::PathBuf::from(value))
+}
+
+fn write_simple_pdf(path: &std::path::Path, lines: &[String]) -> std::io::Result<()> {
+    let lines_per_page = 44usize;
+    let pages = lines.chunks(lines_per_page).collect::<Vec<_>>();
+    let page_count = pages.len().max(1);
+    let mut objects = vec![
+        "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
+        String::new(),
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string(),
+    ];
+
+    let mut kids = Vec::new();
+    for (idx, page_lines) in pages.iter().enumerate() {
+        let page_id = 4 + idx * 2;
+        let content_id = page_id + 1;
+        kids.push(format!("{page_id} 0 R"));
+        objects.push(format!(
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents {content_id} 0 R >>"
+        ));
+
+        let mut stream = String::from("BT /F1 11 Tf 54 790 Td 16 TL\n");
+        for (line_idx, line) in page_lines.iter().enumerate() {
+            if idx == 0 && line_idx == 0 {
+                stream.push_str("/F1 18 Tf ");
+            } else if idx == 0 && line_idx == 1 {
+                stream.push_str("/F1 11 Tf ");
+            }
+            stream.push('(');
+            stream.push_str(&pdf_escape(line));
+            stream.push_str(") Tj T*\n");
+        }
+        stream.push_str("ET");
+        objects.push(format!(
+            "<< /Length {} >>\nstream\n{}\nendstream",
+            stream.as_bytes().len(),
+            stream
+        ));
+    }
+
+    if pages.is_empty() {
+        let page_id = 4;
+        let content_id = 5;
+        kids.push(format!("{page_id} 0 R"));
+        objects.push(format!(
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents {content_id} 0 R >>"
+        ));
+        let stream = "BT /F1 18 Tf 54 790 Td (TinyTime Report) Tj ET";
+        objects.push(format!(
+            "<< /Length {} >>\nstream\n{}\nendstream",
+            stream.as_bytes().len(),
+            stream
+        ));
+    }
+
+    objects[1] = format!(
+        "<< /Type /Pages /Count {} /Kids [{}] >>",
+        page_count,
+        kids.join(" ")
+    );
+
+    let mut out = String::from("%PDF-1.4\n");
+    let mut offsets = Vec::with_capacity(objects.len());
+    for (idx, object) in objects.iter().enumerate() {
+        offsets.push(out.len());
+        out.push_str(&format!("{} 0 obj\n{}\nendobj\n", idx + 1, object));
+    }
+    let xref_start = out.len();
+    out.push_str(&format!(
+        "xref\n0 {}\n0000000000 65535 f \n",
+        objects.len() + 1
+    ));
+    for offset in offsets {
+        out.push_str(&format!("{offset:010} 00000 n \n"));
+    }
+    out.push_str(&format!(
+        "trailer << /Size {} /Root 1 0 R >>\nstartxref\n{}\n%%EOF\n",
+        objects.len() + 1,
+        xref_start
+    ));
+    std::fs::write(path, out)
+}
+
+fn pdf_escape(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| match ch {
+            '\\' => "\\\\".to_string(),
+            '(' => "\\(".to_string(),
+            ')' => "\\)".to_string(),
+            '\n' | '\r' => " ".to_string(),
+            ch if ch.is_ascii() => ch.to_string(),
+            ch => ch.to_string(),
+        })
+        .collect()
+}
+
+fn fmt_pdf_duration(secs: i64) -> String {
+    let hours = secs / 3600;
+    let minutes = (secs % 3600) / 60;
+    if hours > 0 {
+        format!("{hours}h {minutes}m")
+    } else {
+        format!("{minutes}m")
+    }
+}
+
+fn fmt_pdf_money(value: f64, currency: &str, locale: &str) -> String {
+    let amount = format!("{value:.2}");
+    if locale.starts_with("it") {
+        format!("{} {}", amount.replace('.', ","), currency)
+    } else {
+        format!("{currency} {amount}")
+    }
+}
+
+fn epoch_day_key(ts: i64) -> String {
+    format_epoch_date(ts)
+}
+
+fn format_epoch_date(ts: i64) -> String {
+    let days = ts.div_euclid(86_400);
+    let (year, month, day) = civil_from_days(days);
+    format!("{year:04}-{month:02}-{day:02}")
+}
+
+fn civil_from_days(days: i64) -> (i64, i64, i64) {
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = mp + if mp < 10 { 3 } else { -9 };
+    (y + if m <= 2 { 1 } else { 0 }, m, d)
+}
+
 fn export_data_inner(conn: &Connection) -> rusqlite::Result<ExportData> {
     Ok(ExportData {
         exported_at: now_secs(),
         folders: query_folders_all(conn)?,
         projects: query_projects_all(conn)?,
         time_entries: query_entries_all(conn)?,
+        project_payments: query_project_payments_all(conn)?,
         watched_apps: query_watched_all(conn)?,
         settings: query_settings_all(conn)?,
     })
@@ -616,12 +1175,18 @@ fn project_export_data_inner(conn: &Connection, project_id: &str) -> rusqlite::R
         .into_iter()
         .filter(|app| app.project_id.as_deref() == Some(project.id.as_str()) && app.deleted == 0)
         .collect();
+    let project_payments = all
+        .project_payments
+        .into_iter()
+        .filter(|payment| payment.project_id == project.id && payment.deleted == 0)
+        .collect();
 
     Ok(ExportData {
         exported_at: all.exported_at,
         folders: folder.into_iter().collect(),
         projects: vec![project],
         time_entries,
+        project_payments,
         watched_apps,
         settings: Vec::new(),
     })
@@ -692,6 +1257,27 @@ fn query_entries_all(conn: &Connection) -> rusqlite::Result<Vec<TimeEntry>> {
     rows
 }
 
+fn query_project_payments_all(conn: &Connection) -> rusqlite::Result<Vec<ProjectPayment>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, project_id, paid_at, paid_through_at, note, updated_at, deleted
+         FROM project_payments ORDER BY deleted, paid_through_at DESC, paid_at DESC",
+    )?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(ProjectPayment {
+                id: r.get(0)?,
+                project_id: r.get(1)?,
+                paid_at: r.get(2)?,
+                paid_through_at: r.get(3)?,
+                note: r.get(4)?,
+                updated_at: r.get(5)?,
+                deleted: r.get(6)?,
+            })
+        })?
+        .collect();
+    rows
+}
+
 fn query_watched_all(conn: &Connection) -> rusqlite::Result<Vec<WatchedApp>> {
     let mut stmt = conn.prepare(
         "SELECT id, bundle_id, app_name, project_id, remind_after_secs, enabled, updated_at, deleted
@@ -731,7 +1317,7 @@ fn export_data_csv(data: &ExportData) -> String {
     let mut out = String::new();
     writeln!(
         out,
-        "record_type,id,folder_id,folder_name,project_id,project_name,name,color,hourly_rate,rate_profile_id,archived,position,started_at,ended_at,duration_secs,note,bundle_id,app_name,enabled,remind_after_secs,setting_key,setting_value,updated_at,deleted"
+        "record_type,id,folder_id,folder_name,project_id,project_name,name,color,hourly_rate,rate_profile_id,archived,position,started_at,ended_at,duration_secs,note,bundle_id,app_name,enabled,remind_after_secs,paid_at,paid_through_at,setting_key,setting_value,updated_at,deleted"
     )
     .unwrap();
 
@@ -772,6 +1358,8 @@ fn export_data_csv(data: &ExportData) -> String {
                 "",
                 "",
                 "",
+                "",
+                "",
                 &f.updated_at.to_string(),
                 &f.deleted.to_string(),
             ],
@@ -797,6 +1385,8 @@ fn export_data_csv(data: &ExportData) -> String {
                 &p.hourly_rate.to_string(),
                 p.rate_profile_id.as_deref().unwrap_or(""),
                 &p.archived.to_string(),
+                "",
+                "",
                 "",
                 "",
                 "",
@@ -847,8 +1437,51 @@ fn export_data_csv(data: &ExportData) -> String {
                 "",
                 "",
                 "",
+                "",
+                "",
                 &e.updated_at.to_string(),
                 &e.deleted.to_string(),
+            ],
+        );
+    }
+
+    for payment in &data.project_payments {
+        let project = project_by_id.get(payment.project_id.as_str());
+        let folder_id = project.map(|p| p.folder_id.as_str()).unwrap_or("");
+        let folder_name = folder_by_id
+            .get(folder_id)
+            .map(|f| f.name.as_str())
+            .unwrap_or("");
+        let project_name = project.map(|p| p.name.as_str()).unwrap_or("");
+        csv_row(
+            &mut out,
+            &[
+                "project_payment",
+                &payment.id,
+                folder_id,
+                folder_name,
+                &payment.project_id,
+                project_name,
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                payment.note.as_deref().unwrap_or(""),
+                "",
+                "",
+                "",
+                "",
+                &payment.paid_at.to_string(),
+                &payment.paid_through_at.to_string(),
+                "",
+                "",
+                &payment.updated_at.to_string(),
+                &payment.deleted.to_string(),
             ],
         );
     }
@@ -885,6 +1518,8 @@ fn export_data_csv(data: &ExportData) -> String {
                 &w.remind_after_secs.to_string(),
                 "",
                 "",
+                "",
+                "",
                 &w.updated_at.to_string(),
                 &w.deleted.to_string(),
             ],
@@ -896,7 +1531,7 @@ fn export_data_csv(data: &ExportData) -> String {
             &mut out,
             &[
                 "setting", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
-                "", &s.key, &s.value, "", "",
+                "", "", "", &s.key, &s.value, "", "",
             ],
         );
     }
@@ -1057,6 +1692,14 @@ pub fn watched_remove(db: State<Db>, id: String) -> Result<(), String> {
     )
     .map_err(err)?;
     crate::sync::mark_dirty();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn watcher_snooze(db: State<Db>, bundle_id: String, until_epoch: i64) -> Result<(), String> {
+    let conn = db.0.lock().unwrap();
+    let key = format!("watch_snooze_until:{bundle_id}");
+    set_setting(&conn, &key, &until_epoch.to_string()).map_err(err)?;
     Ok(())
 }
 

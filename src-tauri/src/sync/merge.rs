@@ -1,13 +1,19 @@
-use crate::db::{Folder, Project, TimeEntry, WatchedApp};
+use crate::db::{Folder, Project, ProjectPayment, TimeEntry, WatchedApp};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct Snapshot {
+    #[serde(default)]
     pub folders: Vec<Folder>,
+    #[serde(default)]
     pub projects: Vec<Project>,
+    #[serde(default)]
     pub time_entries: Vec<TimeEntry>,
+    #[serde(default)]
+    pub project_payments: Vec<ProjectPayment>,
+    #[serde(default)]
     pub watched_apps: Vec<WatchedApp>,
 }
 
@@ -76,6 +82,25 @@ pub fn load_local(conn: &Connection) -> Result<Snapshot, String> {
         .map_err(err)?;
 
     let mut stmt = conn
+        .prepare("SELECT id, project_id, paid_at, paid_through_at, note, updated_at, deleted FROM project_payments")
+        .map_err(err)?;
+    snap.project_payments = stmt
+        .query_map([], |r| {
+            Ok(ProjectPayment {
+                id: r.get(0)?,
+                project_id: r.get(1)?,
+                paid_at: r.get(2)?,
+                paid_through_at: r.get(3)?,
+                note: r.get(4)?,
+                updated_at: r.get(5)?,
+                deleted: r.get(6)?,
+            })
+        })
+        .map_err(err)?
+        .collect::<Result<_, _>>()
+        .map_err(err)?;
+
+    let mut stmt = conn
         .prepare("SELECT id, bundle_id, app_name, project_id, remind_after_secs, enabled, updated_at, deleted FROM watched_apps")
         .map_err(err)?;
     snap.watched_apps = stmt
@@ -127,6 +152,9 @@ pub fn merge(local: Snapshot, remote: Snapshot) -> Snapshot {
         time_entries: merge_rows(local.time_entries, remote.time_entries, |r| {
             (r.id.clone(), r.updated_at)
         }),
+        project_payments: merge_rows(local.project_payments, remote.project_payments, |r| {
+            (r.id.clone(), r.updated_at)
+        }),
         watched_apps: merge_rows(local.watched_apps, remote.watched_apps, |r| {
             (r.id.clone(), r.updated_at)
         }),
@@ -157,6 +185,22 @@ pub fn apply(conn: &mut Connection, snap: &Snapshot) -> Result<(), String> {
             "INSERT OR REPLACE INTO time_entries (id, project_id, started_at, ended_at, duration_secs, note, updated_at, deleted)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             rusqlite::params![e.id, e.project_id, e.started_at, e.ended_at, e.duration_secs, e.note, e.updated_at, e.deleted],
+        )
+        .map_err(err)?;
+    }
+    for payment in &snap.project_payments {
+        tx.execute(
+            "INSERT OR REPLACE INTO project_payments (id, project_id, paid_at, paid_through_at, note, updated_at, deleted)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                payment.id,
+                payment.project_id,
+                payment.paid_at,
+                payment.paid_through_at,
+                payment.note,
+                payment.updated_at,
+                payment.deleted
+            ],
         )
         .map_err(err)?;
     }

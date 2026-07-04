@@ -187,6 +187,16 @@ export default function PopoverApp() {
     await api.timerStart(id);
   };
 
+  const snoozeReminder = async (mode: 5 | 15 | "today") => {
+    if (!reminder) return;
+    const until =
+      mode === "today"
+        ? endOfTodayEpoch()
+        : Math.floor(Date.now() / 1000) + mode * 60;
+    await api.watcherSnooze(reminder.bundleId, until);
+    setReminder(null);
+  };
+
   const openProjectInMain = async (id: string) => {
     await emit("open_project", id);
     await api.openMain();
@@ -368,24 +378,44 @@ export default function PopoverApp() {
 
       {reminder && (
         <div className="mx-3 mt-3 rounded-lg bg-emerald-500 px-3 py-2 text-[12px] font-semibold text-white shadow-sm pro:bg-[#50fa7b] pro:text-[#282a36]">
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
               <p className="truncate">{t("popover.reminderTitle")}</p>
               <p className="truncate text-[11px] font-medium opacity-85">
                 {t("popover.reminderBody", { app: reminder.appName })}
               </p>
             </div>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
             {reminder.projectId && (
               <button
                 onClick={async () => {
                   await startProject(reminder.projectId!);
                   setReminder(null);
                 }}
-                className="shrink-0 rounded-md bg-white/18 px-2 py-1 text-[11px] hover:bg-white/28 pro:bg-[#282a36]/15 pro:hover:bg-[#282a36]/25"
+                className="rounded-md bg-white/20 px-2 py-1 text-[11px] hover:bg-white/30 pro:bg-[#282a36]/15 pro:hover:bg-[#282a36]/25"
               >
                 {t("timer.start")}
               </button>
             )}
+            <button
+              onClick={() => snoozeReminder(5)}
+              className="rounded-md bg-white/14 px-2 py-1 text-[11px] hover:bg-white/24 pro:bg-[#282a36]/10 pro:hover:bg-[#282a36]/20"
+            >
+              {t("popover.snooze5")}
+            </button>
+            <button
+              onClick={() => snoozeReminder(15)}
+              className="rounded-md bg-white/14 px-2 py-1 text-[11px] hover:bg-white/24 pro:bg-[#282a36]/10 pro:hover:bg-[#282a36]/20"
+            >
+              {t("popover.snooze15")}
+            </button>
+            <button
+              onClick={() => snoozeReminder("today")}
+              className="rounded-md bg-white/14 px-2 py-1 text-[11px] hover:bg-white/24 pro:bg-[#282a36]/10 pro:hover:bg-[#282a36]/20"
+            >
+              {t("popover.ignoreToday")}
+            </button>
           </div>
         </div>
       )}
@@ -781,4 +811,10 @@ function colorWithAlpha(color: string, alpha: number): string {
   const b = value & 255;
 
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function endOfTodayEpoch(): number {
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+  return Math.floor(end.getTime() / 1000);
 }

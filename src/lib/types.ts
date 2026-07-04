@@ -39,6 +39,16 @@ export interface TimeEntry {
   deleted: number;
 }
 
+export interface ProjectPayment {
+  id: string;
+  projectId: string;
+  paidAt: number;
+  paidThroughAt: number;
+  note: string | null;
+  updatedAt: number;
+  deleted: number;
+}
+
 export interface WatchedApp {
   id: string;
   bundleId: string;
@@ -77,4 +87,13 @@ export interface WatchSuggestion {
   bundleId: string;
   appName: string;
   projectId: string | null;
+}
+
+export interface ReportExportPdfRequest {
+  from: number;
+  to: number;
+  folderId: string;
+  projectId: string;
+  currency: string;
+  locale: string;
 }

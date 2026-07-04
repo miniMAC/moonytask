@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Folder, Project, TimeEntry, TimerSnapshot } from "../lib/types";
+import type {
+  Folder,
+  Project,
+  ProjectPayment,
+  TimeEntry,
+  TimerSnapshot,
+} from "../lib/types";
 import * as api from "../lib/api";
 import { projectColor } from "../lib/colors";
 import {
@@ -35,34 +41,78 @@ export default function ProjectView(p: Props) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language === "it" ? "it-IT" : "en-US";
   const [entries, setEntries] = useState<TimeEntry[]>([]);
+  const [payments, setPayments] = useState<ProjectPayment[]>([]);
   const [manualOpen, setManualOpen] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [noteEntry, setNoteEntry] = useState<TimeEntry | null>(null);
+  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const load = () =>
-    api
-      .entriesRange(0, Math.floor(Date.now() / 1000) + 86400)
-      .then((all) => setEntries(all.filter((e) => e.projectId === p.project.id)));
+    Promise.all([
+      api.entriesRange(0, Math.floor(Date.now() / 1000) + 86400),
+      api.projectPaymentsList(p.project.id),
+    ]).then(([allEntries, projectPayments]) => {
+      setEntries(allEntries.filter((e) => e.projectId === p.project.id));
+      setPayments(projectPayments);
+    });
 
   useEffect(() => {
+    setSelectedEntryIds(new Set());
+    setNoteEntry(null);
     load();
   }, [p.project.id, p.refreshKey]);
 
+  const mine = timerIsMine(p.timer, p.project.id);
+  const liveExtra = mine ? p.timer.elapsedSecs : 0;
   const now = new Date();
   const stats = useMemo(() => {
     const today = startOfDay(now);
     const week = startOfWeek(now);
+    const latestPaidThrough = payments.reduce(
+      (latest, payment) => Math.max(latest, payment.paidThroughAt),
+      0,
+    );
     let todaySecs = 0;
     let weekSecs = 0;
     let totalSecs = 0;
+    let residualSecs = 0;
     for (const e of entries) {
       totalSecs += e.durationSecs;
       if (e.startedAt >= week) weekSecs += e.durationSecs;
       if (e.startedAt >= today) todaySecs += e.durationSecs;
+      if (e.endedAt > latestPaidThrough) residualSecs += e.durationSecs;
     }
-    return { todaySecs, weekSecs, totalSecs };
-  }, [entries]);
+    return { todaySecs, weekSecs, totalSecs, residualSecs, latestPaidThrough };
+  }, [entries, payments]);
 
-  const mine = timerIsMine(p.timer, p.project.id);
-  const liveExtra = mine ? p.timer.elapsedSecs : 0;
+  const totalSecsWithLive = stats.totalSecs + liveExtra;
+  const totalCost = (totalSecsWithLive / 3600) * p.project.hourlyRate;
+  const residualSecsWithLive =
+    stats.residualSecs +
+    (liveExtra > 0 && Math.floor(Date.now() / 1000) > stats.latestPaidThrough
+      ? liveExtra
+      : 0);
+  const residualCost = (residualSecsWithLive / 3600) * p.project.hourlyRate;
+  const visibleEntries = entries.slice(0, 15);
+  const selectedCount = selectedEntryIds.size;
+
+  const toggleEntrySelection = (entryId: string) => {
+    setSelectedEntryIds((current) => {
+      const next = new Set(current);
+      if (next.has(entryId)) next.delete(entryId);
+      else next.add(entryId);
+      return next;
+    });
+  };
+
+  const mergeSelectedEntries = async () => {
+    if (selectedEntryIds.size < 2) return;
+    await api.entriesMerge([...selectedEntryIds]);
+    setSelectedEntryIds(new Set());
+    load();
+  };
 
   return (
     <div className="mx-auto max-w-3xl px-8 py-8">
@@ -150,44 +200,145 @@ export default function ProjectView(p: Props) {
       </div>
 
       {/* stats */}
-      <div className="mt-5 grid grid-cols-3 gap-3">
-        {(
-          [
-            [t("projects.todayTime"), stats.todaySecs + liveExtra],
-            [t("projects.weekTime"), stats.weekSecs + liveExtra],
-            [t("projects.totalTime"), stats.totalSecs + liveExtra],
-          ] as const
-        ).map(([label, secs]) => (
-          <div
-            key={label}
-            className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-700"
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <ProjectStatTile
+          label={t("projects.todayTime")}
+          value={fmtDuration(stats.todaySecs + liveExtra)}
+          detail={
+            p.project.hourlyRate > 0
+              ? fmtCost(
+                  ((stats.todaySecs + liveExtra) / 3600) * p.project.hourlyRate,
+                  p.currency,
+                  locale,
+                )
+              : null
+          }
+        />
+        <ProjectStatTile
+          label={t("projects.weekTime")}
+          value={fmtDuration(stats.weekSecs + liveExtra)}
+          detail={
+            p.project.hourlyRate > 0
+              ? fmtCost(
+                  ((stats.weekSecs + liveExtra) / 3600) * p.project.hourlyRate,
+                  p.currency,
+                  locale,
+                )
+              : null
+          }
+        />
+        <ProjectStatTile
+          label={t("projects.totalTime")}
+          value={fmtDuration(totalSecsWithLive)}
+          detail={p.project.hourlyRate > 0 ? fmtCost(totalCost, p.currency, locale) : null}
+        />
+        <ProjectStatTile
+          label={t("projects.totalCost")}
+          value={fmtCost(totalCost, p.currency, locale)}
+          detail={fmtDuration(totalSecsWithLive)}
+        />
+      </div>
+
+      <div className="mt-6 rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900/30 pro:border-[#44475a] pro:bg-[#21222c]">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+            {t("projects.payments")}
+          </h2>
+          <button
+            onClick={() => setPaymentOpen(true)}
+            className="flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
           >
-            <p className="text-xs text-neutral-500">{label}</p>
-            <p className="mt-1 text-lg font-semibold tabular-nums">
-              {fmtDuration(secs)}
-            </p>
-            {p.project.hourlyRate > 0 && (
-              <p className="text-xs text-neutral-500">
-                {fmtCost((secs / 3600) * p.project.hourlyRate, p.currency, locale)}
-              </p>
-            )}
-          </div>
-        ))}
+            <PlusIcon size={13} />
+            {t("projects.markPaid")}
+          </button>
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <ProjectStatTile
+            label={t("projects.paidThrough")}
+            value={
+              stats.latestPaidThrough > 0
+                ? fmtDate(stats.latestPaidThrough, locale)
+                : "-"
+            }
+            detail={
+              payments[0]
+                ? `${t("projects.paidAt")} ${fmtDate(payments[0].paidAt, locale)}`
+                : null
+            }
+          />
+          <ProjectStatTile
+            label={t("projects.amountDue")}
+            value={fmtCost(residualCost, p.currency, locale)}
+            detail={fmtDuration(residualSecsWithLive)}
+          />
+        </div>
+        {payments.length === 0 ? (
+          <p className="mt-4 text-sm text-neutral-500">
+            {t("projects.noPayments")}
+          </p>
+        ) : (
+          <ul className="mt-4 divide-y divide-neutral-100 overflow-hidden rounded-lg border border-neutral-200 text-sm dark:divide-neutral-800 dark:border-neutral-700 pro:divide-[#44475a] pro:border-[#44475a]">
+            {payments.slice(0, 5).map((payment) => (
+              <li
+                key={payment.id}
+                className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">
+                    {t("projects.paidThrough")} {fmtDate(payment.paidThroughAt, locale)}
+                  </span>
+                  <span className="block truncate text-xs text-neutral-500">
+                    {t("projects.paidAt")} {fmtDate(payment.paidAt, locale)}
+                    {payment.note ? ` · ${payment.note}` : ""}
+                  </span>
+                </span>
+                <button
+                  onClick={() => api.projectPaymentDelete(payment.id).then(load)}
+                  className="invisible rounded p-1 text-neutral-400 hover:text-red-600 group-hover:visible"
+                >
+                  <TrashIcon size={13} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* entries */}
       <div className="mt-8">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
             {t("projects.recentEntries")}
           </h2>
-          <button
-            onClick={() => setManualOpen(true)}
-            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-          >
-            <PlusIcon size={13} />
-            {t("projects.addManual")}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedCount > 0 && (
+              <div className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900/40 pro:border-[#44475a] pro:bg-[#21222c]">
+                <span className="px-1 text-xs font-medium text-neutral-500 pro:text-[#b9b9c8]">
+                  {t("projects.selectedEntries", { count: selectedCount })}
+                </span>
+                <button
+                  onClick={() => setSelectedEntryIds(new Set())}
+                  className="rounded-md px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 pro:hover:bg-[#343746]"
+                >
+                  {t("common.cancel")}
+                </button>
+                <button
+                  onClick={mergeSelectedEntries}
+                  disabled={selectedCount < 2}
+                  className="rounded-md bg-neutral-950 px-2.5 py-1 text-xs font-semibold text-white hover:bg-neutral-800 disabled:opacity-40 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 pro:bg-[#50fa7b] pro:text-[#282a36]"
+                >
+                  {t("projects.mergeEntries")}
+                </button>
+              </div>
+            )}
+            <button
+              onClick={() => setManualOpen(true)}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            >
+              <PlusIcon size={13} />
+              {t("projects.addManual")}
+            </button>
+          </div>
         </div>
         {entries.length === 0 ? (
           <p className="py-4 text-sm text-neutral-500">
@@ -195,15 +346,30 @@ export default function ProjectView(p: Props) {
           </p>
         ) : (
           <ul className="divide-y divide-neutral-100 rounded-xl border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-700">
-            {entries.slice(0, 15).map((e) => (
+            {visibleEntries.map((e) => {
+              const selected = selectedEntryIds.has(e.id);
+              return (
               <li
                 key={e.id}
-                className="group flex items-center gap-3 px-4 py-2.5 text-sm"
+                onClick={() => setNoteEntry(e)}
+                className={`group grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-2.5 text-sm transition ${
+                  selected
+                    ? "bg-blue-50 dark:bg-blue-950/30 pro:bg-[#44475a]/50"
+                    : "hover:bg-neutral-50 dark:hover:bg-neutral-800/60 pro:hover:bg-[#343746]"
+                }`}
               >
-                <span className="flex-1 text-neutral-700 dark:text-neutral-300">
-                  {fmtDateTime(e.startedAt, locale)}
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  onChange={() => toggleEntrySelection(e.id)}
+                  onClick={(event) => event.stopPropagation()}
+                  className="h-4 w-4"
+                  aria-label={t("projects.selectEntry")}
+                />
+                <span className="min-w-0 text-neutral-700 dark:text-neutral-300">
+                  <span className="block truncate">{fmtDateTime(e.startedAt, locale)}</span>
                   {e.note && (
-                    <span className="ml-2 text-xs text-neutral-400">
+                    <span className="block truncate text-xs text-neutral-400">
                       {e.note}
                     </span>
                   )}
@@ -212,13 +378,24 @@ export default function ProjectView(p: Props) {
                   {fmtDuration(e.durationSecs)}
                 </span>
                 <button
-                  onClick={() => api.entryDelete(e.id).then(load)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    api.entryDelete(e.id).then(() => {
+                      setSelectedEntryIds((current) => {
+                        const next = new Set(current);
+                        next.delete(e.id);
+                        return next;
+                      });
+                      load();
+                    });
+                  }}
                   className="invisible rounded p-1 text-neutral-400 hover:text-red-600 group-hover:visible"
                 >
                   <TrashIcon size={13} />
                 </button>
               </li>
-            ))}
+            );
+            })}
           </ul>
         )}
       </div>
@@ -233,12 +410,52 @@ export default function ProjectView(p: Props) {
           }}
         />
       )}
+      {paymentOpen && (
+        <PaymentModal
+          projectId={p.project.id}
+          onClose={() => setPaymentOpen(false)}
+          onSaved={() => {
+            setPaymentOpen(false);
+            load();
+          }}
+        />
+      )}
+      {noteEntry && (
+        <EntryNoteModal
+          entry={noteEntry}
+          onClose={() => setNoteEntry(null)}
+          onSaved={() => {
+            setNoteEntry(null);
+            load();
+          }}
+        />
+      )}
     </div>
   );
 }
 
 function timerIsMine(timer: TimerSnapshot, projectId: string): boolean {
   return timer.projectId === projectId && timer.status !== "idle";
+}
+
+function ProjectStatTile({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail?: string | null;
+}) {
+  return (
+    <div className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-700 pro:border-[#44475a]">
+      <p className="text-xs text-neutral-500 pro:text-[#b9b9c8]">{label}</p>
+      <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
+      {detail && (
+        <p className="text-xs text-neutral-500 pro:text-[#b9b9c8]">{detail}</p>
+      )}
+    </div>
+  );
 }
 
 function ManualEntryModal({
@@ -321,4 +538,143 @@ function ManualEntryModal({
       </div>
     </Modal>
   );
+}
+
+function EntryNoteModal({
+  entry,
+  onClose,
+  onSaved,
+}: {
+  entry: TimeEntry;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language === "it" ? "it-IT" : "en-US";
+  const [note, setNote] = useState(entry.note ?? "");
+
+  const save = async () => {
+    await api.entryUpdateNote(entry.id, note.trim() || null);
+    onSaved();
+  };
+
+  return (
+    <Modal
+      title={entry.note ? t("projects.editEntryNote") : t("projects.addEntryNote")}
+      onClose={onClose}
+    >
+      <div className="space-y-3">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-300">
+            {fmtDateTime(entry.startedAt, locale)}
+          </span>
+          <textarea
+            autoFocus
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={4}
+            className="w-full resize-none rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+          />
+        </label>
+        <div className="flex justify-end gap-2 pt-2">
+          <button
+            onClick={onClose}
+            className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+          >
+            {t("common.cancel")}
+          </button>
+          <button
+            onClick={save}
+            className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            {t("common.save")}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function PaymentModal({
+  projectId,
+  onClose,
+  onSaved,
+}: {
+  projectId: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation();
+  const [paidThroughDate, setPaidThroughDate] = useState(toDateInput(new Date()));
+  const [note, setNote] = useState("");
+
+  const save = async () => {
+    await api.projectPaymentCreate(
+      projectId,
+      Math.floor(Date.now() / 1000),
+      endOfDateInput(paidThroughDate),
+      note.trim() || null,
+    );
+    onSaved();
+  };
+
+  return (
+    <Modal title={t("projects.markPaid")} onClose={onClose}>
+      <div className="space-y-3">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-300">
+            {t("projects.paymentThroughDate")}
+          </span>
+          <input
+            type="date"
+            value={paidThroughDate}
+            onChange={(e) => setPaidThroughDate(e.target.value)}
+            className="w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-300">
+            {t("projects.paymentNote")}
+          </span>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={3}
+            className="w-full resize-none rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+          />
+        </label>
+        <div className="flex justify-end gap-2 pt-2">
+          <button
+            onClick={onClose}
+            className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+          >
+            {t("common.cancel")}
+          </button>
+          <button
+            onClick={save}
+            className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            {t("projects.paymentCreate")}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function fmtDate(epochSecs: number, locale: string): string {
+  return new Date(epochSecs * 1000).toLocaleDateString(locale, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function toDateInput(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function endOfDateInput(value: string): number {
+  const [y, m, d] = value.split("-").map(Number);
+  return Math.floor(new Date(y, m - 1, d, 23, 59, 59).getTime() / 1000);
 }

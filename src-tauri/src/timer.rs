@@ -71,15 +71,27 @@ pub fn emit_state(app: &AppHandle) {
 }
 
 /// Chiude il segmento corrente scrivendolo su DB. Da chiamare con i lock già presi.
-fn close_segment(conn: &rusqlite::Connection, t: &mut TimerState) {
+fn close_segment(conn: &rusqlite::Connection, t: &mut TimerState) -> Option<db::TimeEntry> {
     if let (Some(start), Some(pid)) = (t.segment_start, t.project_id.clone()) {
         let now = db::now_secs();
+        let entry = if now > start {
+            db::insert_time_entry(conn, &pid, start, now).ok()
+        } else {
+            None
+        };
         if now > start {
-            let _ = db::insert_time_entry(conn, &pid, start, now);
+            t.accumulated += now - start;
         }
-        t.accumulated += now - start;
         t.segment_start = None;
+        return entry;
     }
+    None
+}
+
+fn emit_note_required(app: &AppHandle, entry: Option<db::TimeEntry>) {
+    let Some(entry) = entry else { return };
+    crate::tray::show_main_window(app);
+    let _ = app.emit("entry_note_required", entry);
 }
 
 #[tauri::command]
@@ -89,11 +101,12 @@ pub fn timer_start(
     db: State<Db>,
     project_id: String,
 ) -> Result<(), String> {
+    let mut note_entry = None;
     {
         let mut t = timer.0.lock().unwrap();
         let conn = db.0.lock().unwrap();
         if t.status != TimerStatus::Idle {
-            close_segment(&conn, &mut t);
+            note_entry = close_segment(&conn, &mut t);
         }
         t.status = TimerStatus::Running;
         t.project_id = Some(project_id);
@@ -101,21 +114,24 @@ pub fn timer_start(
         t.accumulated = 0;
     }
     emit_state(&app);
+    emit_note_required(&app, note_entry);
     Ok(())
 }
 
 #[tauri::command]
 pub fn timer_pause(app: AppHandle, timer: State<Timer>, db: State<Db>) -> Result<(), String> {
+    let note_entry;
     {
         let mut t = timer.0.lock().unwrap();
         if t.status != TimerStatus::Running {
             return Ok(());
         }
         let conn = db.0.lock().unwrap();
-        close_segment(&conn, &mut t);
+        note_entry = close_segment(&conn, &mut t);
         t.status = TimerStatus::Paused;
     }
     emit_state(&app);
+    emit_note_required(&app, note_entry);
     Ok(())
 }
 
@@ -134,19 +150,25 @@ pub fn timer_resume(app: AppHandle, timer: State<Timer>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn timer_stop(app: AppHandle, timer: State<Timer>, db: State<Db>) -> Result<(), String> {
+pub fn timer_stop(
+    app: AppHandle,
+    timer: State<Timer>,
+    db: State<Db>,
+) -> Result<Option<db::TimeEntry>, String> {
+    let note_entry;
     {
         let mut t = timer.0.lock().unwrap();
         if t.status == TimerStatus::Idle {
-            return Ok(());
+            return Ok(None);
         }
         let conn = db.0.lock().unwrap();
-        close_segment(&conn, &mut t);
+        note_entry = close_segment(&conn, &mut t);
         *t = TimerState::new();
     }
     emit_state(&app);
+    emit_note_required(&app, note_entry.clone());
     crate::sync::request_sync(&app);
-    Ok(())
+    Ok(note_entry)
 }
 
 #[tauri::command]

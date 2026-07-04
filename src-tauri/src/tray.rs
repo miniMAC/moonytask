@@ -2,7 +2,9 @@ use crate::timer::{TimerSnapshot, TimerStatus};
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Size, WebviewWindow};
+use tauri::{
+    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Size, WebviewWindow,
+};
 use tauri_plugin_positioner::{Position as TrayPosition, WindowExt};
 
 const TRAY_ID: &str = "main-tray";
@@ -100,7 +102,8 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
                     let _ = crate::timer::timer_stop(app.clone(), app.state(), app.state());
                 }
                 "quit" => {
-                    app.exit(0);
+                    show_main_window(app);
+                    let _ = app.emit("quit_requested", ());
                 }
                 _ => {}
             }
@@ -226,6 +229,11 @@ pub fn hide_popover(app: AppHandle) {
     if let Some(pop) = app.get_webview_window("popover") {
         let _ = pop.hide();
     }
+}
+
+#[tauri::command]
+pub fn quit_now(app: AppHandle) {
+    app.exit(0);
 }
 
 /// Aggiorna titolo tray e voci di menu in base allo stato del timer.

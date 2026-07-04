@@ -65,7 +65,7 @@ export default function SettingsView(p: Props) {
             onCurrencyChange={p.onCurrencyChange}
           />
         )}
-        {tab === "rates" && <RateProfilesSection />}
+        {tab === "rates" && <RateProfilesSection projects={p.projects} />}
         {tab === "apps" && <WatchedAppsSection projects={p.projects} />}
         {tab === "sync" && <SyncSection />}
       </div>
@@ -82,6 +82,18 @@ function GeneralSection({
 }) {
   const { t, i18n } = useTranslation();
   const { pref, setPref } = useTheme();
+  const [pdfDir, setPdfDir] = useState("");
+  const [pdfSaved, setPdfSaved] = useState(false);
+
+  useEffect(() => {
+    api.settingsGet("pdf_export_dir").then((value) => setPdfDir(value ?? ""));
+  }, []);
+
+  const savePdfDir = async () => {
+    await api.settingsSet("pdf_export_dir", pdfDir.trim());
+    setPdfSaved(true);
+    window.setTimeout(() => setPdfSaved(false), 1600);
+  };
 
   return (
     <section>
@@ -140,13 +152,38 @@ function GeneralSection({
           </select>
         </label>
       </div>
+      <div className="mt-6 max-w-2xl">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            {t("settings.pdfExportDir")}
+          </span>
+          <div className="flex gap-2">
+            <input
+              value={pdfDir}
+              onChange={(e) => setPdfDir(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && savePdfDir()}
+              placeholder={t("settings.pdfExportDirPlaceholder")}
+              className={`min-w-0 flex-1 ${inputCls}`}
+            />
+            <button
+              onClick={savePdfDir}
+              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+            >
+              {pdfSaved ? t("common.saved") : t("common.save")}
+            </button>
+          </div>
+        </label>
+        <p className="mt-1.5 text-xs text-neutral-500">
+          {t("settings.pdfExportDirHelp")}
+        </p>
+      </div>
     </section>
   );
 }
 
 // ---------- rate profiles ----------
 
-function RateProfilesSection() {
+function RateProfilesSection({ projects }: { projects: Project[] }) {
   const { t } = useTranslation();
   const [profiles, setProfiles] = useState<RateProfile[]>([]);
   const [defaultId, setDefaultId] = useState<string | null>(null);
@@ -311,6 +348,122 @@ function RateProfilesSection() {
         <PlusIcon size={14} />
         {t("settings.rates.add")}
       </button>
+      <ProjectRatesSection projects={projects} profiles={profiles} />
+    </section>
+  );
+}
+
+function ProjectRatesSection({
+  projects,
+  profiles,
+}: {
+  projects: Project[];
+  profiles: RateProfile[];
+}) {
+  const { t } = useTranslation();
+  const [rows, setRows] = useState<Project[]>([]);
+  const [draftRates, setDraftRates] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const active = projects.filter((project) => !project.archived);
+    setRows(active);
+    setDraftRates(
+      Object.fromEntries(
+        active.map((project) => [project.id, String(project.hourlyRate)]),
+      ),
+    );
+  }, [projects]);
+
+  const patchLocal = (project: Project) => {
+    setRows((current) =>
+      current.map((row) => (row.id === project.id ? project : row)),
+    );
+    setDraftRates((current) => ({
+      ...current,
+      [project.id]: String(project.hourlyRate),
+    }));
+  };
+
+  const saveProject = async (project: Project, patch: Partial<Project>) => {
+    const next = { ...project, ...patch };
+    patchLocal(next);
+    await api.projectUpdate(next);
+  };
+
+  const selectProfile = async (project: Project, profileId: string) => {
+    const profile = profiles.find((item) => item.id === profileId);
+    await saveProject(project, {
+      rateProfileId: profile?.id ?? null,
+      hourlyRate: profile?.hourlyRate ?? project.hourlyRate,
+    });
+  };
+
+  const saveManualRate = async (project: Project) => {
+    const hourlyRate =
+      parseFloat((draftRates[project.id] ?? "0").replace(",", ".")) || 0;
+    await saveProject(project, { hourlyRate, rateProfileId: null });
+  };
+
+  return (
+    <section className="mt-8">
+      <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+        {t("settings.rates.projectTitle")}
+      </h3>
+      <p className="mt-1 max-w-2xl text-xs text-neutral-500">
+        {t("settings.rates.projectHelp")}
+      </p>
+
+      <div className="mt-4 overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-700 pro:border-[#44475a]">
+        <div className="grid min-w-[720px] grid-cols-[minmax(260px,1fr)_220px_160px] gap-3 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-normal text-neutral-500 dark:bg-neutral-900/40 dark:text-neutral-400 pro:bg-[#21222c] pro:text-[#bd93f9]">
+          <span>{t("reports.project")}</span>
+          <span>{t("projects.rateProfile")}</span>
+          <span>{t("projects.hourlyRate")}</span>
+        </div>
+        <div className="divide-y divide-neutral-200 dark:divide-neutral-700 pro:divide-[#44475a]">
+          {rows.length === 0 && (
+            <p className="px-4 py-5 text-xs text-neutral-400">
+              {t("projects.empty")}
+            </p>
+          )}
+          {rows.map((project) => (
+            <div
+              key={project.id}
+              className="grid min-w-[720px] grid-cols-[minmax(260px,1fr)_220px_160px] items-center gap-3 px-4 py-3"
+            >
+              <span className="truncate text-sm font-medium">{project.name}</span>
+              <select
+                value={project.rateProfileId ?? ""}
+                onChange={(e) => selectProfile(project, e.target.value)}
+                className={rateFieldCls}
+              >
+                <option value="">{t("projects.manualRate")}</option>
+                {profiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                inputMode="decimal"
+                value={draftRates[project.id] ?? String(project.hourlyRate)}
+                onChange={(e) =>
+                  setDraftRates((current) => ({
+                    ...current,
+                    [project.id]: e.target.value,
+                  }))
+                }
+                onBlur={() => saveManualRate(project)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.currentTarget.blur();
+                  }
+                }}
+                className={rateFieldCls}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

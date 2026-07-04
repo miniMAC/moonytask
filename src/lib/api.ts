@@ -3,7 +3,9 @@ import type {
   Folder,
   InstalledApp,
   Project,
+  ProjectPayment,
   RateProfile,
+  ReportExportPdfRequest,
   SyncStatus,
   TimeEntry,
   TimerSnapshot,
@@ -52,6 +54,10 @@ export const projectDelete = (id: string) =>
 export const entriesRange = (from: number, to: number) =>
   invoke<TimeEntry[]>("entries_range", { from, to });
 export const entryDelete = (id: string) => invoke<void>("entry_delete", { id });
+export const entryUpdateNote = (id: string, note: string | null) =>
+  invoke<void>("entry_update_note", { id, note });
+export const entriesMerge = (ids: string[]) =>
+  invoke<TimeEntry>("entries_merge", { ids });
 export const entryAddManual = (
   projectId: string,
   startedAt: number,
@@ -65,13 +71,33 @@ export const dataExport = (format: ExportFormat) =>
   invoke<string>("data_export", { format });
 export const projectExport = (projectId: string, format: ExportFormat) =>
   invoke<string>("project_export", { projectId, format });
+export const reportExportPdf = (request: ReportExportPdfRequest) =>
+  invoke<string>("report_export_pdf", { ...request });
+
+// project payments
+export const projectPaymentsList = (projectId: string) =>
+  invoke<ProjectPayment[]>("project_payments_list", { projectId });
+export const projectPaymentCreate = (
+  projectId: string,
+  paidAt: number,
+  paidThroughAt: number,
+  note: string | null,
+) =>
+  invoke<ProjectPayment>("project_payment_create", {
+    projectId,
+    paidAt,
+    paidThroughAt,
+    note,
+  });
+export const projectPaymentDelete = (id: string) =>
+  invoke<void>("project_payment_delete", { id });
 
 // timer
 export const timerStart = (projectId: string) =>
   invoke<void>("timer_start", { projectId });
 export const timerPause = () => invoke<void>("timer_pause");
 export const timerResume = () => invoke<void>("timer_resume");
-export const timerStop = () => invoke<void>("timer_stop");
+export const timerStop = () => invoke<TimeEntry | null>("timer_stop");
 export const timerGetState = () => invoke<TimerSnapshot>("timer_get_state");
 
 // totals per project (per popover e statistiche)
@@ -109,6 +135,8 @@ export const watchedUpdate = (
 ) => invoke<void>("watched_update", { id, enabled, projectId, remindAfterSecs });
 export const watchedRemove = (id: string) =>
   invoke<void>("watched_remove", { id });
+export const watcherSnooze = (bundleId: string, untilEpoch: number) =>
+  invoke<void>("watcher_snooze", { bundleId, untilEpoch });
 
 // settings
 export const settingsGet = (key: string) =>
@@ -141,3 +169,4 @@ export const syncLogin = (email: string | null) =>
   invoke<SyncStatus>("sync_login", { email });
 export const syncLogout = () => invoke<void>("sync_logout");
 export const syncNow = () => invoke<SyncStatus>("sync_now");
+export const quitNow = () => invoke<void>("quit_now");

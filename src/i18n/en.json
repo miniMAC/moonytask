@@ -33,7 +33,22 @@
     "addManual": "Add time manually",
     "date": "Date",
     "durationMinutes": "Duration (minutes)",
-    "note": "Note (optional)"
+    "note": "Note (optional)",
+    "totalCost": "Total cost",
+    "payments": "Payments",
+    "markPaid": "Mark paid through…",
+    "paidThrough": "Paid through",
+    "paidAt": "Paid on",
+    "amountDue": "Amount due",
+    "noPayments": "No saved payments.",
+    "paymentNote": "Payment note",
+    "paymentThroughDate": "Paid through",
+    "paymentCreate": "Save payment",
+    "selectEntry": "Select entry",
+    "selectedEntries": "{{count}} selected",
+    "mergeEntries": "Merge",
+    "addEntryNote": "Add note",
+    "editEntryNote": "Edit note"
   },
   "timer": {
     "start": "Start",
@@ -41,7 +56,10 @@
     "resume": "Resume",
     "stop": "Stop",
     "running": "Running",
-    "paused": "Paused"
+    "paused": "Paused",
+    "noteTitle": "Add a note?",
+    "noteBody": "You can describe what you worked on during this segment. It is optional.",
+    "noteSkip": "Skip"
   },
   "reports": {
     "title": "Reports",
@@ -55,6 +73,9 @@
     "allFolders": "All folders",
     "totalTime": "Total time",
     "totalCost": "Estimated cost",
+    "periodTime": "Period time",
+    "periodCost": "Period cost",
+    "lifetimeCost": "Total cost from start",
     "daysWorked": "Days worked",
     "byDay": "Time per day",
     "byProject": "Breakdown by project",
@@ -62,7 +83,11 @@
     "project": "Project",
     "time": "Time",
     "cost": "Cost",
-    "noData": "No entries in the selected period."
+    "noData": "No entries in the selected period.",
+    "pdf": "PDF",
+    "pdfExported": "PDF exported",
+    "pdfFailed": "PDF export failed",
+    "pdfProjectOnly": "Select a project to export the PDF"
   },
   "popover": {
     "all": "All",
@@ -82,7 +107,10 @@
     "rate": "$/h",
     "noResults": "No projects found.",
     "reminderTitle": "Timer is not running",
-    "reminderBody": "You are using {{app}}: start the timer?"
+    "reminderBody": "You are using {{app}}: start the timer?",
+    "snooze5": "In 5 min",
+    "snooze15": "In 15 min",
+    "ignoreToday": "Ignore today"
   },
   "settings": {
     "title": "Settings",
@@ -100,6 +128,9 @@
     "themeLight": "Light",
     "themeDark": "Dark",
     "themePro": "TinyTime PRO",
+    "pdfExportDir": "PDF export folder",
+    "pdfExportDirPlaceholder": "Empty = Downloads",
+    "pdfExportDirHelp": "Folder path where project PDFs are saved. You can also use ~/Documents/TinyTime.",
     "rates": {
       "title": "Rate profiles",
       "help": "Create reusable profiles with a name, payment type, and hourly rate. The default profile is applied to new projects and can be changed in the project sheet.",
@@ -112,6 +143,8 @@
       "defaultColumn": "Default",
       "default": "Default",
       "setDefault": "Set default",
+      "projectTitle": "Project rates",
+      "projectHelp": "Assign a profile or manual hourly rate to each project. Reports always use the project's rate.",
       "payment": {
         "hourly": "Hourly",
         "retainer": "Retainer",
@@ -158,6 +191,7 @@
     "add": "Add",
     "delete": "Delete",
     "close": "Close",
+    "saved": "Saved",
     "hours": "hours",
     "loading": "Loading…"
   }

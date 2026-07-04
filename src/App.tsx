@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
 import type {
   Folder,
   Project,
+  TimeEntry,
   TimerSnapshot,
 } from "./lib/types";
 import * as api from "./lib/api";
@@ -14,6 +15,7 @@ import ProjectModal, {
 } from "./components/ProjectModal";
 import FolderModal, { type FolderModalState } from "./components/FolderModal";
 import ConfirmModal from "./components/ConfirmModal";
+import Modal from "./components/Modal";
 import ProjectView from "./views/ProjectView";
 import ReportsView from "./views/ReportsView";
 import SettingsView from "./views/SettingsView";
@@ -39,12 +41,19 @@ export default function App() {
     body: string;
     action: () => Promise<void>;
   } | null>(null);
+  const [noteRequest, setNoteRequest] = useState<TimeEntry | null>(null);
+  const [quitAfterNote, setQuitAfterNote] = useState(false);
+  const noteRequestRef = useRef<TimeEntry | null>(null);
 
   const reload = useCallback(async () => {
     const [f, p] = await Promise.all([api.foldersList(), api.projectsList()]);
     setFolders(f);
     setProjects(p);
   }, []);
+
+  useEffect(() => {
+    noteRequestRef.current = noteRequest;
+  }, [noteRequest]);
 
   useEffect(() => {
     reload();
@@ -70,10 +79,35 @@ export default function App() {
       setSelectedId(e.payload);
       setView("project");
     });
+    const unNote = listen<TimeEntry>("entry_note_required", (e) => {
+      setNoteRequest(e.payload);
+      setRefreshKey((k) => k + 1);
+    });
+    const unQuit = listen("quit_requested", async () => {
+      if (noteRequestRef.current) {
+        setQuitAfterNote(true);
+        return;
+      }
+      const snap = await api.timerGetState();
+      if (snap.status === "idle") {
+        await api.quitNow();
+        return;
+      }
+      setQuitAfterNote(true);
+      const entry = await api.timerStop();
+      if (entry) {
+        setNoteRequest(entry);
+      } else {
+        setQuitAfterNote(false);
+        await api.quitNow();
+      }
+    });
     return () => {
       unTimer.then((f) => f());
       unData.then((f) => f());
       unOpen.then((f) => f());
+      unNote.then((f) => f());
+      unQuit.then((f) => f());
     };
   }, []);
 
@@ -88,7 +122,8 @@ export default function App() {
         target.tagName === "SELECT" ||
         projectModal ||
         folderModal ||
-        confirm
+        confirm ||
+        noteRequest
       ) {
         return;
       }
@@ -99,7 +134,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [timer.status, selectedId, projectModal, folderModal, confirm]);
+  }, [timer.status, selectedId, projectModal, folderModal, confirm, noteRequest]);
 
   const selectedProject = projects.find((p) => p.id === selectedId) ?? null;
 
@@ -228,6 +263,64 @@ export default function App() {
           }}
         />
       )}
+      {noteRequest && (
+        <EntryNoteModal
+          entry={noteRequest}
+          onClose={async (note) => {
+            if (note !== null) {
+              await api.entryUpdateNote(noteRequest.id, note);
+            }
+            setNoteRequest(null);
+            setRefreshKey((k) => k + 1);
+            if (quitAfterNote) {
+              setQuitAfterNote(false);
+              await api.quitNow();
+            }
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function EntryNoteModal({
+  entry,
+  onClose,
+}: {
+  entry: TimeEntry;
+  onClose: (note: string | null) => void | Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [note, setNote] = useState(entry.note ?? "");
+
+  return (
+    <Modal title={t("timer.noteTitle")} onClose={() => onClose(null)}>
+      <div className="space-y-3">
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          {t("timer.noteBody")}
+        </p>
+        <textarea
+          autoFocus
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={4}
+          className="w-full resize-none rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+        />
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            onClick={() => onClose(null)}
+            className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+          >
+            {t("timer.noteSkip")}
+          </button>
+          <button
+            onClick={() => onClose(note.trim())}
+            className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            {t("common.save")}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
