@@ -31,6 +31,25 @@
       }
     },
     {
+      "label": "CI: build all desktop artifacts",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/ci-build-all.mjs"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "detail": "Lancia GitHub Actions per macOS, Windows e Linux, aspetta la fine e scarica tutto in ~/Desktop/MoonyTask.",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
       "label": "Rust target: macOS Intel",
       "type": "shell",
       "command": "rustup",
@@ -59,10 +78,7 @@
       },
       "dependsOn": ["Rust target: macOS Intel"],
       "dependsOrder": "sequence",
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
+      "group": "build",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
