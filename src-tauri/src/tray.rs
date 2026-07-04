@@ -10,12 +10,23 @@ use tauri_plugin_positioner::{Position as TrayPosition, WindowExt};
 const TRAY_ID: &str = "main-tray";
 
 fn fmt_hms(total: i64) -> String {
-    format!(
-        "{:02}:{:02}:{:02}",
-        total / 3600,
-        (total % 3600) / 60,
-        total % 60
-    )
+    let hours = total / 3600;
+    let minutes = (total % 3600) / 60;
+    let seconds = total % 60;
+    if hours > 0 {
+        format!("{hours}:{minutes:02}:{seconds:02}")
+    } else {
+        format!("00:{minutes:02}:{seconds:02}")
+    }
+}
+
+fn short_name(value: &str) -> String {
+    const MAX_CHARS: usize = 18;
+    let mut out = value.chars().take(MAX_CHARS).collect::<String>();
+    if value.chars().count() > MAX_CHARS {
+        out.push('…');
+    }
+    out
 }
 
 fn labels(app: &AppHandle) -> (String, String, String, String, String) {
@@ -245,17 +256,17 @@ pub fn refresh(app: &AppHandle, snap: &TimerSnapshot) {
         TimerStatus::Idle => None,
         _ => {
             let name = snap.project_name.clone().unwrap_or_default();
-            let pause_mark = if snap.status == TimerStatus::Paused {
-                "⏸ "
+            let status_mark = if snap.status == TimerStatus::Paused {
+                "⏸"
             } else {
-                ""
+                "🟢"
             };
-            Some(format!(
-                "{}{} · {}",
-                pause_mark,
-                fmt_hms(snap.elapsed_secs),
-                name
-            ))
+            let time = fmt_hms(snap.elapsed_secs);
+            if name.is_empty() {
+                Some(format!("{status_mark} {time}"))
+            } else {
+                Some(format!("{status_mark} {time} · {}", short_name(&name)))
+            }
         }
     };
     let _ = tray.set_title(title.as_deref());

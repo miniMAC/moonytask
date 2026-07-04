@@ -22,12 +22,12 @@ const artifactExtensions = new Set([".dmg", ".msi", ".exe", ".AppImage", ".deb",
 main();
 
 function main() {
-  requireCommand("gh", "GitHub CLI non trovato. Installa con: brew install gh");
+  const gh = resolveCommand("gh", ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"]);
+  if (!gh) {
+    fail("GitHub CLI non trovato. Installa con: brew install gh");
+  }
   requireWorkflowCommitted();
-
-  run("gh", ["auth", "status"], {
-    errorMessage: "GitHub CLI non autenticato. Esegui: gh auth login",
-  });
+  ensureGitHubAuth(gh);
 
   const branch = output("git", ["branch", "--show-current"]).trim();
   if (!branch) {
@@ -37,11 +37,11 @@ function main() {
 
   const startedAt = Date.now();
   console.log(`Launching ${workflow} on branch ${branch}...`);
-  run("gh", ["workflow", "run", workflow, "--ref", branch]);
+  run(gh, ["workflow", "run", workflow, "--ref", branch]);
 
-  const runId = waitForRunId(branch, startedAt);
+  const runId = waitForRunId(gh, branch, startedAt);
   console.log(`Watching GitHub Actions run ${runId}...`);
-  run("gh", ["run", "watch", String(runId), "--exit-status"]);
+  run(gh, ["run", "watch", String(runId), "--exit-status"]);
 
   const desktopDir = resolveDesktopDir();
   const outDir = path.join(desktopDir, "MoonyTask");
@@ -49,7 +49,7 @@ function main() {
   mkdirSync(runDir, { recursive: true });
 
   console.log(`Downloading artifacts to ${runDir}...`);
-  run("gh", ["run", "download", String(runId), "--dir", runDir]);
+  run(gh, ["run", "download", String(runId), "--dir", runDir]);
 
   const copied = copyArtifactsToDesktop(runDir, outDir);
   if (copied === 0) {
@@ -59,13 +59,37 @@ function main() {
   console.log(`Done. ${copied} file ready in ${outDir}`);
 }
 
-function requireCommand(command, message) {
-  const result = spawnSync(command, ["--version"], {
+function resolveCommand(command, candidates = []) {
+  for (const candidate of [command, ...candidates]) {
+    const result = spawnSync(candidate, ["--version"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    });
+    if (!result.error && result.status === 0) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function ensureGitHubAuth(gh) {
+  const status = spawnSync(gh, ["auth", "status"], {
     cwd: projectRoot,
-    encoding: "utf8",
+    stdio: "inherit",
   });
-  if (result.error || result.status !== 0) {
-    fail(message);
+  if (status.status === 0) {
+    return;
+  }
+
+  console.log("GitHub CLI non autenticato. Avvio il login...");
+  run(gh, ["auth", "login"]);
+
+  const verified = spawnSync(gh, ["auth", "status"], {
+    cwd: projectRoot,
+    stdio: "inherit",
+  });
+  if (verified.status !== 0) {
+    fail("Login GitHub non completato. Rilancia il task e completa l'autenticazione.");
   }
 }
 
@@ -92,11 +116,11 @@ function requireBranchPushed() {
   }
 }
 
-function waitForRunId(branch, startedAt) {
+function waitForRunId(gh, branch, startedAt) {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     sleep(2000);
     const runs = JSON.parse(
-      output("gh", [
+      output(gh, [
         "run",
         "list",
         "--workflow",
@@ -129,7 +153,7 @@ function copyArtifactsToDesktop(sourceDir, outDir) {
   mkdirSync(outDir, { recursive: true });
   let copied = 0;
   for (const artifact of findArtifacts(sourceDir)) {
-    const destination = path.join(outDir, path.basename(artifact));
+    const destination = path.join(outDir, stableArtifactName(artifact));
     copyFileSync(artifact, destination);
     copied += 1;
     console.log(`Copied ${artifact} -> ${destination}`);
@@ -157,6 +181,33 @@ function findArtifacts(root) {
     }
   }
   return out.sort();
+}
+
+function stableArtifactName(filePath) {
+  const base = path.basename(filePath);
+  if (base.endsWith(".dmg")) {
+    return "MoonyTask-macOS-universal.dmg";
+  }
+  if (base.endsWith(".AppImage")) {
+    return "MoonyTask-Linux-x64.AppImage";
+  }
+  if (base.endsWith(".deb")) {
+    return "MoonyTask-Linux-x64.deb";
+  }
+  if (base.endsWith(".rpm")) {
+    return "MoonyTask-Linux-x64.rpm";
+  }
+  if (base.endsWith(".exe")) {
+    return base.includes("arm64")
+      ? "MoonyTask-Windows-arm64-setup.exe"
+      : "MoonyTask-Windows-x64-setup.exe";
+  }
+  if (base.endsWith(".msi")) {
+    return base.includes("arm64")
+      ? "MoonyTask-Windows-arm64.msi"
+      : "MoonyTask-Windows-x64.msi";
+  }
+  return base;
 }
 
 function output(command, args) {

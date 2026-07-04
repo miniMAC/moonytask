@@ -120,7 +120,8 @@
       "general": "Generali",
       "rates": "Tariffe",
       "apps": "App",
-      "sync": "Sync"
+      "sync": "Sync",
+      "support": "Supporto"
     },
     "general": "Preferenze",
     "language": "Lingua",
@@ -180,8 +181,13 @@
       "lastSync": "Ultima sync: {{time}}",
       "error": "Errore: {{error}}"
     },
-    "pdfTotalsOnly": "Nel PDF mostra solo i totali",
-    "pdfTotalsOnlyHelp": "Se attivo, il PDF contiene solo il riepilogo (tempo, costi, giorni) senza la tabella giorno per giorno."
+    "support": {
+      "title": "Supporto",
+      "help": "Per segnalare bug o problemi puoi scrivere direttamente al supporto MoonyTask.",
+      "email": "Scrivi a info@moonytask.com"
+    },
+    "pdfTotalsOnly": "Nel PDF nascondi i costi nelle righe",
+    "pdfTotalsOnlyHelp": "Se attivo, il PDF mantiene riepilogo e tabella, ma nella tabella mostra solo giorno e tempo."
   },
   "common": {
     "save": "Salva",

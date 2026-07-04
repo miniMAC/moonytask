@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type {
   InstalledApp,
   PaymentType,
@@ -15,7 +16,7 @@ import Modal from "../components/Modal";
 import { PlusIcon, TrashIcon } from "../components/Icons";
 
 const CURRENCIES = ["EUR", "USD", "GBP", "CHF"];
-const SETTINGS_TABS = ["general", "rates", "apps", "sync"] as const;
+const SETTINGS_TABS = ["general", "rates", "apps", "sync", "support"] as const;
 const PAYMENT_TYPES: PaymentType[] = ["hourly", "retainer", "fixed"];
 
 const inputCls =
@@ -68,6 +69,7 @@ export default function SettingsView(p: Props) {
         {tab === "rates" && <RateProfilesSection projects={p.projects} />}
         {tab === "apps" && <WatchedAppsSection projects={p.projects} />}
         {tab === "sync" && <SyncSection />}
+        {tab === "support" && <SupportSection />}
       </div>
     </div>
   );
@@ -220,6 +222,30 @@ function GeneralSection({
           {t("settings.pdfTotalsOnlyHelp")}
         </p>
       </div>
+    </section>
+  );
+}
+
+function SupportSection() {
+  const { t } = useTranslation();
+  const email = "info@moonytask.com";
+  const subject = encodeURIComponent("MoonyTask support");
+
+  return (
+    <section>
+      <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
+        {t("settings.support.title")}
+      </h2>
+      <p className="mt-1 max-w-2xl text-sm text-neutral-500">
+        {t("settings.support.help")}
+      </p>
+      <button
+        onClick={() => openUrl(`mailto:${email}?subject=${subject}`)}
+        className="mt-4 h-11 rounded-lg bg-neutral-950 px-5 text-base font-semibold text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 pro:bg-[#50fa7b] pro:text-[#282a36]"
+      >
+        {t("settings.support.email")}
+      </button>
+      <p className="mt-2 text-sm text-neutral-500">{email}</p>
     </section>
   );
 }

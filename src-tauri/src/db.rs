@@ -1119,11 +1119,15 @@ pub fn report_export_pdf(
             "Nessun dato nel periodo selezionato.".to_string()
         });
         None
-    } else if totals_only {
-        None
     } else {
         let headers: Vec<String> = if en {
-            vec!["Day".into(), "Time".into(), "Cost".into()]
+            if totals_only {
+                vec!["Day".into(), "Time".into()]
+            } else {
+                vec!["Day".into(), "Time".into(), "Cost".into()]
+            }
+        } else if totals_only {
+            vec!["Giorno".into(), "Tempo".into()]
         } else {
             vec!["Giorno".into(), "Tempo".into(), "Costo".into()]
         };
@@ -1131,11 +1135,15 @@ pub fn report_export_pdf(
             .iter()
             .rev()
             .map(|(day, (secs, money))| {
-                vec![
-                    day.clone(),
-                    fmt_pdf_duration(*secs),
-                    fmt_pdf_money(*money, &currency, &locale),
-                ]
+                if totals_only {
+                    vec![day.clone(), fmt_pdf_duration(*secs)]
+                } else {
+                    vec![
+                        day.clone(),
+                        fmt_pdf_duration(*secs),
+                        fmt_pdf_money(*money, &currency, &locale),
+                    ]
+                }
             })
             .collect();
         Some((headers, rows))

@@ -15,17 +15,22 @@ export default function TimerBar({
   if (timer.status === "idle") return null;
 
   return (
-    <div className="flex items-center gap-4 border-t border-neutral-200 bg-neutral-900 px-5 py-3 text-white dark:border-neutral-800 dark:bg-black/60 pro:border-[#44475a] pro:bg-[#21222c]">
+    <div className="flex items-center gap-4 border-t border-[#434758] bg-[#303443] px-5 py-3 text-white shadow-[0_-1px_0_rgba(255,255,255,0.04)] dark:border-[#434758] dark:bg-[#252938] pro:border-[#44475a] pro:bg-[#21222c]">
       <button
         onClick={() => timer.projectId && onOpenProject(timer.projectId)}
-        className="min-w-0 flex-1 truncate text-left text-base font-medium hover:underline"
+        className="flex min-w-0 flex-1 items-center gap-2 truncate text-left text-base font-medium hover:underline"
       >
-        {timer.projectName}
-        <span className="ml-2 text-sm font-normal text-neutral-400">
+        <span
+          className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+            timer.status === "running" ? "bg-[#4cf272]" : "bg-amber-400"
+          }`}
+        />
+        <span className="truncate">{timer.projectName}</span>
+        <span className="text-sm font-normal text-neutral-400">
           {timer.status === "running" ? t("timer.running") : t("timer.paused")}
         </span>
       </button>
-      <span className="font-mono text-xl tabular-nums">
+      <span className="font-mono text-xl font-semibold tabular-nums text-[#4cf272]">
         {fmtClock(timer.elapsedSecs)}
       </span>
       {timer.status === "running" ? (

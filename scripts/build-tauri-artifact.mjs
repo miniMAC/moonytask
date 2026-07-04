@@ -61,7 +61,7 @@ if (artifacts.length === 0) {
 }
 
 for (const artifact of artifacts) {
-  const destination = path.join(outDir, path.basename(artifact));
+  const destination = path.join(outDir, stableArtifactName(artifact));
   copyFileSync(artifact, destination);
   console.log(`Copied ${path.relative(projectRoot, artifact)} -> ${destination}`);
 }
@@ -99,6 +99,33 @@ function findArtifacts(root, extensions) {
 
 function appImageExtension(filePath) {
   return filePath.endsWith(".AppImage") ? ".AppImage" : null;
+}
+
+function stableArtifactName(filePath) {
+  const base = path.basename(filePath);
+  if (base.endsWith(".dmg")) {
+    return "MoonyTask-macOS-universal.dmg";
+  }
+  if (base.endsWith(".AppImage")) {
+    return "MoonyTask-Linux-x64.AppImage";
+  }
+  if (base.endsWith(".deb")) {
+    return "MoonyTask-Linux-x64.deb";
+  }
+  if (base.endsWith(".rpm")) {
+    return "MoonyTask-Linux-x64.rpm";
+  }
+  if (base.endsWith(".exe")) {
+    return base.includes("arm64")
+      ? "MoonyTask-Windows-arm64-setup.exe"
+      : "MoonyTask-Windows-x64-setup.exe";
+  }
+  if (base.endsWith(".msi")) {
+    return base.includes("arm64")
+      ? "MoonyTask-Windows-arm64.msi"
+      : "MoonyTask-Windows-x64.msi";
+  }
+  return base;
 }
 
 function resolveDesktopDir() {

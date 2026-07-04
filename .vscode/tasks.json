@@ -31,6 +31,21 @@
       }
     },
     {
+      "label": "GitHub: login",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/gh-auth-login.mjs"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "detail": "Autentica GitHub CLI una sola volta, usando il path corretto anche da VS Code.",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
       "label": "CI: build all desktop artifacts",
       "type": "shell",
       "command": "node",

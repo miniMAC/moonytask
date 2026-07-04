@@ -120,7 +120,8 @@
       "general": "General",
       "rates": "Rates",
       "apps": "Apps",
-      "sync": "Sync"
+      "sync": "Sync",
+      "support": "Support"
     },
     "general": "Preferences",
     "language": "Language",
@@ -180,8 +181,13 @@
       "lastSync": "Last sync: {{time}}",
       "error": "Error: {{error}}"
     },
-    "pdfTotalsOnly": "Show only totals in the PDF",
-    "pdfTotalsOnlyHelp": "When enabled, the PDF contains only the summary (time, costs, days) without the day-by-day table."
+    "support": {
+      "title": "Support",
+      "help": "To report bugs or issues, you can write directly to MoonyTask support.",
+      "email": "Email info@moonytask.com"
+    },
+    "pdfTotalsOnly": "Hide row costs in the PDF",
+    "pdfTotalsOnlyHelp": "When enabled, the PDF keeps the summary and table, but the table shows only day and time."
   },
   "common": {
     "save": "Save",
