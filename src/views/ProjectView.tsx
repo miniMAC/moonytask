@@ -4,6 +4,7 @@ import type {
   Folder,
   Project,
   ProjectPayment,
+  RateProfile,
   TimeEntry,
   TimerSnapshot,
 } from "../lib/types";
@@ -28,6 +29,10 @@ import {
   StopIcon,
   TrashIcon,
 } from "../components/Icons";
+
+const fieldCls =
+  "h-11 w-full rounded-md border border-neutral-300 bg-white px-3 text-base outline-none transition focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2] pro:focus:border-[#bd93f9]";
+const sectionLabelCls = "text-sm font-bold uppercase tracking-wide";
 
 interface Props {
   project: Project;
@@ -182,7 +187,7 @@ export default function ProjectView(p: Props) {
                 {p.project.name}
               </h1>
             </div>
-            <p className="mt-1 text-base text-neutral-500">
+            <p className="mt-1 text-base text-neutral-600 dark:text-neutral-400 pro:text-[#c9c9d6]">
               {p.folder?.name}
               {p.project.hourlyRate > 0 && (
                 <>
@@ -329,9 +334,12 @@ export default function ProjectView(p: Props) {
         />
       </div>
 
-      <div className="mt-6 rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900/30 pro:border-[#44475a] pro:bg-[#21222c]">
+      {/* tariffa del progetto */}
+      <RateCard project={p.project} currency={p.currency} locale={locale} />
+
+      <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50/30 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/10 pro:border-[#50fa7b]/30 pro:bg-[#50fa7b]/5">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
+          <h2 className={`${sectionLabelCls} text-emerald-700 dark:text-emerald-400 pro:text-[#50fa7b]`}>
             {t("projects.payments")}
           </h2>
           <button
@@ -360,10 +368,11 @@ export default function ProjectView(p: Props) {
             label={t("projects.amountDue")}
             value={fmtCost(residualCost, p.currency, locale)}
             detail={fmtDuration(residualSecsWithLive)}
+            tone={residualCost > 0 ? "due" : "default"}
           />
         </div>
         {payments.length === 0 ? (
-          <p className="mt-4 text-base text-neutral-500">
+          <p className="mt-4 text-base text-neutral-600 dark:text-neutral-400 pro:text-[#b9b9c8]">
             {t("projects.noPayments")}
           </p>
         ) : (
@@ -377,7 +386,7 @@ export default function ProjectView(p: Props) {
                   <span className="block truncate font-medium">
                     {t("projects.paidThrough")} {fmtDate(payment.paidThroughAt, locale)}
                   </span>
-                  <span className="block truncate text-sm text-neutral-500">
+                  <span className="block truncate text-sm text-neutral-600 dark:text-neutral-400 pro:text-[#b9b9c8]">
                     {t("projects.paidAt")} {fmtDate(payment.paidAt, locale)}
                     {payment.note ? ` · ${payment.note}` : ""}
                   </span>
@@ -397,7 +406,7 @@ export default function ProjectView(p: Props) {
       {/* entries */}
       <div className="mt-8">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
+          <h2 className={`${sectionLabelCls} text-blue-700 dark:text-blue-400 pro:text-[#8be9fd]`}>
             {t("projects.recentEntries")}
           </h2>
           <div className="flex flex-wrap items-center gap-2">
@@ -431,7 +440,7 @@ export default function ProjectView(p: Props) {
           </div>
         </div>
         {entries.length === 0 ? (
-          <p className="py-4 text-base text-neutral-500">
+          <p className="py-4 text-base text-neutral-600 dark:text-neutral-400 pro:text-[#b9b9c8]">
             {t("projects.noEntries")}
           </p>
         ) : (
@@ -459,7 +468,7 @@ export default function ProjectView(p: Props) {
                 <span className="min-w-0 text-neutral-700 dark:text-neutral-300">
                   <span className="block truncate">{fmtDateTime(e.startedAt, locale)}</span>
                   {e.note && (
-                    <span className="block truncate text-sm text-neutral-400">
+                    <span className="block truncate text-sm text-neutral-500 dark:text-neutral-400">
                       {e.note}
                     </span>
                   )}
@@ -532,18 +541,136 @@ function ProjectStatTile({
   label,
   value,
   detail,
+  tone = "default",
 }: {
   label: string;
   value: string;
   detail?: string | null;
+  tone?: "default" | "due";
 }) {
   return (
-    <div className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-700 pro:border-[#44475a]">
-      <p className="text-sm text-neutral-500 pro:text-[#b9b9c8]">{label}</p>
-      <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
+    <div
+      className={`rounded-xl border p-4 ${
+        tone === "due"
+          ? "border-amber-300 bg-amber-50/60 dark:border-amber-700/60 dark:bg-amber-950/20 pro:border-[#ffb86c]/50 pro:bg-[#ffb86c]/10"
+          : "border-neutral-200 bg-neutral-50/60 dark:border-neutral-700 dark:bg-neutral-800/40 pro:border-[#44475a] pro:bg-[#21222c]"
+      }`}
+    >
+      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400 pro:text-[#c9c9d6]">
+        {label}
+      </p>
+      <p
+        className={`mt-1 text-xl font-bold tabular-nums ${
+          tone === "due"
+            ? "text-amber-700 dark:text-amber-300 pro:text-[#ffb86c]"
+            : ""
+        }`}
+      >
+        {value}
+      </p>
       {detail && (
-        <p className="text-sm text-neutral-500 pro:text-[#b9b9c8]">{detail}</p>
+        <p className="mt-0.5 text-sm text-neutral-600 dark:text-neutral-400 pro:text-[#b9b9c8]">
+          {detail}
+        </p>
       )}
+    </div>
+  );
+}
+
+// tariffa del progetto: profilo o costo orario manuale, salvata subito
+function RateCard({
+  project,
+  currency,
+  locale,
+}: {
+  project: Project;
+  currency: string;
+  locale: string;
+}) {
+  const { t } = useTranslation();
+  const [profiles, setProfiles] = useState<RateProfile[]>([]);
+  const [draftRate, setDraftRate] = useState(String(project.hourlyRate));
+
+  useEffect(() => {
+    api.rateProfilesGet().then(setProfiles);
+  }, []);
+
+  useEffect(() => {
+    setDraftRate(String(project.hourlyRate));
+  }, [project.id, project.hourlyRate]);
+
+  const selectProfile = async (profileId: string) => {
+    const profile = profiles.find((item) => item.id === profileId);
+    await api.projectUpdate({
+      ...project,
+      rateProfileId: profile?.id ?? null,
+      hourlyRate: profile?.hourlyRate ?? project.hourlyRate,
+    });
+  };
+
+  const saveManualRate = async () => {
+    const hourlyRate = parseFloat(draftRate.replace(",", ".")) || 0;
+    if (hourlyRate === project.hourlyRate) {
+      setDraftRate(String(project.hourlyRate));
+      return;
+    }
+    await api.projectUpdate({ ...project, hourlyRate, rateProfileId: null });
+  };
+
+  const activeProfile = profiles.find(
+    (item) => item.id === project.rateProfileId,
+  );
+
+  return (
+    <div className="mt-6 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/15 pro:border-[#bd93f9]/40 pro:bg-[#bd93f9]/5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className={`${sectionLabelCls} text-indigo-700 dark:text-indigo-300 pro:text-[#bd93f9]`}>
+          {t("projects.rateTitle")}
+        </h2>
+        <span className="text-base font-semibold text-indigo-900 dark:text-indigo-200 pro:text-[#f8f8f2]">
+          {fmtCost(project.hourlyRate, currency, locale)}/
+          {t("common.hours").slice(0, 1)}
+          {" · "}
+          {activeProfile?.name ?? t("projects.manualRate")}
+        </span>
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px]">
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300 pro:text-[#c9c9d6]">
+            {t("projects.rateProfile")}
+          </span>
+          <select
+            value={project.rateProfileId ?? ""}
+            onChange={(e) => selectProfile(e.target.value)}
+            className={fieldCls}
+          >
+            <option value="">{t("projects.manualRate")}</option>
+            {profiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300 pro:text-[#c9c9d6]">
+            {t("projects.hourlyRate")}
+          </span>
+          <input
+            inputMode="decimal"
+            value={draftRate}
+            onChange={(e) => setDraftRate(e.target.value)}
+            onBlur={saveManualRate}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            className={fieldCls}
+          />
+        </label>
+      </div>
+      <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400 pro:text-[#b9b9c8]">
+        {t("projects.rateHelp")} {t("projects.rateManualHint")}
+      </p>
     </div>
   );
 }

@@ -56,7 +56,10 @@
     "exportCsv": "CSV",
     "exportCsvHelp": "Export project data as CSV",
     "exported": "Exported",
-    "exportFailed": "Export failed"
+    "exportFailed": "Export failed",
+    "rateTitle": "Rate",
+    "rateHelp": "Pick a profile or set a manual hourly rate. Reports and costs use this rate.",
+    "rateManualHint": "Editing the rate by hand switches the project to a manual rate."
   },
   "timer": {
     "start": "Start",
@@ -150,11 +153,8 @@
       "name": "Name",
       "paymentType": "Payment",
       "hourlyRate": "Hourly rate",
-      "defaultColumn": "Default",
-      "default": "Default",
-      "setDefault": "Set default",
-      "projectTitle": "Project rates",
-      "projectHelp": "Assign a profile or manual hourly rate to each project. Reports always use the project's rate.",
+      "default": "Default profile",
+      "setDefault": "Use as default",
       "payment": {
         "hourly": "Hourly",
         "retainer": "Retainer",
@@ -191,6 +191,20 @@
       "title": "Support",
       "help": "To report bugs or issues, you can write directly to MoonyTask support.",
       "email": "Email info@moonytask.com"
+    },
+    "danger": {
+      "title": "Danger zone",
+      "resetHelp": "Deletes every folder, project, tracked hour, and payment. Settings (language, theme, rate profiles) are kept.",
+      "resetButton": "Reset folders and projects…",
+      "resetStep1Title": "Really delete everything?",
+      "resetStep1Body": "All projects, folders, tracked time, and payments will be permanently deleted. This cannot be undone.",
+      "resetContinue": "Continue",
+      "resetStep2Title": "Final confirmation",
+      "confirmWord": "DELETE",
+      "typeToConfirm": "Type {{word}} to confirm:",
+      "resetFinal": "Delete everything",
+      "resetting": "Deleting…",
+      "resetDone": "All data has been deleted."
     },
     "pdfTotalsOnly": "Hide row costs in the PDF",
     "pdfTotalsOnlyHelp": "When enabled, the PDF keeps the summary and table, but the table shows only day and time."

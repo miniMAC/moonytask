@@ -24,8 +24,10 @@ const inputCls =
   "h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2]";
 const rateFieldCls =
   "h-11 w-full rounded-md border border-neutral-300 bg-white px-3 text-base outline-none transition focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2] pro:focus:border-[#bd93f9]";
-const rateGridCls =
-  "grid min-w-[820px] grid-cols-[minmax(240px,1fr)_180px_150px_170px_44px] gap-3";
+const fieldLabelCls =
+  "mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300 pro:text-[#c9c9d6]";
+const helpTextCls =
+  "text-sm text-neutral-600 dark:text-neutral-400 pro:text-[#b9b9c8]";
 
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
@@ -55,7 +57,7 @@ export default function SettingsView(p: Props) {
               className={`whitespace-nowrap rounded-md px-3 py-1.5 font-medium transition ${
                 tab === item
                   ? "bg-white text-neutral-950 shadow-sm dark:bg-neutral-800 dark:text-white pro:bg-[#44475a] pro:text-[#f8f8f2]"
-                  : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white pro:text-[#b9b9c8] pro:hover:text-[#f8f8f2]"
+                  : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white pro:text-[#c9c9d6] pro:hover:text-[#f8f8f2]"
               }`}
             >
               {t(`settings.tabs.${item}`)}
@@ -66,12 +68,15 @@ export default function SettingsView(p: Props) {
 
       <div className="space-y-8">
         {tab === "general" && (
-          <GeneralSection
-            currency={p.currency}
-            onCurrencyChange={p.onCurrencyChange}
-          />
+          <>
+            <GeneralSection
+              currency={p.currency}
+              onCurrencyChange={p.onCurrencyChange}
+            />
+            <DangerSection projects={p.projects} />
+          </>
         )}
-        {tab === "rates" && <RateProfilesSection projects={p.projects} />}
+        {tab === "rates" && <RateProfilesSection />}
         {tab === "apps" && <WatchedAppsSection projects={p.projects} />}
         {tab === "sync" && <SyncSection />}
         {tab === "support" && <SupportSection />}
@@ -211,7 +216,7 @@ function GeneralSection({
             </button>
           </div>
         </label>
-        <p className="mt-1.5 text-sm text-neutral-500">
+        <p className={`mt-1.5 ${helpTextCls}`}>
           {t("settings.pdfExportDirHelp")}
         </p>
         <label className="mt-4 flex items-center gap-2 text-base">
@@ -225,7 +230,7 @@ function GeneralSection({
           />
           {t("settings.pdfTotalsOnly")}
         </label>
-        <p className="mt-1 text-sm text-neutral-500">
+        <p className={`mt-1 ${helpTextCls}`}>
           {t("settings.pdfTotalsOnlyHelp")}
         </p>
       </div>
@@ -244,7 +249,7 @@ function SupportSection() {
       <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
         {t("settings.support.title")}
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-neutral-500">
+      <p className={`mt-1 max-w-2xl ${helpTextCls}`}>
         {t("settings.support.help")}
       </p>
       <button
@@ -253,14 +258,13 @@ function SupportSection() {
       >
         {t("settings.support.email")}
       </button>
-      <p className="mt-2 text-sm text-neutral-500">{email}</p>
     </section>
   );
 }
 
 // ---------- rate profiles ----------
 
-function RateProfilesSection({ projects }: { projects: Project[] }) {
+function RateProfilesSection() {
   const { t } = useTranslation();
   const [profiles, setProfiles] = useState<RateProfile[]>([]);
   const [defaultId, setDefaultId] = useState<string | null>(null);
@@ -320,102 +324,96 @@ function RateProfilesSection({ projects }: { projects: Project[] }) {
       <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
         {t("settings.rates.title")}
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-neutral-500">
+      <p className={`mt-1 max-w-2xl ${helpTextCls}`}>
         {t("settings.rates.help")}
       </p>
 
-      <div className="mt-4 overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-700 pro:border-[#44475a]">
-        <div
-          className={`${rateGridCls} bg-neutral-50 px-4 py-3 text-sm font-semibold uppercase tracking-normal text-neutral-500 dark:bg-neutral-900/40 dark:text-neutral-400 pro:bg-[#21222c] pro:text-[#bd93f9]`}
-        >
-          <span>{t("settings.rates.name")}</span>
-          <span>{t("settings.rates.paymentType")}</span>
-          <span>{t("settings.rates.hourlyRate")}</span>
-          <span>{t("settings.rates.defaultColumn")}</span>
-          <span className="sr-only">{t("common.delete")}</span>
-        </div>
-
-        <div className="divide-y divide-neutral-200 dark:divide-neutral-700 pro:divide-[#44475a]">
+      <div className="mt-4 space-y-3">
         {profiles.length === 0 && (
-          <p className="px-4 py-5 text-sm text-neutral-400">
-            {t("settings.rates.empty")}
-          </p>
+          <p className={helpTextCls}>{t("settings.rates.empty")}</p>
         )}
         {profiles.map((profile) => (
           <div
             key={profile.id}
-            className={`${rateGridCls} items-center px-4 py-3`}
+            className={`rounded-xl border p-4 transition ${
+              defaultId === profile.id
+                ? "border-emerald-400 bg-emerald-50/50 dark:border-emerald-700 dark:bg-emerald-950/20 pro:border-[#50fa7b]/60 pro:bg-[#50fa7b]/5"
+                : "border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900/40 pro:border-[#44475a] pro:bg-[#21222c]"
+            }`}
           >
-            <label className="block min-w-0">
-              <span className="sr-only">
-                {t("settings.rates.name")}
-              </span>
-              <input
-                value={profile.name}
-                onChange={(e) =>
-                  updateProfile(profile.id, { name: e.target.value })
-                }
-                className={rateFieldCls}
-              />
-            </label>
-            <label className="block">
-              <span className="sr-only">
-                {t("settings.rates.paymentType")}
-              </span>
-              <select
-                value={profile.paymentType}
-                onChange={(e) =>
-                  updateProfile(profile.id, {
-                    paymentType: e.target.value as PaymentType,
-                  })
-                }
-                className={rateFieldCls}
-              >
-                {PAYMENT_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {t(`settings.rates.payment.${type}`)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="sr-only">
-                {t("settings.rates.hourlyRate")}
-              </span>
-              <input
-                inputMode="decimal"
-                value={String(profile.hourlyRate)}
-                onChange={(e) =>
-                  updateProfile(profile.id, {
-                    hourlyRate:
-                      parseFloat(e.target.value.replace(",", ".")) || 0,
-                  })
-                }
-                className={rateFieldCls}
-              />
-            </label>
-            <button
-              onClick={() => saveProfiles(profiles, profile.id)}
-              className={`h-11 w-full rounded-md border px-3 text-base font-semibold transition ${
-                defaultId === profile.id
-                  ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 pro:border-[#50fa7b] pro:bg-[#50fa7b]/15 pro:text-[#50fa7b]"
-                  : "border-neutral-300 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:text-[#b9b9c8] pro:hover:bg-[#343746]"
-              }`}
-            >
-              {defaultId === profile.id
-                ? t("settings.rates.default")
-                : t("settings.rates.setDefault")}
-            </button>
-            <button
-              onClick={() => removeProfile(profile.id)}
-              className="flex h-11 w-11 items-center justify-center rounded-md text-neutral-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
-              title={t("common.delete")}
-            >
-              <TrashIcon size={16} />
-            </button>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_170px_140px_auto] xl:items-end">
+              <label className="block min-w-0">
+                <span className={fieldLabelCls}>
+                  {t("settings.rates.name")}
+                </span>
+                <input
+                  value={profile.name}
+                  onChange={(e) =>
+                    updateProfile(profile.id, { name: e.target.value })
+                  }
+                  className={rateFieldCls}
+                />
+              </label>
+              <label className="block">
+                <span className={fieldLabelCls}>
+                  {t("settings.rates.paymentType")}
+                </span>
+                <select
+                  value={profile.paymentType}
+                  onChange={(e) =>
+                    updateProfile(profile.id, {
+                      paymentType: e.target.value as PaymentType,
+                    })
+                  }
+                  className={rateFieldCls}
+                >
+                  {PAYMENT_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {t(`settings.rates.payment.${type}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className={fieldLabelCls}>
+                  {t("settings.rates.hourlyRate")}
+                </span>
+                <input
+                  inputMode="decimal"
+                  value={String(profile.hourlyRate)}
+                  onChange={(e) =>
+                    updateProfile(profile.id, {
+                      hourlyRate:
+                        parseFloat(e.target.value.replace(",", ".")) || 0,
+                    })
+                  }
+                  className={rateFieldCls}
+                />
+              </label>
+              <div className="flex items-center gap-2 sm:col-span-2 xl:col-span-1">
+                <button
+                  onClick={() => saveProfiles(profiles, profile.id)}
+                  className={`h-11 flex-1 rounded-md border px-4 text-base font-semibold transition xl:flex-none ${
+                    defaultId === profile.id
+                      ? "border-emerald-500 bg-emerald-100 text-emerald-800 dark:border-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-200 pro:border-[#50fa7b] pro:bg-[#50fa7b]/15 pro:text-[#50fa7b]"
+                      : "border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:text-[#c9c9d6] pro:hover:bg-[#343746]"
+                  }`}
+                >
+                  {defaultId === profile.id
+                    ? `✓ ${t("settings.rates.default")}`
+                    : t("settings.rates.setDefault")}
+                </button>
+                <button
+                  onClick={() => removeProfile(profile.id)}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-red-950/40 pro:border-[#44475a]"
+                  title={t("common.delete")}
+                >
+                  <TrashIcon size={16} />
+                </button>
+              </div>
+            </div>
           </div>
         ))}
-        </div>
       </div>
 
       <button
@@ -425,122 +423,126 @@ function RateProfilesSection({ projects }: { projects: Project[] }) {
         <PlusIcon size={14} />
         {t("settings.rates.add")}
       </button>
-      <ProjectRatesSection projects={projects} profiles={profiles} />
     </section>
   );
 }
 
-function ProjectRatesSection({
-  projects,
-  profiles,
-}: {
-  projects: Project[];
-  profiles: RateProfile[];
-}) {
+// ---------- danger zone ----------
+
+function DangerSection({ projects }: { projects: Project[] }) {
   const { t } = useTranslation();
-  const [rows, setRows] = useState<Project[]>([]);
-  const [draftRates, setDraftRates] = useState<Record<string, string>>({});
+  const [step, setStep] = useState<0 | 1 | 2>(0);
+  const [confirmText, setConfirmText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const word = t("settings.danger.confirmWord");
 
-  useEffect(() => {
-    const active = projects.filter((project) => !project.archived);
-    setRows(active);
-    setDraftRates(
-      Object.fromEntries(
-        active.map((project) => [project.id, String(project.hourlyRate)]),
-      ),
-    );
-  }, [projects]);
-
-  const patchLocal = (project: Project) => {
-    setRows((current) =>
-      current.map((row) => (row.id === project.id ? project : row)),
-    );
-    setDraftRates((current) => ({
-      ...current,
-      [project.id]: String(project.hourlyRate),
-    }));
+  const close = () => {
+    if (busy) return;
+    setStep(0);
+    setConfirmText("");
   };
 
-  const saveProject = async (project: Project, patch: Partial<Project>) => {
-    const next = { ...project, ...patch };
-    patchLocal(next);
-    await api.projectUpdate(next);
-  };
-
-  const selectProfile = async (project: Project, profileId: string) => {
-    const profile = profiles.find((item) => item.id === profileId);
-    await saveProject(project, {
-      rateProfileId: profile?.id ?? null,
-      hourlyRate: profile?.hourlyRate ?? project.hourlyRate,
-    });
-  };
-
-  const saveManualRate = async (project: Project) => {
-    const hourlyRate =
-      parseFloat((draftRates[project.id] ?? "0").replace(",", ".")) || 0;
-    await saveProject(project, { hourlyRate, rateProfileId: null });
+  const doReset = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      // ferma un eventuale timer attivo prima di cancellare i progetti
+      await api.timerStop().catch(() => null);
+      const folders = await api.foldersList();
+      for (const project of projects) {
+        await api.projectDelete(project.id);
+      }
+      for (const folder of folders) {
+        await api.folderDelete(folder.id);
+      }
+      setDone(true);
+      setStep(0);
+      setConfirmText("");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <section className="mt-8">
-      <h3 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
-        {t("settings.rates.projectTitle")}
-      </h3>
-      <p className="mt-1 max-w-2xl text-sm text-neutral-500">
-        {t("settings.rates.projectHelp")}
+    <section className="rounded-xl border border-red-200 bg-red-50/40 p-4 dark:border-red-900/60 dark:bg-red-950/10 pro:border-[#ff5555]/40 pro:bg-[#ff5555]/5">
+      <h2 className="text-base font-semibold text-red-700 dark:text-red-400 pro:text-[#ff5555]">
+        {t("settings.danger.title")}
+      </h2>
+      <p className={`mt-1 max-w-2xl ${helpTextCls}`}>
+        {t("settings.danger.resetHelp")}
       </p>
+      <button
+        onClick={() => {
+          setDone(false);
+          setStep(1);
+        }}
+        className="mt-3 h-11 rounded-lg border border-red-300 px-5 text-base font-semibold text-red-700 transition hover:bg-red-100 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40 pro:border-[#ff5555]/60 pro:text-[#ff5555] pro:hover:bg-[#ff5555]/10"
+      >
+        {t("settings.danger.resetButton")}
+      </button>
+      {done && (
+        <p className="mt-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 pro:text-[#50fa7b]">
+          {t("settings.danger.resetDone")}
+        </p>
+      )}
 
-      <div className="mt-4 overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-700 pro:border-[#44475a]">
-        <div className="grid min-w-[720px] grid-cols-[minmax(260px,1fr)_220px_160px] gap-3 bg-neutral-50 px-4 py-3 text-sm font-semibold uppercase tracking-normal text-neutral-500 dark:bg-neutral-900/40 dark:text-neutral-400 pro:bg-[#21222c] pro:text-[#bd93f9]">
-          <span>{t("reports.project")}</span>
-          <span>{t("projects.rateProfile")}</span>
-          <span>{t("projects.hourlyRate")}</span>
-        </div>
-        <div className="divide-y divide-neutral-200 dark:divide-neutral-700 pro:divide-[#44475a]">
-          {rows.length === 0 && (
-            <p className="px-4 py-5 text-sm text-neutral-400">
-              {t("projects.empty")}
-            </p>
-          )}
-          {rows.map((project) => (
-            <div
-              key={project.id}
-              className="grid min-w-[720px] grid-cols-[minmax(260px,1fr)_220px_160px] items-center gap-3 px-4 py-3"
+      {step === 1 && (
+        <Modal title={t("settings.danger.resetStep1Title")} onClose={close}>
+          <p className="text-base text-neutral-700 dark:text-neutral-300">
+            {t("settings.danger.resetStep1Body")}
+          </p>
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              onClick={close}
+              className="h-11 rounded-lg px-5 text-base text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
             >
-              <span className="truncate text-base font-medium">{project.name}</span>
-              <select
-                value={project.rateProfileId ?? ""}
-                onChange={(e) => selectProfile(project, e.target.value)}
-                className={rateFieldCls}
-              >
-                <option value="">{t("projects.manualRate")}</option>
-                {profiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                inputMode="decimal"
-                value={draftRates[project.id] ?? String(project.hourlyRate)}
-                onChange={(e) =>
-                  setDraftRates((current) => ({
-                    ...current,
-                    [project.id]: e.target.value,
-                  }))
-                }
-                onBlur={() => saveManualRate(project)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.currentTarget.blur();
-                  }
-                }}
-                className={rateFieldCls}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
+              {t("common.cancel")}
+            </button>
+            <button
+              onClick={() => setStep(2)}
+              className="h-11 rounded-lg bg-red-600 px-6 text-base font-semibold text-white hover:bg-red-700"
+            >
+              {t("settings.danger.resetContinue")}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {step === 2 && (
+        <Modal title={t("settings.danger.resetStep2Title")} onClose={close}>
+          <label className="block">
+            <span className="mb-2 block text-base text-neutral-700 dark:text-neutral-300">
+              {t("settings.danger.typeToConfirm", { word })}
+            </span>
+            <input
+              autoFocus
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder={word}
+              className={`w-full ${inputCls}`}
+            />
+          </label>
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              onClick={close}
+              disabled={busy}
+              className="h-11 rounded-lg px-5 text-base text-neutral-600 hover:bg-neutral-100 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              onClick={doReset}
+              disabled={busy || confirmText.trim().toUpperCase() !== word}
+              className="h-11 rounded-lg bg-red-600 px-6 text-base font-semibold text-white hover:bg-red-700 disabled:opacity-40"
+            >
+              {busy
+                ? t("settings.danger.resetting")
+                : t("settings.danger.resetFinal")}
+            </button>
+          </div>
+        </Modal>
+      )}
     </section>
   );
 }
@@ -571,7 +573,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
       <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
         {t("settings.watchedApps")}
       </h2>
-      <p className="mt-1 text-sm text-neutral-500">
+      <p className={`mt-1 ${helpTextCls}`}>
         {t("settings.watchedAppsHelp")}
       </p>
 
@@ -589,7 +591,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
 
       <div className="mt-3 space-y-1.5">
         {watched.length === 0 && (
-          <p className="text-sm text-neutral-400">{t("settings.noWatched")}</p>
+          <p className={helpTextCls}>{t("settings.noWatched")}</p>
         )}
         {watched.map((w) => (
           <div
@@ -612,7 +614,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
             />
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{w.appName}</p>
-              <p className="truncate text-sm text-neutral-400">{w.bundleId}</p>
+              <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{w.bundleId}</p>
             </div>
             <select
               value={w.projectId ?? ""}
@@ -794,7 +796,7 @@ function SyncSection() {
       <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
         {t("settings.sync.title")}
       </h2>
-      <p className="mt-1 text-sm text-neutral-500">{t("settings.sync.help")}</p>
+      <p className={`mt-1 ${helpTextCls}`}>{t("settings.sync.help")}</p>
 
       {!status.configured ? (
         <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
@@ -857,14 +859,14 @@ function SyncSection() {
                   {busy ? t("settings.sync.syncing") : t("settings.sync.connect")}
                 </button>
               </div>
-              <p className="mt-1.5 text-sm text-neutral-400">
+              <p className={`mt-1.5 ${helpTextCls}`}>
                 {t("settings.sync.connectHelp")}
               </p>
             </div>
           )}
 
           {status.lastSync && (
-            <p className="text-sm text-neutral-400">
+            <p className={helpTextCls}>
               {t("settings.sync.lastSync", {
                 time: new Date(status.lastSync * 1000).toLocaleString(locale),
               })}

@@ -56,7 +56,10 @@
     "exportCsv": "CSV",
     "exportCsvHelp": "Esporta i dati del progetto in CSV",
     "exported": "Esportato",
-    "exportFailed": "Export non riuscito"
+    "exportFailed": "Export non riuscito",
+    "rateTitle": "Tariffa",
+    "rateHelp": "Scegli un profilo o imposta un costo orario manuale. Report e costi usano questa tariffa.",
+    "rateManualHint": "Modificando il costo a mano il progetto passa a tariffa manuale."
   },
   "timer": {
     "start": "Avvia",
@@ -150,11 +153,8 @@
       "name": "Nome",
       "paymentType": "Pagamento",
       "hourlyRate": "Costo orario",
-      "defaultColumn": "Predefinito",
-      "default": "Default",
-      "setDefault": "Imposta default",
-      "projectTitle": "Tariffe per progetto",
-      "projectHelp": "Assegna un profilo o un costo orario manuale a ogni progetto. I report usano sempre la tariffa del progetto.",
+      "default": "Profilo predefinito",
+      "setDefault": "Usa come default",
       "payment": {
         "hourly": "Orario",
         "retainer": "Retainer",
@@ -191,6 +191,20 @@
       "title": "Supporto",
       "help": "Per segnalare bug o problemi puoi scrivere direttamente al supporto MoonyTask.",
       "email": "Scrivi a info@moonytask.com"
+    },
+    "danger": {
+      "title": "Zona pericolosa",
+      "resetHelp": "Elimina tutte le cartelle, i progetti, le ore registrate e i pagamenti. Le impostazioni (lingua, tema, profili tariffari) restano.",
+      "resetButton": "Reset cartelle e progetti…",
+      "resetStep1Title": "Vuoi davvero cancellare tutto?",
+      "resetStep1Body": "Verranno eliminati definitivamente tutti i progetti, le cartelle, le ore registrate e i pagamenti. L'operazione non si può annullare.",
+      "resetContinue": "Continua",
+      "resetStep2Title": "Conferma definitiva",
+      "confirmWord": "ELIMINA",
+      "typeToConfirm": "Scrivi {{word}} per confermare:",
+      "resetFinal": "Elimina tutto",
+      "resetting": "Eliminazione…",
+      "resetDone": "Tutti i dati sono stati eliminati."
     },
     "pdfTotalsOnly": "Nel PDF nascondi i costi nelle righe",
     "pdfTotalsOnlyHelp": "Se attivo, il PDF mantiene riepilogo e tabella, ma nella tabella mostra solo giorno e tempo."
