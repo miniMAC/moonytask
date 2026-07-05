@@ -80,11 +80,20 @@ fn perform_sync(app: &AppHandle) -> Result<(), String> {
     let token = oauth::valid_access_token(app, &client_id, &client_secret)?;
 
     let file_id = drive::find_file(&token)?;
-    let remote: merge::Snapshot = match &file_id {
+    let mut remote: merge::Snapshot = match &file_id {
         Some(id) => serde_json::from_str(&drive::download(&token, id)?)
             .map_err(|e| format!("bad_remote_snapshot: {e}"))?,
         None => merge::Snapshot::default(),
     };
+
+    // migrazione dal file col vecchio nome (TinyTime): i suoi dati entrano nel
+    // merge e, a upload riuscito, il file viene eliminato da Drive
+    let legacy_id = drive::find_legacy_file(&token)?;
+    if let Some(id) = &legacy_id {
+        let legacy: merge::Snapshot = serde_json::from_str(&drive::download(&token, id)?)
+            .map_err(|e| format!("bad_legacy_snapshot: {e}"))?;
+        remote = merge::merge(remote, legacy);
+    }
 
     let db = app.state::<Db>();
     let merged = {
@@ -97,6 +106,9 @@ fn perform_sync(app: &AppHandle) -> Result<(), String> {
 
     let body = serde_json::to_string(&merged).map_err(|e| e.to_string())?;
     drive::upload(&token, file_id.as_deref(), &body)?;
+    if let Some(id) = &legacy_id {
+        let _ = drive::delete_file(&token, id);
+    }
 
     {
         let conn = db.0.lock().unwrap();

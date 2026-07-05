@@ -1,6 +1,9 @@
 use serde::Deserialize;
 
 const FILE_NAME: &str = "moonytask-data.json";
+// nome usato dalle build precedenti al rebranding TinyTime → MoonyTask:
+// se esiste ancora va letto (migrazione) e poi eliminato
+const LEGACY_FILE_NAME: &str = "tinytime-data.json";
 
 #[derive(Deserialize)]
 struct FileList {
@@ -20,11 +23,19 @@ fn client() -> reqwest::blocking::Client {
 }
 
 pub fn find_file(token: &str) -> Result<Option<String>, String> {
+    find_by_name(token, FILE_NAME)
+}
+
+pub fn find_legacy_file(token: &str) -> Result<Option<String>, String> {
+    find_by_name(token, LEGACY_FILE_NAME)
+}
+
+fn find_by_name(token: &str, name: &str) -> Result<Option<String>, String> {
     let resp: FileList = client()
         .get("https://www.googleapis.com/drive/v3/files")
         .query(&[
             ("spaces", "appDataFolder"),
-            ("q", &format!("name = '{FILE_NAME}'")),
+            ("q", &format!("name = '{name}'")),
             ("fields", "files(id)"),
         ])
         .bearer_auth(token)
@@ -35,6 +46,17 @@ pub fn find_file(token: &str) -> Result<Option<String>, String> {
         .json()
         .map_err(|e| e.to_string())?;
     Ok(resp.files.into_iter().next().map(|f| f.id))
+}
+
+pub fn delete_file(token: &str, file_id: &str) -> Result<(), String> {
+    client()
+        .delete(format!("https://www.googleapis.com/drive/v3/files/{file_id}"))
+        .bearer_auth(token)
+        .send()
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| format!("drive_delete_failed: {e}"))?;
+    Ok(())
 }
 
 pub fn download(token: &str, file_id: &str) -> Result<String, String> {
