@@ -58,7 +58,7 @@ fn credentials(app: &AppHandle) -> Option<(String, String)> {
 
 fn status(app: &AppHandle) -> SyncStatus {
     let configured = credentials(app).is_some();
-    let connected = oauth::load_tokens().is_some();
+    let connected = oauth::load_tokens(app).is_some();
     let db = app.state::<Db>();
     let conn = db.0.lock().unwrap();
     SyncStatus {
@@ -77,7 +77,7 @@ fn emit_status(app: &AppHandle) {
 
 fn perform_sync(app: &AppHandle) -> Result<(), String> {
     let (client_id, client_secret) = credentials(app).ok_or("not_configured")?;
-    let token = oauth::valid_access_token(&client_id, &client_secret)?;
+    let token = oauth::valid_access_token(app, &client_id, &client_secret)?;
 
     let file_id = drive::find_file(&token)?;
     let remote: merge::Snapshot = match &file_id {
@@ -123,7 +123,7 @@ fn run_sync(app: &AppHandle) {
 }
 
 fn ready(app: &AppHandle) -> bool {
-    credentials(app).is_some() && oauth::load_tokens().is_some()
+    credentials(app).is_some() && oauth::load_tokens(app).is_some()
 }
 
 /// Sync in background, fire-and-forget. No-op se non configurato o non connesso.
@@ -195,7 +195,19 @@ pub fn sync_set_credentials(
 #[tauri::command]
 pub fn sync_login(app: AppHandle, email: Option<String>) -> Result<SyncStatus, String> {
     let (client_id, client_secret) = credentials(&app).ok_or("not_configured")?;
-    let (_tokens, id_email) = oauth::login(&client_id, &client_secret, email.as_deref())?;
+    let login = oauth::login(&app, &client_id, &client_secret, email.as_deref());
+    // un login fallito deve comparire nella UI, non sparire nel nulla
+    let (_tokens, id_email) = match login {
+        Ok(v) => v,
+        Err(e) => {
+            let db = app.state::<Db>();
+            let conn = db.0.lock().unwrap();
+            let _ = db::set_setting(&conn, "sync_last_error", &e);
+            drop(conn);
+            emit_status(&app);
+            return Err(e);
+        }
+    };
     {
         let db = app.state::<Db>();
         let conn = db.0.lock().unwrap();
@@ -212,7 +224,7 @@ pub fn sync_login(app: AppHandle, email: Option<String>) -> Result<SyncStatus, S
 
 #[tauri::command]
 pub fn sync_logout(app: AppHandle, db: State<Db>) -> Result<(), String> {
-    oauth::clear_tokens();
+    oauth::clear_tokens(&app);
     {
         let conn = db.0.lock().unwrap();
         let _ = db::set_setting(&conn, "google_email", "");

@@ -21,17 +21,18 @@ serde_json = "1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
 reqwest = { version = "0.12", features = ["blocking", "json", "rustls-tls"], default-features = false }
-keyring = { version = "3", features = ["apple-native"] }
 sha2 = "0.10"
 base64 = "0.22"
 rand = "0.8"
 tiny_http = "0.12"
 urlencoding = "2"
 
-# solo desktop: menu bar (tray + rendering timer) e posizionamento del popover
+# solo desktop: menu bar (tray + rendering timer), posizionamento del popover
+# e keychain per i token OAuth (su mobile i token stanno nel db in sandbox)
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
 fontdue = "0.9"
+keyring = { version = "3", features = ["apple-native"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.5"

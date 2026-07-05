@@ -2,12 +2,17 @@ use base64::Engine;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tauri::AppHandle;
 
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const SCOPE: &str = "https://www.googleapis.com/auth/drive.appdata openid email";
+#[cfg(desktop)]
 const KEYRING_SERVICE: &str = "com.minimamente.moonytask";
+#[cfg(desktop)]
 const KEYRING_USER: &str = "google_oauth";
+#[cfg(mobile)]
+const TOKENS_SETTING: &str = "google_oauth_tokens";
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct StoredTokens {
@@ -24,23 +29,54 @@ struct TokenResponse {
     id_token: Option<String>,
 }
 
-pub fn load_tokens() -> Option<StoredTokens> {
+// su desktop i token vivono nel keychain; su mobile nel db SQLite,
+// che su Android/iOS sta già nella sandbox privata dell'app
+#[cfg(desktop)]
+pub fn load_tokens(_app: &AppHandle) -> Option<StoredTokens> {
     let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER).ok()?;
     let raw = entry.get_password().ok()?;
     serde_json::from_str(&raw).ok()
 }
 
-pub fn save_tokens(tokens: &StoredTokens) -> Result<(), String> {
+#[cfg(desktop)]
+pub fn save_tokens(_app: &AppHandle, tokens: &StoredTokens) -> Result<(), String> {
     let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER).map_err(|e| e.to_string())?;
     entry
         .set_password(&serde_json::to_string(tokens).unwrap())
         .map_err(|e| e.to_string())
 }
 
-pub fn clear_tokens() {
+#[cfg(desktop)]
+pub fn clear_tokens(_app: &AppHandle) {
     if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER) {
         let _ = entry.delete_credential();
     }
+}
+
+#[cfg(mobile)]
+pub fn load_tokens(app: &AppHandle) -> Option<StoredTokens> {
+    use tauri::Manager;
+    let db = app.state::<crate::db::Db>();
+    let conn = db.0.lock().unwrap();
+    let raw = crate::db::get_setting(&conn, TOKENS_SETTING)?;
+    serde_json::from_str(&raw).ok()
+}
+
+#[cfg(mobile)]
+pub fn save_tokens(app: &AppHandle, tokens: &StoredTokens) -> Result<(), String> {
+    use tauri::Manager;
+    let db = app.state::<crate::db::Db>();
+    let conn = db.0.lock().unwrap();
+    crate::db::set_setting(&conn, TOKENS_SETTING, &serde_json::to_string(tokens).unwrap())
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(mobile)]
+pub fn clear_tokens(app: &AppHandle) {
+    use tauri::Manager;
+    let db = app.state::<crate::db::Db>();
+    let conn = db.0.lock().unwrap();
+    let _ = crate::db::set_setting(&conn, TOKENS_SETTING, "");
 }
 
 fn random_verifier() -> String {
@@ -64,6 +100,7 @@ fn email_from_id_token(id_token: &str) -> Option<String> {
 /// listener di loopback, scambia il code. `login_hint` pre-seleziona l'account
 /// Google nel browser. Ritorna (tokens, email).
 pub fn login(
+    app: &AppHandle,
     client_id: &str,
     client_secret: &str,
     login_hint: Option<&str>,
@@ -89,7 +126,7 @@ pub fn login(
         url.push_str(&format!("&login_hint={}", urlencoding::encode(hint.trim())));
     }
 
-    open_browser(&url)?;
+    open_browser(app, &url)?;
 
     // attende il redirect (max 3 minuti)
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(180);
@@ -159,13 +196,17 @@ pub fn login(
         refresh_token: resp.refresh_token.ok_or("no_refresh_token")?,
         expires_at: crate::db::now_secs() + resp.expires_in - 60,
     };
-    save_tokens(&tokens)?;
+    save_tokens(app, &tokens)?;
     Ok((tokens, email))
 }
 
 /// Ritorna un access token valido, rinfrescandolo se scaduto.
-pub fn valid_access_token(client_id: &str, client_secret: &str) -> Result<String, String> {
-    let tokens = load_tokens().ok_or("not_connected")?;
+pub fn valid_access_token(
+    app: &AppHandle,
+    client_id: &str,
+    client_secret: &str,
+) -> Result<String, String> {
+    let tokens = load_tokens(app).ok_or("not_connected")?;
     if tokens.expires_at > crate::db::now_secs() {
         return Ok(tokens.access_token);
     }
@@ -193,7 +234,7 @@ pub fn valid_access_token(client_id: &str, client_secret: &str) -> Result<String
         refresh_token: tokens.refresh_token,
         expires_at: crate::db::now_secs() + resp.expires_in - 60,
     };
-    save_tokens(&new_tokens)?;
+    save_tokens(app, &new_tokens)?;
     Ok(resp.access_token)
 }
 
@@ -207,17 +248,11 @@ fn html_response(msg: &str) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     )
 }
 
-fn open_browser(url: &str) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg(url)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        Err("unsupported platform".into())
-    }
+// il plugin opener apre il browser di sistema su tutte le piattaforme,
+// Android incluso (dove `open` non esiste)
+fn open_browser(app: &AppHandle, url: &str) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(url, None::<String>)
+        .map_err(|e| e.to_string())
 }
