@@ -55,6 +55,12 @@ export const GearIcon = ({ size = 16 }: { size?: number }) => (
   </svg>
 );
 
+export const BackIcon = ({ size = 16 }: { size?: number }) => (
+  <svg {...base} width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m15 18-6-6 6-6" />
+  </svg>
+);
+
 export const FolderIcon = ({ size = 16 }: { size?: number }) => (
   <svg {...base} width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2Z" />

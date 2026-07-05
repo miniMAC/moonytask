@@ -17,6 +17,9 @@ body,
 body {
   @apply bg-neutral-100 text-neutral-900 antialiased select-none dark:bg-neutral-900 dark:text-neutral-100;
   overscroll-behavior: none;
+  /* niente flash blu al tocco e niente doppio-tap zoom nella webview Android */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 :root.tt-pro {

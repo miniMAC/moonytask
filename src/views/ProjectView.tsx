@@ -18,7 +18,9 @@ import {
   startOfWeek,
 } from "../lib/time";
 import Modal from "../components/Modal";
+import { isMobilePlatform } from "../lib/platform";
 import {
+  BackIcon,
   PauseIcon,
   PencilIcon,
   PlayIcon,
@@ -35,6 +37,7 @@ interface Props {
   refreshKey: number;
   onEdit: () => void;
   onDelete: () => void;
+  onBack: () => void;
 }
 
 export default function ProjectView(p: Props) {
@@ -157,70 +160,86 @@ export default function ProjectView(p: Props) {
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-8">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span
-              className="h-3.5 w-3.5 rounded-full"
-              style={{
-                backgroundColor: projectColor(p.project.color, p.project.id),
-              }}
-            />
-            <h1 className="text-xl font-semibold">{p.project.name}</h1>
+    <div className="mx-auto max-w-3xl px-4 pb-8 pt-[max(1.25rem,env(safe-area-inset-top))] md:px-8 md:py-8">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-1">
+          <button
+            title={t("common.back")}
+            onClick={p.onBack}
+            className="-ml-2 mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-neutral-500 active:bg-neutral-200 md:hidden dark:active:bg-neutral-700"
+          >
+            <BackIcon size={20} />
+          </button>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5">
+              <span
+                className="h-3.5 w-3.5 shrink-0 rounded-full"
+                style={{
+                  backgroundColor: projectColor(p.project.color, p.project.id),
+                }}
+              />
+              <h1 className="truncate text-xl font-semibold">
+                {p.project.name}
+              </h1>
+            </div>
+            <p className="mt-1 text-base text-neutral-500">
+              {p.folder?.name}
+              {p.project.hourlyRate > 0 && (
+                <>
+                  {" · "}
+                  {fmtCost(p.project.hourlyRate, p.currency, locale)}/
+                  {t("common.hours").slice(0, 1)}
+                </>
+              )}
+            </p>
           </div>
-          <p className="mt-1 text-base text-neutral-500">
-            {p.folder?.name}
-            {p.project.hourlyRate > 0 && (
-              <>
-                {" · "}
-                {fmtCost(p.project.hourlyRate, p.currency, locale)}/
-                {t("common.hours").slice(0, 1)}
-              </>
-            )}
-          </p>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {pdfMsg && (
             <span className="mr-1 max-w-48 truncate text-sm text-neutral-500">
               {pdfMsg}
             </span>
           )}
-          <button
-            onClick={exportAllTimePdf}
-            disabled={pdfBusy}
-            title={t("projects.exportPdfHelp")}
-            className="h-11 rounded-lg border border-neutral-300 px-5 text-base font-semibold hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
-          >
-            {pdfBusy ? "..." : t("projects.exportPdf")}
-          </button>
-          <button
-            onClick={() => exportProjectData("json")}
-            disabled={exportBusy !== null}
-            title={t("projects.exportJsonHelp")}
-            className="h-11 rounded-lg border border-neutral-300 px-5 text-base font-semibold hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
-          >
-            {exportBusy === "json" ? "..." : t("projects.exportJson")}
-          </button>
-          <button
-            onClick={() => exportProjectData("csv")}
-            disabled={exportBusy !== null}
-            title={t("projects.exportCsvHelp")}
-            className="h-11 rounded-lg border border-neutral-300 px-5 text-base font-semibold hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
-          >
-            {exportBusy === "csv" ? "..." : t("projects.exportCsv")}
-          </button>
+          {/* gli export scrivono su una cartella scelta dall'utente: solo desktop */}
+          {!isMobilePlatform && (
+            <>
+              <button
+                onClick={exportAllTimePdf}
+                disabled={pdfBusy}
+                title={t("projects.exportPdfHelp")}
+                className="h-11 rounded-lg border border-neutral-300 px-5 text-base font-semibold hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+              >
+                {pdfBusy ? "..." : t("projects.exportPdf")}
+              </button>
+              <button
+                onClick={() => exportProjectData("json")}
+                disabled={exportBusy !== null}
+                title={t("projects.exportJsonHelp")}
+                className="h-11 rounded-lg border border-neutral-300 px-5 text-base font-semibold hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+              >
+                {exportBusy === "json" ? "..." : t("projects.exportJson")}
+              </button>
+              <button
+                onClick={() => exportProjectData("csv")}
+                disabled={exportBusy !== null}
+                title={t("projects.exportCsvHelp")}
+                className="h-11 rounded-lg border border-neutral-300 px-5 text-base font-semibold hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+              >
+                {exportBusy === "csv" ? "..." : t("projects.exportCsv")}
+              </button>
+            </>
+          )}
           <button
             title={t("projects.edit")}
             onClick={p.onEdit}
-            className="rounded-md p-2 text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+            className="flex h-10 w-10 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
           >
             <PencilIcon size={16} />
           </button>
           <button
             title={t("projects.delete")}
             onClick={p.onDelete}
-            className="rounded-md p-2 text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-red-600"
+            className="flex h-10 w-10 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-red-600 dark:hover:bg-neutral-800"
           >
             <TrashIcon size={16} />
           </button>
@@ -228,8 +247,8 @@ export default function ProjectView(p: Props) {
       </div>
 
       {/* timer */}
-      <div className="mt-6 flex items-center gap-5 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-700 dark:bg-neutral-800/60">
-        <span className="flex-1 font-mono text-4xl tabular-nums text-neutral-800 dark:text-neutral-100">
+      <div className="mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 p-4 md:gap-5 md:p-5 dark:border-neutral-700 dark:bg-neutral-800/60">
+        <span className="w-full font-mono text-3xl tabular-nums text-neutral-800 sm:w-auto sm:flex-1 md:text-4xl dark:text-neutral-100">
           {fmtClock(mine ? p.timer.elapsedSecs : 0)}
         </span>
         {!mine || p.timer.status === "idle" ? (
@@ -365,7 +384,7 @@ export default function ProjectView(p: Props) {
                 </span>
                 <button
                   onClick={() => api.projectPaymentDelete(payment.id).then(load)}
-                  className="invisible rounded p-1 text-neutral-400 hover:text-red-600 group-hover:visible"
+                  className="flex h-10 w-10 items-center justify-center rounded text-neutral-400 hover:text-red-600 md:invisible md:group-hover:visible"
                 >
                   <TrashIcon size={13} />
                 </button>
@@ -460,7 +479,7 @@ export default function ProjectView(p: Props) {
                       load();
                     });
                   }}
-                  className="invisible rounded p-1 text-neutral-400 hover:text-red-600 group-hover:visible"
+                  className="flex h-10 w-10 items-center justify-center rounded text-neutral-400 hover:text-red-600 md:invisible md:group-hover:visible"
                 >
                   <TrashIcon size={13} />
                 </button>

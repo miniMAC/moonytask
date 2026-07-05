@@ -12,6 +12,7 @@ import {
 import type { Folder, Project, TimeEntry } from "../lib/types";
 import * as api from "../lib/api";
 import { projectColor } from "../lib/colors";
+import { isMobilePlatform } from "../lib/platform";
 import { useTheme } from "../lib/theme";
 import {
   dayKey,
@@ -200,7 +201,7 @@ export default function ReportsView(p: Props) {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-8 py-8">
+    <div className="mx-auto max-w-6xl px-4 pb-8 pt-[max(1.25rem,env(safe-area-inset-top))] md:px-8 md:py-8">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">{t("reports.title")}</h1>
         {pdfMessage && (
@@ -213,12 +214,12 @@ export default function ReportsView(p: Props) {
       <div className="mt-5 rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900/40 pro:border-[#44475a] pro:bg-[#21222c]">
         {/* i controlli vanno a capo quando la finestra è stretta, niente overflow */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex h-11 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-neutral-700 dark:bg-neutral-800/70 pro:border-[#44475a] pro:bg-[#282a36]">
+          <div className="flex h-11 max-w-full rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-neutral-700 dark:bg-neutral-800/70 pro:border-[#44475a] pro:bg-[#282a36]">
             {(["today", "week", "month", "custom"] as Preset[]).map((pr) => (
               <button
                 key={pr}
                 onClick={() => setPreset(pr)}
-                className={`rounded-md px-4 text-base transition ${
+                className={`min-w-0 truncate rounded-md px-2.5 text-base transition sm:px-4 ${
                   preset === pr
                     ? "bg-neutral-900 font-semibold text-white shadow-sm dark:bg-white dark:text-neutral-900 pro:bg-[#44475a] pro:text-[#f8f8f2]"
                     : "text-neutral-600 hover:bg-white dark:text-neutral-300 dark:hover:bg-neutral-700 pro:text-[#b9b9c8] pro:hover:bg-[#343746]"
@@ -253,7 +254,7 @@ export default function ReportsView(p: Props) {
               setFolderId(e.target.value);
               setProjectId("all");
             }}
-            className="h-11 w-56 max-w-full rounded-lg border border-neutral-200 bg-white text-base outline-none dark:border-neutral-700 dark:bg-neutral-800/70 pro:border-[#44475a] pro:bg-[#282a36]"
+            className="h-11 w-full rounded-lg border border-neutral-200 bg-white text-base outline-none sm:w-56 dark:border-neutral-700 dark:bg-neutral-800/70 pro:border-[#44475a] pro:bg-[#282a36]"
           >
             <option value="all">{t("reports.allFolders")}</option>
             {p.folders.map((f) => (
@@ -265,7 +266,7 @@ export default function ReportsView(p: Props) {
           <select
             value={projectId}
             onChange={(e) => setProjectId(e.target.value)}
-            className="h-11 w-56 max-w-full rounded-lg border border-neutral-200 bg-white text-base outline-none dark:border-neutral-700 dark:bg-neutral-800/70 pro:border-[#44475a] pro:bg-[#282a36]"
+            className="h-11 w-full rounded-lg border border-neutral-200 bg-white text-base outline-none sm:w-56 dark:border-neutral-700 dark:bg-neutral-800/70 pro:border-[#44475a] pro:bg-[#282a36]"
           >
             <option value="all">{t("reports.allProjects")}</option>
             {visibleFolderProjects.map((pr) => (
@@ -274,14 +275,17 @@ export default function ReportsView(p: Props) {
               </option>
             ))}
           </select>
-          <button
-            onClick={exportPdf}
-            disabled={pdfExporting || !selectedProject}
-            title={!selectedProject ? t("reports.pdfProjectOnly") : undefined}
-            className="h-11 rounded-lg border border-neutral-200 bg-neutral-950 px-5 text-base font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-50 dark:border-neutral-700 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 pro:border-[#50fa7b]/40 pro:bg-[#50fa7b] pro:text-[#282a36]"
-          >
-            {pdfExporting ? "..." : t("reports.pdf")}
-          </button>
+          {/* il PDF viene scritto su una cartella locale: solo desktop */}
+          {!isMobilePlatform && (
+            <button
+              onClick={exportPdf}
+              disabled={pdfExporting || !selectedProject}
+              title={!selectedProject ? t("reports.pdfProjectOnly") : undefined}
+              className="h-11 rounded-lg border border-neutral-200 bg-neutral-950 px-5 text-base font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-50 dark:border-neutral-700 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 pro:border-[#50fa7b]/40 pro:bg-[#50fa7b] pro:text-[#282a36]"
+            >
+              {pdfExporting ? "..." : t("reports.pdf")}
+            </button>
+          )}
         </div>
       </div>
 
@@ -353,7 +357,7 @@ export default function ReportsView(p: Props) {
                     backgroundColor: projectColor(project!.color, project!.id),
                   }}
                 />
-                <span className="w-44 truncate">{project!.name}</span>
+                <span className="w-24 truncate sm:w-44">{project!.name}</span>
                 <div className="h-3.5 flex-1 rounded-sm bg-neutral-100 dark:bg-neutral-800">
                   <div
                     className="h-full rounded-sm"
@@ -363,10 +367,10 @@ export default function ReportsView(p: Props) {
                     }}
                   />
                 </div>
-                <span className="w-20 text-right font-medium tabular-nums">
+                <span className="w-16 text-right font-medium tabular-nums sm:w-20">
                   {fmtDuration(secs)}
                 </span>
-                <span className="w-24 text-right text-neutral-500 tabular-nums">
+                <span className="hidden w-24 text-right text-neutral-500 tabular-nums sm:block">
                   {fmtCost(money, p.currency, locale)}
                 </span>
               </div>

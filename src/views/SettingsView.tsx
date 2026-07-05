@@ -11,6 +11,7 @@ import type {
   WatchedApp,
 } from "../lib/types";
 import * as api from "../lib/api";
+import { isMobilePlatform } from "../lib/platform";
 import { useTheme, type ThemePref } from "../lib/theme";
 import Modal from "../components/Modal";
 import { PlusIcon, TrashIcon } from "../components/Icons";
@@ -37,17 +38,21 @@ interface Props {
 export default function SettingsView(p: Props) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<SettingsTab>("general");
+  // il watcher delle app in primo piano esiste solo su desktop
+  const tabs = SETTINGS_TABS.filter(
+    (item) => item !== "apps" || !isMobilePlatform,
+  );
 
   return (
-    <div className="mx-auto max-w-4xl px-8 py-8">
+    <div className="mx-auto max-w-4xl px-4 pb-8 pt-[max(1.25rem,env(safe-area-inset-top))] md:px-8 md:py-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">{t("settings.title")}</h1>
-        <nav className="flex rounded-lg border border-neutral-200 bg-neutral-100 p-1 text-base dark:border-neutral-700 dark:bg-neutral-900 pro:border-[#44475a] pro:bg-[#21222c]">
-          {SETTINGS_TABS.map((item) => (
+        <nav className="flex max-w-full overflow-x-auto rounded-lg border border-neutral-200 bg-neutral-100 p-1 text-base dark:border-neutral-700 dark:bg-neutral-900 pro:border-[#44475a] pro:bg-[#21222c]">
+          {tabs.map((item) => (
             <button
               key={item}
               onClick={() => setTab(item)}
-              className={`rounded-md px-3 py-1.5 font-medium transition ${
+              className={`whitespace-nowrap rounded-md px-3 py-1.5 font-medium transition ${
                 tab === item
                   ? "bg-white text-neutral-950 shadow-sm dark:bg-neutral-800 dark:text-white pro:bg-[#44475a] pro:text-[#f8f8f2]"
                   : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white pro:text-[#b9b9c8] pro:hover:text-[#f8f8f2]"
@@ -174,12 +179,14 @@ function GeneralSection({
           </select>
         </label>
       </div>
+      {/* la cartella export riguarda solo il filesystem desktop */}
+      {!isMobilePlatform && (
       <div className="mt-6 max-w-2xl">
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
             {t("settings.pdfExportDir")}
           </span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <input
               value={pdfDir}
               onChange={(e) => setPdfDir(e.target.value)}
@@ -222,6 +229,7 @@ function GeneralSection({
           {t("settings.pdfTotalsOnlyHelp")}
         </p>
       </div>
+      )}
     </section>
   );
 }
@@ -832,14 +840,14 @@ function SyncSection() {
               <label className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
                 {t("settings.sync.emailLabel")}
               </label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={t("settings.sync.emailPlaceholder")}
                   onKeyDown={(e) => e.key === "Enter" && email.trim() && !busy && doLogin()}
-                  className={`w-64 ${inputCls}`}
+                  className={`w-full sm:w-64 ${inputCls}`}
                 />
                 <button
                   onClick={doLogin}

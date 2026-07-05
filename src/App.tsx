@@ -9,6 +9,8 @@ import type {
 } from "./lib/types";
 import * as api from "./lib/api";
 import Sidebar, { type View } from "./components/Sidebar";
+import MobileNav from "./components/MobileNav";
+import MobileProjectList from "./components/MobileProjectList";
 import TimerBar from "./components/TimerBar";
 import ProjectModal, {
   type ProjectModalState,
@@ -221,11 +223,37 @@ export default function App() {
                 setProjectModal({ mode: "edit", project: selectedProject })
               }
               onDelete={() => deleteProject(selectedProject)}
+              onBack={() => setSelectedId(null)}
             />
           ) : (
-            <div className="flex h-full items-center justify-center">
-              <p className="text-base text-neutral-400">{t("projects.select")}</p>
-            </div>
+            <>
+              {/* su mobile la lista progetti sostituisce la sidebar */}
+              <div className="md:hidden">
+                <MobileProjectList
+                  folders={folders}
+                  projects={projects}
+                  timer={timer}
+                  onSelectProject={(id) => {
+                    setSelectedId(id);
+                    setView("project");
+                  }}
+                  onNewFolder={() => setFolderModal({ mode: "create" })}
+                  onRenameFolder={(f) =>
+                    setFolderModal({ mode: "rename", folder: f })
+                  }
+                  onDeleteFolder={deleteFolder}
+                  onNewProject={(folderId) =>
+                    setProjectModal({ mode: "create", folderId })
+                  }
+                  onStart={(id) => api.timerStart(id)}
+                />
+              </div>
+              <div className="hidden h-full items-center justify-center md:flex">
+                <p className="text-base text-neutral-400">
+                  {t("projects.select")}
+                </p>
+              </div>
+            </>
           )}
         </main>
         <TimerBar
@@ -233,6 +261,14 @@ export default function App() {
           onOpenProject={(id) => {
             setSelectedId(id);
             setView("project");
+          }}
+        />
+        <MobileNav
+          view={view}
+          onNav={(v) => {
+            setView(v);
+            // il tab Progetti torna alla lista, non all'ultimo progetto aperto
+            if (v === "project") setSelectedId(null);
           }}
         />
       </div>
