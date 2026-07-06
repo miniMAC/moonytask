@@ -9,6 +9,17 @@ use tauri_plugin_positioner::{Position as TrayPosition, WindowExt};
 
 const TRAY_ID: &str = "main-tray";
 
+/// Nome progetto mostrato nella menu bar: al massimo 15 caratteri.
+fn tray_project_name(name: &str) -> String {
+    if name.chars().count() <= 15 {
+        name.to_string()
+    } else {
+        let mut short: String = name.chars().take(14).collect();
+        short.push('…');
+        short
+    }
+}
+
 fn fmt_hms(total: i64) -> String {
     let hours = total / 3600;
     let minutes = (total % 3600) / 60;
@@ -129,7 +140,7 @@ fn timer_badge(status: TimerStatus, time: &str) -> Option<Image<'static>> {
     Some(Image::new_owned(buf, w as u32, h as u32))
 }
 
-fn labels(app: &AppHandle) -> (String, String, String, String, String) {
+fn labels(app: &AppHandle) -> (String, String, String, String, String, String) {
     let lang = {
         let db = app.state::<crate::db::Db>();
         let conn = db.0.lock().unwrap();
@@ -142,6 +153,7 @@ fn labels(app: &AppHandle) -> (String, String, String, String, String) {
             "Resume".into(),
             "Stop".into(),
             "Quit".into(),
+            "Check for Updates…".into(),
         )
     } else {
         (
@@ -150,15 +162,22 @@ fn labels(app: &AppHandle) -> (String, String, String, String, String) {
             "Riprendi".into(),
             "Stop".into(),
             "Esci".into(),
+            "Controlla aggiornamenti…".into(),
         )
     }
 }
 
+/// Etichetta della voce "controlla aggiornamenti" nella lingua corrente.
+pub fn updates_label(app: &AppHandle) -> String {
+    labels(app).5
+}
+
 pub fn setup(app: &AppHandle) -> tauri::Result<()> {
-    let (open, pause, _resume, stop, quit) = labels(app);
+    let (open, pause, _resume, stop, quit, updates) = labels(app);
     let open_i = MenuItem::with_id(app, "open", &open, true, None::<&str>)?;
     let pause_i = MenuItem::with_id(app, "pause_resume", &pause, false, None::<&str>)?;
     let stop_i = MenuItem::with_id(app, "stop", &stop, false, None::<&str>)?;
+    let updates_i = MenuItem::with_id(app, "tray_check_updates", &updates, true, None::<&str>)?;
     let quit_i = MenuItem::with_id(app, "quit", &quit, true, None::<&str>)?;
     let menu = Menu::with_items(
         app,
@@ -168,6 +187,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
             &pause_i,
             &stop_i,
             &PredefinedMenuItem::separator(app)?,
+            &updates_i,
             &quit_i,
         ],
     )?;
@@ -175,6 +195,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(tray_icon(app))
         .icon_as_template(true)
+        .title("00:00:00")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|tray, event| {
@@ -212,6 +233,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
                 "stop" => {
                     let _ = crate::timer::timer_stop(app.clone(), app.state(), app.state());
                 }
+                "tray_check_updates" => crate::updater::check_interactive(app),
                 "quit" => {
                     show_main_window(app);
                     let _ = app.emit("quit_requested", ());
@@ -354,17 +376,19 @@ pub fn refresh(app: &AppHandle, snap: &TimerSnapshot) {
     };
     match snap.status {
         TimerStatus::Idle => {
-            // nessun timer: solo l'icona template (bianca su barra scura), senza testo
+            // nessun timer: icona template (bianca su barra scura) + timer a zero
             let _ = tray.set_icon_with_as_template(Some(tray_icon(app)), true);
-            let _ = tray.set_title(None::<&str>);
+            let _ = tray.set_title(Some("00:00:00"));
             let _ = tray.set_tooltip(None::<&str>);
         }
         _ => {
             let time = fmt_hms(snap.elapsed_secs);
+            let name = snap.project_name.as_deref().map(tray_project_name);
             if let Some(badge) = timer_badge(snap.status, &time) {
-                // timer attivo: badge colorato (verde/ambra) al posto dell'icona
+                // timer attivo: badge colorato (verde/ambra) al posto dell'icona,
+                // con il nome del progetto come titolo alla sua destra
                 let _ = tray.set_icon_with_as_template(Some(badge), false);
-                let _ = tray.set_title(None::<&str>);
+                let _ = tray.set_title(name.as_deref());
             } else {
                 // fallback se il font di sistema non è disponibile
                 let mark = if snap.status == TimerStatus::Paused {
@@ -372,15 +396,19 @@ pub fn refresh(app: &AppHandle, snap: &TimerSnapshot) {
                 } else {
                     "🟢"
                 };
+                let title = match &name {
+                    Some(n) => format!("{mark} {time} {n}"),
+                    None => format!("{mark} {time}"),
+                };
                 let _ = tray.set_icon_with_as_template(Some(tray_icon(app)), true);
-                let _ = tray.set_title(Some(format!("{mark} {time}")));
+                let _ = tray.set_title(Some(title));
             }
             let _ = tray.set_tooltip(snap.project_name.as_deref());
         }
     }
 
     if let Some(items) = app.try_state::<TrayMenuItems>() {
-        let (_open, pause, resume, _stop, _quit) = labels(app);
+        let (_open, pause, resume, _stop, _quit, _updates) = labels(app);
         match snap.status {
             TimerStatus::Idle => {
                 let _ = items.pause.set_enabled(false);

@@ -185,6 +185,7 @@ export default function App() {
         onNewFolder={() => setFolderModal({ mode: "create" })}
         onRenameFolder={(f) => setFolderModal({ mode: "rename", folder: f })}
         onDeleteFolder={deleteFolder}
+        onDeleteProject={deleteProject}
         onNewProject={(folderId) => setProjectModal({ mode: "create", folderId })}
         onStart={(id) => api.timerStart(id)}
         onReorderFolders={async (ids) => {

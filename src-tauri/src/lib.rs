@@ -5,6 +5,8 @@ mod timer;
 #[cfg(desktop)]
 mod tray;
 #[cfg(desktop)]
+mod updater;
+#[cfg(desktop)]
 mod watcher;
 
 // su mobile non c'è menu bar: stub con le stesse firme dei comandi desktop
@@ -40,6 +42,13 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder
         .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
+        .on_menu_event(|app, event| {
+            if event.id().as_ref() == "check_updates" {
+                updater::check_interactive(app);
+            }
+        })
         .on_window_event(|window, event| {
             match event {
                 // chiudere la finestra non termina l'app: resta nella menu bar
@@ -68,6 +77,45 @@ pub fn run() {
                 tray::setup(&handle)?;
                 tray::fit_main_window(&handle);
                 watcher::spawn(handle.clone());
+                updater::spawn_startup_check(&handle);
+            }
+
+            // menu applicazione macOS con "Controlla aggiornamenti…"
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::menu::{AboutMetadata, MenuBuilder, SubmenuBuilder};
+                let app_menu = SubmenuBuilder::new(app, "MoonyTask")
+                    .about(Some(AboutMetadata::default()))
+                    .separator()
+                    .text("check_updates", tray::updates_label(&handle))
+                    .separator()
+                    .services()
+                    .separator()
+                    .hide()
+                    .hide_others()
+                    .show_all()
+                    .separator()
+                    .quit()
+                    .build()?;
+                let edit_menu = SubmenuBuilder::new(app, "Edit")
+                    .undo()
+                    .redo()
+                    .separator()
+                    .cut()
+                    .copy()
+                    .paste()
+                    .select_all()
+                    .build()?;
+                let window_menu = SubmenuBuilder::new(app, "Window")
+                    .minimize()
+                    .maximize()
+                    .separator()
+                    .close_window()
+                    .build()?;
+                let menu = MenuBuilder::new(app)
+                    .items(&[&app_menu, &edit_menu, &window_menu])
+                    .build()?;
+                app.set_menu(menu)?;
             }
             timer::spawn_tick_thread(handle.clone());
             sync::spawn_auto_sync(handle.clone());

@@ -31,7 +31,6 @@ import {
 
 type Tab = "all" | "recent";
 type CreateKind = "project" | "folder";
-type ExportingFormat = api.ExportFormat | null;
 
 const PROJECT_MIME = "application/x-moonytask-project";
 const FOLDER_MIME = "application/x-moonytask-folder";
@@ -47,8 +46,8 @@ function halfOf(event: DragEvent): "before" | "after" {
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
   return event.clientY < rect.top + rect.height / 2 ? "before" : "after";
 }
-type ProjectMenu = {
-  project: Project;
+type FolderMenu = {
+  folder: Folder;
   x: number;
   y: number;
 } | null;
@@ -74,10 +73,8 @@ export default function PopoverApp() {
   const [newRate, setNewRate] = useState("0");
   const [newColor, setNewColor] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [exporting, setExporting] = useState<ExportingFormat>(null);
-  const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
-  const [projectMenu, setProjectMenu] = useState<ProjectMenu>(null);
+  const [folderMenu, setFolderMenu] = useState<FolderMenu>(null);
   const [reminder, setReminder] = useState<WatchSuggestion | null>(null);
   const [defaultRateProfile, setDefaultRateProfile] =
     useState<RateProfile | null>(null);
@@ -342,42 +339,27 @@ export default function PopoverApp() {
     }
   };
 
-  const openQuickCreate = (kind: CreateKind) => {
+  const openQuickCreate = (kind: CreateKind, folderId?: string) => {
     setCreateKind(kind);
     setCreateMenuOpen(false);
-    setProjectMenu(null);
+    setFolderMenu(null);
     setNewName("");
     setNewColor(null);
+    if (kind === "project" && folderId) setNewFolderId(folderId);
     setNewRate(
       String(kind === "project" ? (defaultRateProfile?.hourlyRate ?? 0) : 0),
     );
   };
 
-  const openProjectMenu = (project: Project, event: MouseEvent) => {
+  const openFolderMenu = (folder: Folder, event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
     setCreateMenuOpen(false);
-    setProjectMenu({
-      project,
-      x: Math.min(event.clientX, window.innerWidth - 154),
-      y: Math.min(event.clientY, window.innerHeight - 92),
+    setFolderMenu({
+      folder,
+      x: Math.min(event.clientX, window.innerWidth - 178),
+      y: Math.min(event.clientY, window.innerHeight - 80),
     });
-  };
-
-  const exportProject = async (format: api.ExportFormat) => {
-    if (!projectMenu) return;
-    const projectId = projectMenu.project.id;
-    setExporting(format);
-    setExportMessage(null);
-    setProjectMenu(null);
-    try {
-      await api.projectExport(projectId, format);
-      setExportMessage(t("popover.exported"));
-    } catch {
-      setExportMessage(t("popover.exportFailed"));
-    } finally {
-      setExporting(null);
-    }
   };
 
   const headerColor = headerProject
@@ -402,12 +384,12 @@ export default function PopoverApp() {
   return (
     <div
       onMouseDown={() => {
-        setProjectMenu(null);
+        setFolderMenu(null);
         setCreateMenuOpen(false);
       }}
       onContextMenu={(event) => {
         event.preventDefault();
-        setProjectMenu(null);
+        setFolderMenu(null);
         setCreateMenuOpen(false);
       }}
       className="h-screen p-2.5"
@@ -465,7 +447,7 @@ export default function PopoverApp() {
             <button
               title={t("timer.stop")}
               onClick={() => api.timerStop()}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.12] text-white shadow-sm transition hover:bg-red-500 active:scale-95"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500 text-white shadow-sm transition hover:bg-red-600 hover:shadow-[0_0_14px_rgba(239,68,68,0.6)] active:scale-95"
             >
               <StopIcon size={14} />
             </button>
@@ -525,12 +507,6 @@ export default function PopoverApp() {
           placeholder={t("popover.search")}
           className="w-full rounded-lg border border-black/[0.08] bg-white px-3 py-2 text-[15px] font-medium text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-blue-500 dark:border-white/10 dark:bg-neutral-900 dark:text-white pro:border-[#44475a] pro:bg-[#21222c] pro:text-[#f8f8f2] pro:placeholder:text-[#b9b9c8] pro:focus:border-[#bd93f9]"
         />
-
-        {exportMessage && (
-          <p className="truncate px-1 text-[12px] font-medium text-neutral-500 dark:text-neutral-400 pro:text-[#b9b9c8]">
-            {exportMessage}
-          </p>
-        )}
 
         {createKind && (
           <div className="rounded-lg bg-white p-2 shadow-sm dark:bg-neutral-900 pro:bg-[#21222c]">
@@ -649,7 +625,6 @@ export default function PopoverApp() {
                 total={projectTotal(project.id)}
                 onStart={() => startProject(project.id)}
                 onOpen={() => openProjectInMain(project.id)}
-                onContextMenu={(event) => openProjectMenu(project, event)}
                 subtitle={folderById.get(project.folderId)?.name}
               />
             ))
@@ -677,6 +652,7 @@ export default function PopoverApp() {
                   onDragOver={(e) => onDragOverFolder(e, folder.id)}
                   onDragLeave={() => setDropHint(null)}
                   onDrop={(e) => onDropOnFolder(e, folder.id)}
+                  onContextMenu={(event) => openFolderMenu(folder, event)}
                   className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 transition hover:bg-white hover:shadow-sm dark:hover:bg-white/[0.07] pro:hover:bg-[#343746] ${
                     dropHint?.kind === "project-into-folder" &&
                     dropHint.folderId === folder.id
@@ -735,9 +711,6 @@ export default function PopoverApp() {
                         total={projectTotal(project.id)}
                         onStart={() => startProject(project.id)}
                         onOpen={() => openProjectInMain(project.id)}
-                        onContextMenu={(event) =>
-                          openProjectMenu(project, event)
-                        }
                         onRowDragOver={(event) =>
                           onDragOverProject(event, project.id)
                         }
@@ -765,39 +738,30 @@ export default function PopoverApp() {
               total={projectTotal(project.id)}
               onStart={() => startProject(project.id)}
               onOpen={() => openProjectInMain(project.id)}
-              onContextMenu={(event) => openProjectMenu(project, event)}
               subtitle={folderById.get(project.folderId)?.name}
             />
           ))
         )}
       </div>
 
-      {projectMenu && (
+      {folderMenu && (
         <div
           onMouseDown={(event) => event.stopPropagation()}
           onContextMenu={(event) => {
             event.preventDefault();
             event.stopPropagation();
           }}
-          className="fixed z-50 w-36 overflow-hidden rounded-lg bg-white py-1 text-[13px] font-semibold text-neutral-800 shadow-xl ring-1 ring-black/10 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-white/10 pro:bg-[#21222c] pro:text-[#f8f8f2] pro:ring-[#44475a]"
-          style={{ left: projectMenu.x, top: projectMenu.y }}
+          className="fixed z-50 w-42 overflow-hidden rounded-lg bg-white py-1 text-[13px] font-semibold text-neutral-800 shadow-xl ring-1 ring-black/10 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-white/10 pro:bg-[#21222c] pro:text-[#f8f8f2] pro:ring-[#44475a]"
+          style={{ left: folderMenu.x, top: folderMenu.y }}
         >
           <p className="truncate px-3 py-1.5 text-[12px] font-semibold text-neutral-400 pro:text-[#bd93f9]">
-            {projectMenu.project.name}
+            {folderMenu.folder.name}
           </p>
           <button
-            onClick={() => exportProject("csv")}
-            disabled={exporting !== null}
-            className="block w-full px-3 py-2 text-left hover:bg-neutral-100 disabled:opacity-50 dark:hover:bg-neutral-800 pro:hover:bg-[#343746]"
+            onClick={() => openQuickCreate("project", folderMenu.folder.id)}
+            className="block w-full px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800 pro:hover:bg-[#343746]"
           >
-            {exporting === "csv" ? "..." : t("popover.exportCsv")}
-          </button>
-          <button
-            onClick={() => exportProject("json")}
-            disabled={exporting !== null}
-            className="block w-full px-3 py-2 text-left hover:bg-neutral-100 disabled:opacity-50 dark:hover:bg-neutral-800 pro:hover:bg-[#343746]"
-          >
-            {exporting === "json" ? "..." : t("popover.exportJson")}
+            {t("projects.new")}
           </button>
         </div>
       )}
@@ -810,7 +774,7 @@ export default function PopoverApp() {
             onMouseDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
-              setProjectMenu(null);
+              setFolderMenu(null);
               setCreateMenuOpen((open) => !open);
             }}
             className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/[0.06] text-neutral-600 transition hover:bg-black/[0.12] hover:text-neutral-900 active:scale-95 dark:bg-white/[0.08] dark:text-neutral-300 dark:hover:bg-white/[0.15] dark:hover:text-white pro:bg-[#343746] pro:text-[#b9b9c8] pro:hover:bg-[#44475a] pro:hover:text-[#f8f8f2]"
@@ -860,7 +824,6 @@ function ProjectRow({
   total,
   onStart,
   onOpen,
-  onContextMenu,
   onRowDragOver,
   onRowDrop,
   hintClass,
@@ -872,7 +835,6 @@ function ProjectRow({
   total: number;
   onStart: () => void;
   onOpen: () => void;
-  onContextMenu: (event: MouseEvent) => void;
   onRowDragOver?: (event: DragEvent) => void;
   onRowDrop?: (event: DragEvent) => void;
   hintClass?: string;
@@ -894,7 +856,6 @@ function ProjectRow({
       onDragStart={onDragStart}
       onDragOver={onRowDragOver}
       onDrop={onRowDrop}
-      onContextMenu={onContextMenu}
       className={`group flex items-center gap-2.5 rounded-lg border px-2 py-1.5 transition ${hintClass ?? ""} ${
         isRunning || isPaused
           ? "border-black/5 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.08] pro:border-[#bd93f9]/50 pro:bg-[#343746]"

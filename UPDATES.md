@@ -1,0 +1,119 @@
+# MoonyTask — Aggiornamenti automatici e distribuzione
+
+L'app usa il plugin ufficiale `tauri-plugin-updater`. A ogni avvio (dopo ~15 secondi) e
+dalla voce di menu **Controlla aggiornamenti…** (menu MoonyTask su macOS e menu della
+tray su tutti i sistemi) l'app scarica:
+
+```
+https://moonytask.com/downloads/latest.json
+```
+
+Se la versione indicata lì è più nuova di quella installata, chiede all'utente se
+installare, scarica il pacchetto firmato, lo verifica e propone il riavvio.
+
+## 1. La chiave di firma (fatto una volta sola)
+
+Gli aggiornamenti sono firmati: l'app accetta solo pacchetti firmati con la **tua**
+chiave privata. La coppia di chiavi è già stata generata (password vuota):
+
+- privata: `~/.tauri/moonytask.key` → **non perderla e non committarla**: senza questa
+  chiave non potrai più pubblicare aggiornamenti per le app già installate.
+  Fanne un backup (es. nel password manager).
+- pubblica: `~/.tauri/moonytask.key.pub` → già incorporata in
+  `src-tauri/tauri.conf.json` (`plugins.updater.pubkey`).
+
+Per la CI su GitHub aggiungi due secrets (Settings → Secrets and variables → Actions):
+
+- `TAURI_SIGNING_PRIVATE_KEY` = contenuto del file `~/.tauri/moonytask.key`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` = stringa vuota
+
+Per compilare in locale (`npm run tauri build`) esporta prima:
+
+```sh
+export TAURI_SIGNING_PRIVATE_KEY_PATH=~/.tauri/moonytask.key
+```
+
+Senza, la build desktop fallisce perché `createUpdaterArtifacts` è attivo.
+
+## 2. Cosa caricare su FTP in `/downloads/`
+
+La build (locale o via workflow "Build desktop artifacts") produce, oltre agli
+installer, gli artefatti per l'updater con relativo file di firma `.sig`:
+
+| Piattaforma | File da caricare | Firma |
+|---|---|---|
+| macOS | `MoonyTask.app.tar.gz` (bundle `app`) | `MoonyTask.app.tar.gz.sig` |
+| Windows x64/arm64 | `MoonyTask_X.Y.Z_…-setup.exe` (NSIS) | `.exe.sig` |
+| Linux | `MoonyTask_X.Y.Z_amd64.AppImage` | `.AppImage.sig` |
+
+Il `.sig` **non** va caricato come file: il suo contenuto (una riga base64) va incollato
+nel campo `signature` di `latest.json`. Carica anche DMG/MSI/DEB/RPM per chi scarica
+dal sito la prima volta.
+
+## 3. Il file `latest.json`
+
+Nella repo c'è il template pronto da compilare: [`downloads/latest.json`](downloads/latest.json).
+A ogni release aggiorni versione, URL e firme e lo carichi via FTP in `/downloads/`.
+
+```json
+{
+  "version": "0.2.0",
+  "notes": "Novità di questa versione…",
+  "pub_date": "2026-07-06T18:00:00Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "CONTENUTO DEL FILE MoonyTask.app.tar.gz.sig",
+      "url": "https://moonytask.com/downloads/MoonyTask_0.2.0_universal.app.tar.gz"
+    },
+    "darwin-x86_64": {
+      "signature": "CONTENUTO DEL FILE MoonyTask.app.tar.gz.sig",
+      "url": "https://moonytask.com/downloads/MoonyTask_0.2.0_universal.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "CONTENUTO DEL FILE MoonyTask_0.2.0_x64-setup.exe.sig",
+      "url": "https://moonytask.com/downloads/MoonyTask_0.2.0_x64-setup.exe"
+    },
+    "windows-aarch64": {
+      "signature": "CONTENUTO DEL FILE MoonyTask_0.2.0_arm64-setup.exe.sig",
+      "url": "https://moonytask.com/downloads/MoonyTask_0.2.0_arm64-setup.exe"
+    },
+    "linux-x86_64": {
+      "signature": "CONTENUTO DEL FILE MoonyTask_0.2.0_amd64.AppImage.sig",
+      "url": "https://moonytask.com/downloads/MoonyTask_0.2.0_amd64.AppImage"
+    }
+  }
+}
+```
+
+Note:
+- la build macOS è universale, quindi `darwin-aarch64` e `darwin-x86_64` puntano allo
+  stesso `.app.tar.gz`;
+- su Linux l'updater aggiorna solo l'**AppImage**; chi installa DEB/RPM aggiorna con il
+  gestore pacchetti scaricando il nuovo file dal sito;
+- gli URL devono essere **https** (il sito è dietro Cloudflare, quindi ok).
+
+## 4. Checklist di rilascio
+
+1. Aggiorna la versione in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` e
+   `package.json` (devono coincidere).
+2. Lancia il workflow **Build desktop artifacts** su GitHub (o builda in locale con la
+   variabile `TAURI_SIGNING_PRIVATE_KEY_PATH` impostata).
+3. Scarica gli artefatti e carica su FTP in `/downloads/` gli installer e gli artefatti
+   updater della tabella sopra.
+4. Aggiorna `latest.json` con nuova `version`, URL e firme, e caricalo per **ultimo**.
+5. Verifica: apri l'app vecchia → menu → Controlla aggiornamenti…
+
+## 5. Pacchetto RPM (Fedora)
+
+L'RPM viene generato dalla build Linux del workflow. In `tauri.conf.json` ora sono
+dichiarate le dipendenze runtime come soname (`libwebkit2gtk-4.1.so.0`,
+`libgtk-3.so.0`), come richiesto dalle linee guida di packaging: così `dnf` installa da
+solo WebKitGTK se manca. Installazione su Fedora:
+
+```sh
+sudo dnf install ./MoonyTask-X.Y.Z-1.x86_64.rpm
+```
+
+Se un utente non riesce a installare, fatti mandare l'output esatto di quel comando:
+il workflow ora stampa anche metadati e dipendenze dell'RPM (`rpm -qip` / `rpm -qRp`)
+nel log, utile per confrontare.

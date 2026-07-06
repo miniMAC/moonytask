@@ -1,7 +1,14 @@
-import { useState, type DragEvent } from "react";
+import {
+  useEffect,
+  useState,
+  type DragEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 import type { Folder, Project, TimerSnapshot } from "../lib/types";
 import { projectColor } from "../lib/colors";
+import appIcon from "../assets/icon.png";
 import {
   ChartIcon,
   FolderIcon,
@@ -25,6 +32,7 @@ interface Props {
   onNewFolder: () => void;
   onRenameFolder: (f: Folder) => void;
   onDeleteFolder: (f: Folder) => void;
+  onDeleteProject: (p: Project) => void;
   onNewProject: (folderId: string) => void;
   onStart: (projectId: string) => void;
   onReorderFolders: (ids: string[]) => void;
@@ -49,6 +57,33 @@ function halfOf(event: DragEvent): "before" | "after" {
 export default function Sidebar(p: Props) {
   const { t } = useTranslation();
   const [dropHint, setDropHint] = useState<DropHint>(null);
+  const [projectMenu, setProjectMenu] = useState<{
+    project: Project;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  // il menu contestuale si chiude cliccando altrove
+  useEffect(() => {
+    if (!projectMenu) return;
+    const close = () => setProjectMenu(null);
+    window.addEventListener("mousedown", close);
+    window.addEventListener("blur", close);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("blur", close);
+    };
+  }, [projectMenu]);
+
+  const openProjectMenu = (project: Project, event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setProjectMenu({
+      project,
+      x: Math.min(event.clientX, window.innerWidth - 190),
+      y: Math.min(event.clientY, window.innerHeight - 84),
+    });
+  };
 
   const visibleIn = (folderId: string) =>
     p.projects
@@ -140,8 +175,14 @@ export default function Sidebar(p: Props) {
 
   return (
     <aside className="hidden w-72 shrink-0 flex-col border-r border-neutral-200 bg-neutral-100 md:flex dark:border-neutral-800 dark:bg-neutral-900 pro:border-[#44475a] pro:bg-[#21222c]">
-      <div className="flex items-center justify-between px-4 pb-2 pt-4">
-        <span className="text-base font-bold tracking-wide text-neutral-700 dark:text-neutral-200 pro:text-[#f8f8f2]">
+      <div className="flex items-center gap-2 px-4 pb-2 pt-4">
+        <img
+          src={appIcon}
+          alt=""
+          className="h-6 w-6 shrink-0 rounded-[6px]"
+          draggable={false}
+        />
+        <span className="text-base font-bold tracking-wide text-neutral-900 dark:text-neutral-100 pro:text-[#f8f8f2]">
           MoonyTask
         </span>
       </div>
@@ -184,7 +225,7 @@ export default function Sidebar(p: Props) {
                   e.dataTransfer.setData(FOLDER_MIME, folder.id);
                   e.dataTransfer.effectAllowed = "move";
                 }}
-                className="group flex items-center gap-1.5 rounded px-2 py-1 text-neutral-600 dark:text-neutral-300 pro:text-[#d7d7e2]"
+                className="group flex items-center gap-1.5 rounded px-2 py-1 text-neutral-900 dark:text-neutral-100 pro:text-[#f8f8f2]"
               >
                 <span style={{ color: folder.color ?? undefined }}>
                   <FolderIcon size={13} />
@@ -192,28 +233,26 @@ export default function Sidebar(p: Props) {
                 <span className="flex-1 truncate text-base font-medium">
                   {folder.name}
                 </span>
-                <span className="hidden gap-0.5 group-hover:flex">
-                  <button
-                    title={t("projects.new")}
+                <span className="hidden items-center gap-1.5 group-hover:flex">
+                  <HoverIconButton
+                    label={t("projects.new")}
                     onClick={() => p.onNewProject(folder.id)}
-                    className="rounded p-0.5 text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-700 pro:text-[#b9b9c8] pro:hover:bg-[#44475a] pro:hover:text-[#50fa7b]"
                   >
-                    <PlusIcon size={13} />
-                  </button>
-                  <button
-                    title={t("folders.rename")}
+                    <PlusIcon size={14} />
+                  </HoverIconButton>
+                  <HoverIconButton
+                    label={t("folders.rename")}
                     onClick={() => p.onRenameFolder(folder)}
-                    className="rounded p-0.5 text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-700 pro:text-[#b9b9c8] pro:hover:bg-[#44475a] pro:hover:text-[#8be9fd]"
                   >
-                    <PencilIcon size={13} />
-                  </button>
-                  <button
-                    title={t("folders.delete")}
+                    <PencilIcon size={14} />
+                  </HoverIconButton>
+                  <HoverIconButton
+                    label={t("folders.delete")}
                     onClick={() => p.onDeleteFolder(folder)}
-                    className="rounded p-0.5 text-neutral-500 hover:bg-neutral-200 hover:text-red-600 dark:hover:bg-neutral-700 pro:text-[#b9b9c8] pro:hover:bg-[#44475a] pro:hover:text-[#ff5555]"
+                    danger
                   >
-                    <TrashIcon size={13} />
-                  </button>
+                    <TrashIcon size={14} />
+                  </HoverIconButton>
                 </span>
               </div>
 
@@ -234,10 +273,11 @@ export default function Sidebar(p: Props) {
                     onDragOver={(e) => onDragOverProject(e, project.id)}
                     onDrop={(e) => onDropOnProject(e, folder.id, project.id)}
                     onClick={() => p.onSelectProject(project.id)}
+                    onContextMenu={(e) => openProjectMenu(project, e)}
                     className={`group ml-3 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-base ${projectHint(project.id)} ${
                       active
                         ? "bg-white font-medium shadow-sm dark:bg-neutral-800 pro:bg-[#44475a] pro:text-[#f8f8f2]"
-                        : "text-neutral-700 hover:bg-neutral-200/60 dark:text-neutral-300 dark:hover:bg-neutral-800/60 pro:text-[#d7d7e2] pro:hover:bg-[#343746]"
+                        : "text-neutral-900 hover:bg-neutral-200/60 dark:text-neutral-100 dark:hover:bg-neutral-800/60 pro:text-[#d7d7e2] pro:hover:bg-[#343746]"
                     }`}
                   >
                     <span
@@ -283,6 +323,29 @@ export default function Sidebar(p: Props) {
         })}
       </div>
 
+      {projectMenu && (
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+          className="fixed z-50 w-44 overflow-hidden rounded-lg bg-white py-1 text-sm font-medium text-neutral-800 shadow-xl ring-1 ring-black/10 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-white/10 pro:bg-[#21222c] pro:text-[#f8f8f2] pro:ring-[#44475a]"
+          style={{ left: projectMenu.x, top: projectMenu.y }}
+        >
+          <p className="truncate px-3 py-1.5 text-xs font-semibold text-neutral-400 pro:text-[#bd93f9]">
+            {projectMenu.project.name}
+          </p>
+          <button
+            onClick={() => {
+              const project = projectMenu.project;
+              setProjectMenu(null);
+              p.onDeleteProject(project);
+            }}
+            className="block w-full cursor-pointer px-3 py-2 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40 pro:text-[#ff5555] pro:hover:bg-[#343746]"
+          >
+            {t("projects.delete")}
+          </button>
+        </div>
+      )}
+
       <nav className="border-t border-neutral-200 p-2 dark:border-neutral-800 pro:border-[#44475a]">
         {(
           [
@@ -305,5 +368,39 @@ export default function Sidebar(p: Props) {
         ))}
       </nav>
     </aside>
+  );
+}
+
+/// Icona azione mostrata all'hover di una cartella: area di click generosa,
+/// contrasto pieno in chiaro/scuro e tooltip custom ben leggibile.
+function HoverIconButton({
+  label,
+  onClick,
+  danger,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      aria-label={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`group/icon relative cursor-pointer rounded-md p-1 text-neutral-950 transition hover:bg-neutral-300/70 dark:text-white dark:hover:bg-neutral-700 pro:text-[#f8f8f2] pro:hover:bg-[#44475a] ${
+        danger
+          ? "hover:text-red-600 dark:hover:text-red-400 pro:hover:text-[#ff5555]"
+          : ""
+      }`}
+    >
+      {children}
+      <span className="pointer-events-none absolute -top-8 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-md bg-neutral-950 px-2 py-1 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover/icon:opacity-100 dark:bg-white dark:text-neutral-950 pro:bg-[#bd93f9] pro:text-[#282a36]">
+        {label}
+      </span>
+    </button>
   );
 }

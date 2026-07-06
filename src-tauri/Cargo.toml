@@ -27,10 +27,13 @@ rand = "0.8"
 tiny_http = "0.12"
 urlencoding = "2"
 
-# solo desktop: menu bar (tray + rendering timer), posizionamento del popover
-# e keychain per i token OAuth (su mobile i token stanno nel db in sandbox)
+# solo desktop: menu bar (tray + rendering timer), posizionamento del popover,
+# keychain per i token OAuth (su mobile i token stanno nel db in sandbox)
+# e auto-update con dialoghi nativi
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
+tauri-plugin-updater = "2"
+tauri-plugin-dialog = "2"
 fontdue = "0.9"
 keyring = { version = "3", features = ["apple-native"] }
 
