@@ -52,8 +52,9 @@ dal sito la prima volta.
 
 ## 3. Il file `latest.json`
 
-Nella repo c'è il template pronto da compilare: [`downloads/latest.json`](downloads/latest.json).
-A ogni release aggiorni versione, URL e firme e lo carichi via FTP in `/downloads/`.
+Il template pronto da compilare sta nella repo del sito: `miniMAC/moonytaskweb`,
+file `downloads/latest.json`. A ogni release aggiorni versione, URL e firme e lo
+carichi via FTP in `/downloads/` insieme ai pacchetti.
 
 ```json
 {
