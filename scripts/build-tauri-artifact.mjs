@@ -40,9 +40,22 @@ if (target && target !== "--copy-only") {
     args.push("--bundles", bundles);
   }
 
+  // createUpdaterArtifacts richiede la chiave di firma degli update:
+  // se non è già configurata usa quella locale (vedi UPDATES.md)
+  const env = { ...process.env };
+  const localKey = path.join(homedir(), ".tauri", "moonytask.key");
+  if (
+    !env.TAURI_SIGNING_PRIVATE_KEY &&
+    !env.TAURI_SIGNING_PRIVATE_KEY_PATH &&
+    existsSync(localKey)
+  ) {
+    env.TAURI_SIGNING_PRIVATE_KEY_PATH = localKey;
+  }
+
   const result = spawnSync(npm, args, {
     cwd: projectRoot,
     stdio: "inherit",
+    env,
   });
 
   if (result.status !== 0) {

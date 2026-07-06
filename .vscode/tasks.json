@@ -2,6 +2,20 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Build: tutto (desktop CI + Android APK)",
+      "dependsOn": [
+        "CI: build all desktop artifacts",
+        "Build: Android APK (release)"
+      ],
+      "dependsOrder": "parallel",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "detail": "⌘⇧B: lancia la CI per i pacchetti desktop e intanto genera l'APK Android in locale (tutto finisce in ~/Desktop/MoonyTask)."
+    },
+    {
       "label": "Tauri: dev",
       "type": "shell",
       "command": "npm",
@@ -53,10 +67,7 @@
       "options": {
         "cwd": "${workspaceFolder}"
       },
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
+      "group": "build",
       "problemMatcher": [],
       "detail": "Lancia GitHub Actions per macOS, Windows e Linux, aspetta la fine e scarica tutto in ~/Desktop/MoonyTask.",
       "presentation": {
