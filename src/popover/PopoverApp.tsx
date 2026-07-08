@@ -531,7 +531,7 @@ export default function PopoverApp() {
                   <select
                     value={newFolderId}
                     onChange={(e) => setNewFolderId(e.target.value)}
-                    className="min-w-0 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-[13px] outline-none dark:border-white/10 dark:bg-neutral-950 pro:border-[#44475a] pro:bg-[#282a36] pro:text-[#f8f8f2]"
+                    className="mt-select min-w-0 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-[13px] outline-none focus:border-blue-500 dark:border-white/10 dark:bg-neutral-950 dark:text-white pro:border-[#44475a] pro:bg-[#282a36] pro:text-[#f8f8f2] pro:focus:border-[#bd93f9]"
                   >
                     {folders.map((folder) => (
                       <option key={folder.id} value={folder.id}>
@@ -548,7 +548,9 @@ export default function PopoverApp() {
                   />
                 </div>
               )}
-              <div className="flex items-center justify-between gap-2">
+              {/* flex-wrap: se colori e bottoni non entrano su una riga, i
+                  bottoni scendono sotto invece di uscire dal popover */}
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="flex gap-1">
                   {PROJECT_COLORS.map((color) => (
                     <button
@@ -563,7 +565,7 @@ export default function PopoverApp() {
                     />
                   ))}
                 </div>
-                <div className="flex gap-1">
+                <div className="ml-auto flex shrink-0 gap-1">
                   <button
                     onClick={resetQuickCreate}
                     className="rounded-md px-2 py-1 text-[13px] font-medium text-neutral-500 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 pro:text-[#b9b9c8] pro:hover:bg-[#343746]"
@@ -610,7 +612,7 @@ export default function PopoverApp() {
       )}
 
       {/* list */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 pb-2">
         {queryNorm ? (
           searchResults.length === 0 ? (
             <p className="px-3 py-4 text-center text-xs text-neutral-400 pro:text-[#b9b9c8]">

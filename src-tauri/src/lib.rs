@@ -1,5 +1,7 @@
 mod apps;
 mod db;
+#[cfg(desktop)]
+mod idle;
 mod sync;
 mod timer;
 #[cfg(desktop)]
@@ -77,6 +79,7 @@ pub fn run() {
                 tray::setup(&handle)?;
                 tray::fit_main_window(&handle);
                 watcher::spawn(handle.clone());
+                idle::spawn(handle.clone());
                 updater::spawn_startup_check(&handle);
             }
 
@@ -158,6 +161,7 @@ pub fn run() {
             timer::timer_pause,
             timer::timer_resume,
             timer::timer_stop,
+            timer::timer_stop_at,
             timer::timer_get_state,
             apps::apps_installed,
             tray::open_main,

@@ -103,6 +103,9 @@ export const timerStart = (projectId: string) =>
 export const timerPause = () => invoke<void>("timer_pause");
 export const timerResume = () => invoke<void>("timer_resume");
 export const timerStop = () => invoke<TimeEntry | null>("timer_stop");
+// ferma il timer chiudendo il segmento a endedAt (scarta il tempo di inattività)
+export const timerStopAt = (endedAt: number) =>
+  invoke<TimeEntry | null>("timer_stop_at", { endedAt });
 export const timerGetState = () => invoke<TimerSnapshot>("timer_get_state");
 
 // totals per project (per popover e statistiche)

@@ -2248,6 +2248,7 @@ name = "moonytask"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "chrono",
  "fontdue",
  "keyring",
  "objc2 0.5.2",

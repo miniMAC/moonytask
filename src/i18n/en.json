@@ -72,6 +72,12 @@
     "noteBody": "You can describe what you worked on during this segment. It is optional.",
     "noteSkip": "Skip"
   },
+  "idle": {
+    "title": "Are you still there?",
+    "body": "No activity for {{minutes}} minutes while the timer was running. Keep this time in the session, or stop the timer at the moment you went away?",
+    "keep": "Keep the time",
+    "discard": "Stop and discard idle time"
+  },
   "reports": {
     "title": "Reports",
     "today": "Today",
@@ -203,7 +209,9 @@
       "resetDone": "All data has been deleted."
     },
     "pdfTotalsOnly": "Hide row costs in the PDF",
-    "pdfTotalsOnlyHelp": "When enabled, the PDF keeps the summary and table, but the table shows only day and time."
+    "pdfTotalsOnlyHelp": "When enabled, the PDF keeps the summary and table, but the table shows only day and time.",
+    "autoMergeDaily": "Automatically merge daily times per project",
+    "autoMergeDailyHelp": "On every pause or stop the app still asks what you did, but entries of the same project are summed into a single daily entry."
   },
   "common": {
     "save": "Save",

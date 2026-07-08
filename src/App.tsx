@@ -46,6 +46,10 @@ export default function App() {
   const [noteRequest, setNoteRequest] = useState<TimeEntry | null>(null);
   const [quitAfterNote, setQuitAfterNote] = useState(false);
   const noteRequestRef = useRef<TimeEntry | null>(null);
+  const [idlePrompt, setIdlePrompt] = useState<{
+    idleStartEpoch: number;
+    idleSecs: number;
+  } | null>(null);
 
   const reload = useCallback(async () => {
     const [f, p] = await Promise.all([api.foldersList(), api.projectsList()]);
@@ -85,6 +89,11 @@ export default function App() {
       setNoteRequest(e.payload);
       setRefreshKey((k) => k + 1);
     });
+    // il backend ha rilevato inattività prolungata con il timer attivo
+    const unIdle = listen<{ idleStartEpoch: number; idleSecs: number }>(
+      "idle_detected",
+      (e) => setIdlePrompt(e.payload),
+    );
     const unQuit = listen("quit_requested", async () => {
       if (noteRequestRef.current) {
         setQuitAfterNote(true);
@@ -109,6 +118,7 @@ export default function App() {
       unData.then((f) => f());
       unOpen.then((f) => f());
       unNote.then((f) => f());
+      unIdle.then((f) => f());
       unQuit.then((f) => f());
     };
   }, []);
@@ -125,7 +135,8 @@ export default function App() {
         projectModal ||
         folderModal ||
         confirm ||
-        noteRequest
+        noteRequest ||
+        idlePrompt
       ) {
         return;
       }
@@ -136,7 +147,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [timer.status, selectedId, projectModal, folderModal, confirm, noteRequest]);
+  }, [timer.status, selectedId, projectModal, folderModal, confirm, noteRequest, idlePrompt]);
 
   const selectedProject = projects.find((p) => p.id === selectedId) ?? null;
 
@@ -308,6 +319,19 @@ export default function App() {
           }}
         />
       )}
+      {idlePrompt && (
+        <IdlePromptModal
+          idlePrompt={idlePrompt}
+          onKeep={() => setIdlePrompt(null)}
+          onDiscard={async () => {
+            const prompt = idlePrompt;
+            setIdlePrompt(null);
+            // chiude il segmento all'inizio dell'inattività e ferma il timer;
+            // il backend apre poi il consueto modale della nota
+            await api.timerStopAt(prompt.idleStartEpoch);
+          }}
+        />
+      )}
       {noteRequest && (
         <EntryNoteModal
           entry={noteRequest}
@@ -325,6 +349,43 @@ export default function App() {
         />
       )}
     </div>
+  );
+}
+
+function IdlePromptModal({
+  idlePrompt,
+  onKeep,
+  onDiscard,
+}: {
+  idlePrompt: { idleStartEpoch: number; idleSecs: number };
+  onKeep: () => void;
+  onDiscard: () => void | Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const minutes = Math.max(1, Math.round(idlePrompt.idleSecs / 60));
+
+  return (
+    <Modal title={t("idle.title")} onClose={onKeep}>
+      <div className="space-y-3">
+        <p className="text-base text-neutral-500 dark:text-neutral-400">
+          {t("idle.body", { minutes })}
+        </p>
+        <div className="flex flex-wrap justify-end gap-2 pt-1">
+          <button
+            onClick={onDiscard}
+            className="h-11 rounded-lg px-5 text-base text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+          >
+            {t("idle.discard")}
+          </button>
+          <button
+            onClick={onKeep}
+            className="h-11 rounded-lg bg-blue-600 px-6 text-base font-medium text-white hover:bg-blue-700"
+          >
+            {t("idle.keep")}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

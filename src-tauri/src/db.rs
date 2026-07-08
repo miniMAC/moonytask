@@ -339,6 +339,131 @@ pub fn insert_time_entry(
     Ok(entry)
 }
 
+/// Se l'impostazione "auto_merge_daily" è attiva, somma l'entry appena chiusa
+/// alle altre dello stesso progetto registrate nello stesso giorno (ora locale)
+/// in un'unica voce. Ritorna l'entry unificata (o quella originale se non c'è
+/// nulla da unire o l'operazione fallisce).
+pub fn maybe_merge_daily(conn: &mut Connection, entry: TimeEntry) -> TimeEntry {
+    if get_setting(conn, "auto_merge_daily").as_deref() != Some("1") {
+        return entry;
+    }
+    match merge_entry_into_day(conn, &entry) {
+        Ok(Some(merged)) => merged,
+        _ => entry,
+    }
+}
+
+fn local_day_key(ts: i64) -> String {
+    use chrono::TimeZone;
+    chrono::Local
+        .timestamp_opt(ts, 0)
+        .single()
+        .map(|dt| dt.format("%Y-%m-%d").to_string())
+        .unwrap_or_default()
+}
+
+fn merge_entry_into_day(
+    conn: &mut Connection,
+    entry: &TimeEntry,
+) -> Result<Option<TimeEntry>, String> {
+    let day = local_day_key(entry.started_at);
+    if day.is_empty() {
+        return Ok(None);
+    }
+
+    // finestra larga attorno all'entry, poi filtro esatto sul giorno locale
+    let group = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, project_id, started_at, ended_at, duration_secs, note, updated_at, deleted
+                 FROM time_entries
+                 WHERE deleted = 0 AND project_id = ?1 AND started_at BETWEEN ?2 AND ?3
+                 ORDER BY started_at",
+            )
+            .map_err(err)?;
+        let rows = stmt
+            .query_map(
+                rusqlite::params![
+                    entry.project_id,
+                    entry.started_at - 2 * 86_400,
+                    entry.started_at + 2 * 86_400
+                ],
+                |r| {
+                    Ok(TimeEntry {
+                        id: r.get(0)?,
+                        project_id: r.get(1)?,
+                        started_at: r.get(2)?,
+                        ended_at: r.get(3)?,
+                        duration_secs: r.get(4)?,
+                        note: r.get(5)?,
+                        updated_at: r.get(6)?,
+                        deleted: r.get(7)?,
+                    })
+                },
+            )
+            .map_err(err)?
+            .filter_map(Result::ok)
+            .filter(|e| local_day_key(e.started_at) == day)
+            .collect::<Vec<_>>();
+        rows
+    };
+    if group.len() < 2 {
+        return Ok(None);
+    }
+
+    let started_at = group.iter().map(|e| e.started_at).min().unwrap_or(0);
+    let ended_at = group.iter().map(|e| e.ended_at).max().unwrap_or(started_at);
+    let duration_secs = group.iter().map(|e| e.duration_secs).sum::<i64>();
+    let notes = group
+        .iter()
+        .filter_map(|e| e.note.as_deref())
+        .map(str::trim)
+        .filter(|note| !note.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let now = now_secs();
+    let merged = TimeEntry {
+        id: new_id(),
+        project_id: entry.project_id.clone(),
+        started_at,
+        ended_at,
+        duration_secs,
+        note: if notes.is_empty() {
+            None
+        } else {
+            Some(notes.join("\n"))
+        },
+        updated_at: now,
+        deleted: 0,
+    };
+
+    let tx = conn.transaction().map_err(err)?;
+    tx.execute(
+        "INSERT INTO time_entries (id, project_id, started_at, ended_at, duration_secs, note, updated_at, deleted)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0)",
+        rusqlite::params![
+            &merged.id,
+            &merged.project_id,
+            merged.started_at,
+            merged.ended_at,
+            merged.duration_secs,
+            &merged.note,
+            merged.updated_at
+        ],
+    )
+    .map_err(err)?;
+    for old in &group {
+        tx.execute(
+            "UPDATE time_entries SET deleted = 1, updated_at = ?2 WHERE id = ?1",
+            rusqlite::params![old.id, now],
+        )
+        .map_err(err)?;
+    }
+    tx.commit().map_err(err)?;
+    crate::sync::mark_dirty();
+    Ok(Some(merged))
+}
+
 pub fn get_setting(conn: &Connection, key: &str) -> Option<String> {
     conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| {
         r.get(0)

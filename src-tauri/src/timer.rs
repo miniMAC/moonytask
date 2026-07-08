@@ -75,14 +75,25 @@ const MIN_SEGMENT_SECS: i64 = 15;
 
 /// Chiude il segmento corrente scrivendolo su DB. Da chiamare con i lock già presi.
 /// I segmenti più corti di 15 secondi non vengono registrati (né mostrati nel totale).
-fn close_segment(conn: &rusqlite::Connection, t: &mut TimerState) -> Option<db::TimeEntry> {
+fn close_segment(conn: &mut rusqlite::Connection, t: &mut TimerState) -> Option<db::TimeEntry> {
+    close_segment_at(conn, t, db::now_secs())
+}
+
+/// Come `close_segment`, ma il segmento termina a `ended_at`: serve a scartare
+/// il tempo di inattività fermando il timer al momento in cui è iniziata.
+fn close_segment_at(
+    conn: &mut rusqlite::Connection,
+    t: &mut TimerState,
+    ended_at: i64,
+) -> Option<db::TimeEntry> {
     if let (Some(start), Some(pid)) = (t.segment_start, t.project_id.clone()) {
-        let now = db::now_secs();
         t.segment_start = None;
-        let duration = now - start;
+        let duration = ended_at.max(start) - start;
         if duration >= MIN_SEGMENT_SECS {
             t.accumulated += duration;
-            return db::insert_time_entry(conn, &pid, start, now).ok();
+            return db::insert_time_entry(conn, &pid, start, start + duration)
+                .ok()
+                .map(|entry| db::maybe_merge_daily(conn, entry));
         }
         return None;
     }
@@ -105,9 +116,9 @@ pub fn timer_start(
     let mut note_entry = None;
     {
         let mut t = timer.0.lock().unwrap();
-        let conn = db.0.lock().unwrap();
+        let mut conn = db.0.lock().unwrap();
         if t.status != TimerStatus::Idle {
-            note_entry = close_segment(&conn, &mut t);
+            note_entry = close_segment(&mut conn, &mut t);
         }
         t.status = TimerStatus::Running;
         t.project_id = Some(project_id);
@@ -127,8 +138,8 @@ pub fn timer_pause(app: AppHandle, timer: State<Timer>, db: State<Db>) -> Result
         if t.status != TimerStatus::Running {
             return Ok(());
         }
-        let conn = db.0.lock().unwrap();
-        note_entry = close_segment(&conn, &mut t);
+        let mut conn = db.0.lock().unwrap();
+        note_entry = close_segment(&mut conn, &mut t);
         t.status = TimerStatus::Paused;
     }
     emit_state(&app);
@@ -162,8 +173,33 @@ pub fn timer_stop(
         if t.status == TimerStatus::Idle {
             return Ok(None);
         }
-        let conn = db.0.lock().unwrap();
-        note_entry = close_segment(&conn, &mut t);
+        let mut conn = db.0.lock().unwrap();
+        note_entry = close_segment(&mut conn, &mut t);
+        *t = TimerState::new();
+    }
+    emit_state(&app);
+    emit_note_required(&app, note_entry.clone());
+    crate::sync::request_sync(&app);
+    Ok(note_entry)
+}
+
+/// Ferma il timer chiudendo il segmento a `ended_at` invece che ad adesso:
+/// usato dal prompt di inattività per scartare il tempo in cui l'utente era via.
+#[tauri::command]
+pub fn timer_stop_at(
+    app: AppHandle,
+    timer: State<Timer>,
+    db: State<Db>,
+    ended_at: i64,
+) -> Result<Option<db::TimeEntry>, String> {
+    let note_entry;
+    {
+        let mut t = timer.0.lock().unwrap();
+        if t.status == TimerStatus::Idle {
+            return Ok(None);
+        }
+        let mut conn = db.0.lock().unwrap();
+        note_entry = close_segment_at(&mut conn, &mut t, ended_at);
         *t = TimerState::new();
     }
     emit_state(&app);

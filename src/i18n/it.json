@@ -72,6 +72,12 @@
     "noteBody": "Puoi descrivere cosa hai fatto in questo segmento di lavoro. È facoltativo.",
     "noteSkip": "Salta"
   },
+  "idle": {
+    "title": "Sei ancora lì?",
+    "body": "Nessuna attività da {{minutes}} minuti mentre il timer era acceso. Vuoi tenere questo tempo nella sessione o fermare il timer al momento in cui ti sei allontanato?",
+    "keep": "Tieni il tempo",
+    "discard": "Ferma e scarta l'inattività"
+  },
   "reports": {
     "title": "Report",
     "today": "Oggi",
@@ -203,7 +209,9 @@
       "resetDone": "Tutti i dati sono stati eliminati."
     },
     "pdfTotalsOnly": "Nel PDF nascondi i costi nelle righe",
-    "pdfTotalsOnlyHelp": "Se attivo, il PDF mantiene riepilogo e tabella, ma nella tabella mostra solo giorno e tempo."
+    "pdfTotalsOnlyHelp": "Se attivo, il PDF mantiene riepilogo e tabella, ma nella tabella mostra solo giorno e tempo.",
+    "autoMergeDaily": "Unifica automaticamente i tempi del giorno per progetto",
+    "autoMergeDailyHelp": "A ogni pausa o stop l'app chiede comunque cosa hai fatto, ma le registrazioni dello stesso progetto vengono sommate in un'unica voce giornaliera."
   },
   "common": {
     "save": "Salva",

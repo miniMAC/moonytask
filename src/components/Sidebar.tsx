@@ -187,7 +187,7 @@ export default function Sidebar(p: Props) {
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
         <div className="mb-1 flex items-center justify-between px-2 pt-2">
           <span className="text-sm font-semibold uppercase tracking-wider text-neutral-500 pro:text-[#bd93f9]">
             {t("folders.title")}
@@ -398,7 +398,9 @@ function HoverIconButton({
       }`}
     >
       {children}
-      <span className="pointer-events-none absolute -top-8 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-md bg-neutral-950 px-2 py-1 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover/icon:opacity-100 dark:bg-white dark:text-neutral-950 pro:bg-[#bd93f9] pro:text-[#282a36]">
+      {/* ancorato a destra: centrato sul bottone sporgerebbe oltre il bordo
+          della sidebar creando overflow orizzontale (scrollbar all'hover) */}
+      <span className="pointer-events-none absolute -top-8 right-0 z-20 whitespace-nowrap rounded-md bg-neutral-950 px-2 py-1 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover/icon:opacity-100 dark:bg-white dark:text-neutral-950 pro:bg-[#bd93f9] pro:text-[#282a36]">
         {label}
       </span>
     </button>

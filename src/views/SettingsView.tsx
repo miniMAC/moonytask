@@ -98,12 +98,16 @@ function GeneralSection({
   const [pdfSaved, setPdfSaved] = useState(false);
   const [pdfSelecting, setPdfSelecting] = useState(false);
   const [pdfTotalsOnly, setPdfTotalsOnly] = useState(false);
+  const [autoMergeDaily, setAutoMergeDaily] = useState(false);
 
   useEffect(() => {
     api.settingsGet("pdf_export_dir").then((value) => setPdfDir(value ?? ""));
     api
       .settingsGet("pdf_totals_only")
       .then((value) => setPdfTotalsOnly(value === "1"));
+    api
+      .settingsGet("auto_merge_daily")
+      .then((value) => setAutoMergeDaily(value === "1"));
   }, []);
 
   const savePdfDir = async () => {
@@ -183,6 +187,22 @@ function GeneralSection({
             ))}
           </select>
         </label>
+      </div>
+      <div className="mt-6 max-w-2xl">
+        <label className="flex items-center gap-2 text-base">
+          <input
+            type="checkbox"
+            checked={autoMergeDaily}
+            onChange={(e) => {
+              setAutoMergeDaily(e.target.checked);
+              api.settingsSet("auto_merge_daily", e.target.checked ? "1" : "0");
+            }}
+          />
+          {t("settings.autoMergeDaily")}
+        </label>
+        <p className={`mt-1 ${helpTextCls}`}>
+          {t("settings.autoMergeDailyHelp")}
+        </p>
       </div>
       {/* la cartella export riguarda solo il filesystem desktop */}
       {!isMobilePlatform && (

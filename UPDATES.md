@@ -104,16 +104,30 @@ Note:
 4. Aggiorna `latest.json` con nuova `version`, URL e firme, e caricalo per **ultimo**.
 5. Verifica: apri l'app vecchia → menu → Controlla aggiornamenti…
 
-## 5. Pacchetto RPM (Fedora)
+## 5. Pacchetto RPM (Fedora / openSUSE)
 
 L'RPM viene generato dalla build Linux del workflow. In `tauri.conf.json` ora sono
 dichiarate le dipendenze runtime come soname (`libwebkit2gtk-4.1.so.0`,
 `libgtk-3.so.0`), come richiesto dalle linee guida di packaging: così `dnf` installa da
-solo WebKitGTK se manca. Installazione su Fedora:
+solo WebKitGTK se manca. A queste, la CLI di Tauri aggiunge **automaticamente**
+`libayatana-appindicator3.so.1()(64bit)` perché la feature `tray-icon` è attiva: è la
+libreria che disegna l'icona nella tray su Linux, non si può togliere.
+
+**Importante: non installare con `rpm -ivh`** — `rpm` non risolve le dipendenze dai
+repository e fallisce con `Dipendenze fallite: libayatana-appindicator3.so.1()(64bit)
+necessario`. Va usato il gestore pacchetti della distro, che scarica da solo la
+libreria mancante:
 
 ```sh
-sudo dnf install ./MoonyTask-X.Y.Z-1.x86_64.rpm
+# Fedora / RHEL (la dipendenza è nel pacchetto libayatana-appindicator-gtk3)
+sudo dnf install ./MoonyTask-Linux-x64.rpm
+
+# openSUSE (pacchetto libayatana-appindicator3-1)
+sudo zypper install ./MoonyTask-Linux-x64.rpm
 ```
+
+In alternativa si può installare prima la libreria a mano
+(`sudo dnf install libayatana-appindicator-gtk3`) e poi usare `rpm -ivh`.
 
 Se un utente non riesce a installare, fatti mandare l'output esatto di quel comando:
 il workflow ora stampa anche metadati e dipendenze dell'RPM (`rpm -qip` / `rpm -qRp`)
