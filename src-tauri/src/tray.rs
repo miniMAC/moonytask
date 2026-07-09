@@ -3,11 +3,28 @@ use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{
-    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Size, WebviewWindow,
+    AppHandle, Emitter, Manager, Monitor, PhysicalPosition, PhysicalSize, Position, Rect, Size,
+    WebviewWindow,
 };
-use tauri_plugin_positioner::{Position as TrayPosition, WindowExt};
 
 const TRAY_ID: &str = "main-tray";
+
+#[derive(Clone, Copy)]
+struct PopoverAnchor {
+    click_position: PhysicalPosition<f64>,
+    tray_position: PhysicalPosition<f64>,
+    tray_size: PhysicalSize<f64>,
+}
+
+impl PopoverAnchor {
+    fn from_tray_event(position: PhysicalPosition<f64>, rect: Rect) -> Self {
+        Self {
+            click_position: position,
+            tray_position: rect.position.to_physical(1.0),
+            tray_size: rect.size.to_physical(1.0),
+        }
+    }
+}
 
 /// Nome progetto mostrato nella menu bar: al massimo 15 caratteri.
 fn tray_project_name(name: &str) -> String {
@@ -82,7 +99,10 @@ fn timer_badge(status: TimerStatus, time: &str) -> Option<Image<'static>> {
     let sym_w = 11usize;
     let gap = 8usize;
 
-    let text_w: f32 = time.chars().map(|c| font.metrics(c, px).advance_width).sum();
+    let text_w: f32 = time
+        .chars()
+        .map(|c| font.metrics(c, px).advance_width)
+        .sum();
     let w = pad + sym_w + gap + text_w.ceil() as usize + pad;
 
     let mut buf = vec![0u8; w * h * 4];
@@ -199,14 +219,18 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|tray, event| {
-            tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
+                position,
+                rect,
                 ..
             } = event
             {
-                toggle_popover(tray.app_handle());
+                toggle_popover(
+                    tray.app_handle(),
+                    Some(PopoverAnchor::from_tray_event(position, rect)),
+                );
             }
         })
         .on_menu_event(|app, event| {
@@ -300,20 +324,14 @@ fn fit_main_window_to_monitor(win: &WebviewWindow) {
 }
 
 /// Mostra/nasconde il popover ancorato all'icona nella menu bar.
-pub fn toggle_popover(app: &AppHandle) {
+fn toggle_popover(app: &AppHandle, anchor: Option<PopoverAnchor>) {
     let Some(win) = app.get_webview_window("popover") else {
         return;
     };
     if win.is_visible().unwrap_or(false) {
         let _ = win.hide();
     } else {
-        fit_popover_to_monitor(&win);
-        let _ = win
-            .as_ref()
-            .window()
-            .move_window(TrayPosition::TrayBottomCenter);
-        let _ = win.show();
-        let _ = win.set_focus();
+        show_popover_window(app, &win, anchor);
     }
 }
 
@@ -321,24 +339,56 @@ pub fn show_popover(app: &AppHandle) {
     let Some(win) = app.get_webview_window("popover") else {
         return;
     };
-    fit_popover_to_monitor(&win);
-    let _ = win
-        .as_ref()
-        .window()
-        .move_window(TrayPosition::TrayBottomCenter);
+    show_popover_window(app, &win, None);
+}
+
+fn show_popover_window(app: &AppHandle, win: &WebviewWindow, anchor: Option<PopoverAnchor>) {
+    let Some(monitor) = popover_monitor(app, win, anchor.as_ref()) else {
+        return;
+    };
+    let size = fit_popover_to_monitor(win, &monitor);
+    position_popover(win, &monitor, size, anchor.as_ref());
     let _ = win.show();
     let _ = win.set_focus();
 }
 
-fn fit_popover_to_monitor(win: &WebviewWindow) {
-    let monitor = win
-        .current_monitor()
+fn popover_monitor(
+    app: &AppHandle,
+    win: &WebviewWindow,
+    anchor: Option<&PopoverAnchor>,
+) -> Option<Monitor> {
+    if let Some(anchor) = anchor {
+        if let Some(monitor) = app
+            .monitor_from_point(anchor.click_position.x, anchor.click_position.y)
+            .ok()
+            .flatten()
+        {
+            return Some(monitor);
+        }
+
+        let center_x = anchor.tray_position.x + anchor.tray_size.width / 2.0;
+        let center_y = anchor.tray_position.y + anchor.tray_size.height / 2.0;
+        if let Some(monitor) = app.monitor_from_point(center_x, center_y).ok().flatten() {
+            return Some(monitor);
+        }
+    }
+
+    if let Some(monitor) = app
+        .cursor_position()
+        .ok()
+        .and_then(|pos| app.monitor_from_point(pos.x, pos.y).ok().flatten())
+    {
+        return Some(monitor);
+    }
+
+    win.current_monitor()
         .ok()
         .flatten()
-        .or_else(|| win.primary_monitor().ok().flatten());
-    let Some(monitor) = monitor else { return };
+        .or_else(|| win.primary_monitor().ok().flatten())
+}
 
-    let size = monitor.size();
+fn fit_popover_to_monitor(win: &WebviewWindow, monitor: &Monitor) -> PhysicalSize<u32> {
+    let size = &monitor.work_area().size;
     let max_width = size.width.saturating_sub(40).max(560);
     let max_height = size.height.saturating_sub(60).max(500);
     let width = 700.min(max_width);
@@ -346,7 +396,68 @@ fn fit_popover_to_monitor(win: &WebviewWindow) {
         .max(620)
         .min(max_height);
 
-    let _ = win.set_size(Size::Physical(PhysicalSize { width, height }));
+    let size = PhysicalSize { width, height };
+    let _ = win.set_size(Size::Physical(size));
+    size
+}
+
+fn position_popover(
+    win: &WebviewWindow,
+    monitor: &Monitor,
+    window_size: PhysicalSize<u32>,
+    anchor: Option<&PopoverAnchor>,
+) {
+    let work_area = monitor.work_area();
+    let bounds_pos = work_area.position;
+    let bounds_size = work_area.size;
+    let width = window_size.width as i32;
+    let height = window_size.height as i32;
+    let min_x = bounds_pos.x;
+    let min_y = bounds_pos.y;
+    let max_x = bounds_pos.x + bounds_size.width as i32 - width;
+    let max_y = bounds_pos.y + bounds_size.height as i32 - height;
+
+    let (x, y) = if let Some(anchor) = anchor {
+        let tray_x = anchor.tray_position.x.round() as i32;
+        let tray_y = anchor.tray_position.y.round() as i32;
+        let tray_width = anchor.tray_size.width.round().max(0.0) as i32;
+        let tray_height = anchor.tray_size.height.round().max(0.0) as i32;
+        let center_x = if tray_width > 0 {
+            tray_x + tray_width / 2
+        } else {
+            anchor.click_position.x.round() as i32
+        };
+        let center_y = if tray_height > 0 {
+            tray_y + tray_height / 2
+        } else {
+            anchor.click_position.y.round() as i32
+        };
+        let middle_y = bounds_pos.y + bounds_size.height as i32 / 2;
+        let y = if center_y <= middle_y {
+            tray_y + tray_height
+        } else {
+            tray_y - height
+        };
+        (center_x - width / 2, y)
+    } else {
+        (
+            bounds_pos.x + (bounds_size.width as i32 - width) / 2,
+            bounds_pos.y + 8,
+        )
+    };
+
+    let _ = win.set_position(Position::Physical(PhysicalPosition {
+        x: clamp_axis(x, min_x, max_x),
+        y: clamp_axis(y, min_y, max_y),
+    }));
+}
+
+fn clamp_axis(value: i32, min: i32, max: i32) -> i32 {
+    if max < min {
+        min
+    } else {
+        value.clamp(min, max)
+    }
 }
 
 #[tauri::command]
@@ -428,5 +539,3 @@ pub fn refresh(app: &AppHandle, snap: &TimerSnapshot) {
         }
     }
 }
-
-

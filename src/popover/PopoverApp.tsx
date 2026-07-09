@@ -392,7 +392,7 @@ export default function PopoverApp() {
         setFolderMenu(null);
         setCreateMenuOpen(false);
       }}
-      className="h-screen p-2.5"
+      className="h-screen overflow-hidden p-2.5"
     >
       <div className="flex h-full flex-col overflow-hidden rounded-[14px] bg-neutral-50 text-neutral-950 shadow-[0_1px_5px_rgba(0,0,0,0.18)] ring-1 ring-black/10 dark:bg-neutral-950 dark:text-white dark:ring-white/10 pro:bg-[#282a36]">
       {/* header */}
@@ -509,7 +509,7 @@ export default function PopoverApp() {
         />
 
         {createKind && (
-          <div className="rounded-lg bg-white p-2 shadow-sm dark:bg-neutral-900 pro:bg-[#21222c]">
+          <div className="overflow-hidden rounded-lg bg-white p-2 shadow-sm dark:bg-neutral-900 pro:bg-[#21222c]">
             <p className="mb-2 text-[12px] font-semibold uppercase text-neutral-400 pro:text-[#bd93f9]">
               {t("popover.quickCreate")}
             </p>
@@ -527,11 +527,11 @@ export default function PopoverApp() {
                 className="w-full rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-[15px] outline-none focus:border-blue-500 dark:border-white/10 dark:bg-neutral-950 pro:border-[#44475a] pro:bg-[#282a36] pro:text-[#f8f8f2] pro:placeholder:text-[#b9b9c8] pro:focus:border-[#bd93f9]"
               />
               {createKind === "project" && (
-                <div className="grid grid-cols-[1fr_62px] gap-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_62px] gap-2">
                   <select
                     value={newFolderId}
                     onChange={(e) => setNewFolderId(e.target.value)}
-                    className="mt-select min-w-0 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-[13px] outline-none focus:border-blue-500 dark:border-white/10 dark:bg-neutral-950 dark:text-white pro:border-[#44475a] pro:bg-[#282a36] pro:text-[#f8f8f2] pro:focus:border-[#bd93f9]"
+                    className="mt-select h-9 w-full min-w-0 truncate rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-[13px] font-medium text-neutral-800 shadow-inner outline-none transition focus:border-blue-500 dark:border-white/10 dark:bg-neutral-950 dark:text-white pro:border-[#44475a] pro:bg-[#282a36] pro:text-[#f8f8f2] pro:focus:border-[#bd93f9]"
                   >
                     {folders.map((folder) => (
                       <option key={folder.id} value={folder.id}>
@@ -544,14 +544,11 @@ export default function PopoverApp() {
                     value={newRate}
                     onChange={(e) => setNewRate(e.target.value)}
                     placeholder={t("popover.rate")}
-                    className="rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-[13px] outline-none dark:border-white/10 dark:bg-neutral-950 pro:border-[#44475a] pro:bg-[#282a36] pro:text-[#f8f8f2]"
+                    className="h-9 rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-[13px] outline-none dark:border-white/10 dark:bg-neutral-950 pro:border-[#44475a] pro:bg-[#282a36] pro:text-[#f8f8f2]"
                   />
                 </div>
               )}
-              {/* flex-wrap: se colori e bottoni non entrano su una riga, i
-                  bottoni scendono sotto invece di uscire dal popover */}
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex gap-1">
+              <div className="flex flex-wrap items-center gap-1.5">
                   {PROJECT_COLORS.map((color) => (
                     <button
                       key={color}
@@ -564,11 +561,11 @@ export default function PopoverApp() {
                       style={{ backgroundColor: color }}
                     />
                   ))}
-                </div>
-                <div className="ml-auto flex shrink-0 gap-1">
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-1">
                   <button
                     onClick={resetQuickCreate}
-                    className="rounded-md px-2 py-1 text-[13px] font-medium text-neutral-500 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 pro:text-[#b9b9c8] pro:hover:bg-[#343746]"
+                    className="h-8 rounded-lg px-2 text-[13px] font-medium text-neutral-500 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 pro:text-[#b9b9c8] pro:hover:bg-[#343746]"
                   >
                     {t("common.cancel")}
                   </button>
@@ -579,11 +576,10 @@ export default function PopoverApp() {
                       saving ||
                       (createKind === "project" && !newFolderId)
                     }
-                    className="rounded-md bg-neutral-950 px-2.5 py-1 text-[13px] font-semibold text-white disabled:opacity-45 dark:bg-white dark:text-neutral-950 pro:bg-[#bd93f9] pro:text-[#282a36]"
+                    className="h-8 rounded-lg bg-neutral-950 px-2.5 text-[13px] font-semibold text-white disabled:opacity-45 dark:bg-white dark:text-neutral-950 pro:bg-[#bd93f9] pro:text-[#282a36]"
                   >
                     {t("common.save")}
                   </button>
-                </div>
               </div>
             </div>
           </div>
@@ -612,7 +608,7 @@ export default function PopoverApp() {
       )}
 
       {/* list */}
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 pb-2">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-clip px-3 pb-2">
         {queryNorm ? (
           searchResults.length === 0 ? (
             <p className="px-3 py-4 text-center text-xs text-neutral-400 pro:text-[#b9b9c8]">

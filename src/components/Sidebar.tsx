@@ -187,7 +187,7 @@ export default function Sidebar(p: Props) {
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
+      <div className="flex-1 overflow-y-auto overflow-x-clip px-2 pb-2">
         <div className="mb-1 flex items-center justify-between px-2 pt-2">
           <span className="text-sm font-semibold uppercase tracking-wider text-neutral-500 pro:text-[#bd93f9]">
             {t("folders.title")}
@@ -225,15 +225,15 @@ export default function Sidebar(p: Props) {
                   e.dataTransfer.setData(FOLDER_MIME, folder.id);
                   e.dataTransfer.effectAllowed = "move";
                 }}
-                className="group flex items-center gap-1.5 rounded px-2 py-1 text-neutral-900 dark:text-neutral-100 pro:text-[#f8f8f2]"
+                className="group relative flex min-w-0 items-center gap-1.5 rounded px-2 py-1 pr-20 text-neutral-900 dark:text-neutral-100 pro:text-[#f8f8f2]"
               >
                 <span style={{ color: folder.color ?? undefined }}>
                   <FolderIcon size={13} />
                 </span>
-                <span className="flex-1 truncate text-base font-medium">
+                <span className="min-w-0 flex-1 truncate text-base font-medium">
                   {folder.name}
                 </span>
-                <span className="hidden items-center gap-1.5 group-hover:flex">
+                <span className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                   <HoverIconButton
                     label={t("projects.new")}
                     onClick={() => p.onNewProject(folder.id)}
