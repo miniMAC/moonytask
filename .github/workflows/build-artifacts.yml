@@ -8,9 +8,9 @@ jobs:
     name: macOS universal DMG
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -64,7 +64,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri -- build --target universal-apple-darwin --bundles dmg,app
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: moonytask-macos-universal-dmg
           path: |
@@ -85,9 +85,9 @@ jobs:
           - arch: arm64
             target: aarch64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -110,7 +110,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri -- build --target ${{ matrix.target }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: moonytask-windows-${{ matrix.arch }}
           path: |
@@ -124,9 +124,9 @@ jobs:
     name: Linux x64 AppImage, DEB, RPM
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -163,7 +163,7 @@ jobs:
           rpm -qip src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
           rpm -qRp src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: moonytask-linux-x64
           path: |
