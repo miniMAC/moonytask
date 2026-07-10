@@ -10,6 +10,12 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 pub struct Db(pub Mutex<Connection>);
 
+pub fn setting_value(app: &AppHandle, key: &str) -> Option<String> {
+    let db = app.state::<Db>();
+    let conn = db.0.lock().ok()?;
+    get_setting(&conn, key)
+}
+
 pub fn now_secs() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

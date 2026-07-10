@@ -806,7 +806,7 @@ export default function PopoverApp() {
         </div>
         <button
           onClick={() => api.openMain()}
-          className="min-w-0 flex-1 rounded-lg py-2 text-[13px] font-semibold text-neutral-600 transition hover:bg-black/[0.045] hover:text-neutral-950 dark:text-neutral-300 dark:hover:bg-white/[0.08] dark:hover:text-white pro:text-[#f8f8f2] pro:hover:bg-[#343746]"
+          className="min-w-0 flex-1 rounded-lg border border-black/10 bg-black/[0.065] px-4 py-2 text-[13px] font-semibold text-neutral-800 shadow-sm transition hover:bg-black/[0.11] hover:text-neutral-950 active:scale-[0.99] dark:border-white/10 dark:bg-white/[0.1] dark:text-white dark:hover:bg-white/[0.16] pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2] pro:hover:bg-[#44475a]"
         >
           {t("popover.open")}
         </button>

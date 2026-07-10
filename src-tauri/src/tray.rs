@@ -346,7 +346,7 @@ fn show_popover_window(app: &AppHandle, win: &WebviewWindow, anchor: Option<Popo
     let Some(monitor) = popover_monitor(app, win, anchor.as_ref()) else {
         return;
     };
-    let size = fit_popover_to_monitor(win, &monitor);
+    let size = fit_popover_to_monitor(app, win, &monitor);
     position_popover(win, &monitor, size, anchor.as_ref());
     let _ = win.show();
     let _ = win.set_focus();
@@ -387,13 +387,26 @@ fn popover_monitor(
         .or_else(|| win.primary_monitor().ok().flatten())
 }
 
-fn fit_popover_to_monitor(win: &WebviewWindow, monitor: &Monitor) -> PhysicalSize<u32> {
+fn fit_popover_to_monitor(
+    app: &AppHandle,
+    win: &WebviewWindow,
+    monitor: &Monitor,
+) -> PhysicalSize<u32> {
     let size = &monitor.work_area().size;
     let max_width = size.width.saturating_sub(40).max(560);
     let max_height = size.height.saturating_sub(60).max(500);
-    let width = 700.min(max_width);
-    let height = (((size.height as f64) * 0.5).round() as u32)
-        .max(620)
+    let preferred_width = match crate::db::setting_value(app, "menubar_window_width").as_deref() {
+        Some("small") => 700,
+        Some("large") => 900,
+        _ => 780,
+    };
+    let width = preferred_width.min(max_width);
+    // Una lista di cartelle deve restare davvero utilizzabile anche su display bassi:
+    // 58% dell'area desktop, e comunque mai meno del 40% richiesto.
+    let minimum_height = (((size.height as f64) * 0.4).ceil() as u32).min(max_height);
+    let height = (((size.height as f64) * 0.58).round() as u32)
+        .max(minimum_height)
+        .max(680)
         .min(max_height);
 
     let size = PhysicalSize { width, height };

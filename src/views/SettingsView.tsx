@@ -99,6 +99,7 @@ function GeneralSection({
   const [pdfSelecting, setPdfSelecting] = useState(false);
   const [pdfTotalsOnly, setPdfTotalsOnly] = useState(false);
   const [autoMergeDaily, setAutoMergeDaily] = useState(false);
+  const [menubarWindowWidth, setMenubarWindowWidth] = useState("medium");
 
   useEffect(() => {
     api.settingsGet("pdf_export_dir").then((value) => setPdfDir(value ?? ""));
@@ -108,6 +109,9 @@ function GeneralSection({
     api
       .settingsGet("auto_merge_daily")
       .then((value) => setAutoMergeDaily(value === "1"));
+    api
+      .settingsGet("menubar_window_width")
+      .then((value) => setMenubarWindowWidth(value || "medium"));
   }, []);
 
   const savePdfDir = async () => {
@@ -187,6 +191,25 @@ function GeneralSection({
             ))}
           </select>
         </label>
+        {!isMobilePlatform && (
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
+              {t("settings.menubarWindowWidth")}
+            </span>
+            <select
+              value={menubarWindowWidth}
+              onChange={(e) => {
+                setMenubarWindowWidth(e.target.value);
+                api.settingsSet("menubar_window_width", e.target.value);
+              }}
+              className={inputCls}
+            >
+              <option value="small">{t("settings.windowWidthSmall")}</option>
+              <option value="medium">{t("settings.windowWidthMedium")}</option>
+              <option value="large">{t("settings.windowWidthLarge")}</option>
+            </select>
+          </label>
+        )}
       </div>
       <div className="mt-6 max-w-2xl">
         <label className="flex items-center gap-2 text-base">
