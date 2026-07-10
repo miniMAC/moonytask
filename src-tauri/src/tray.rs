@@ -358,17 +358,15 @@ fn popover_monitor(
     anchor: Option<&PopoverAnchor>,
 ) -> Option<Monitor> {
     if let Some(anchor) = anchor {
-        if let Some(monitor) = app
-            .monitor_from_point(anchor.click_position.x, anchor.click_position.y)
-            .ok()
-            .flatten()
-        {
-            return Some(monitor);
-        }
-
-        let center_x = anchor.tray_position.x + anchor.tray_size.width / 2.0;
-        let center_y = anchor.tray_position.y + anchor.tray_size.height / 2.0;
-        if let Some(monitor) = app.monitor_from_point(center_x, center_y).ok().flatten() {
+        let (center_x, center_y) = if anchor.tray_size.width > 0.0 {
+            (
+                anchor.tray_position.x + anchor.tray_size.width / 2.0,
+                anchor.tray_position.y + anchor.tray_size.height / 2.0,
+            )
+        } else {
+            (anchor.click_position.x, anchor.click_position.y)
+        };
+        if let Some(monitor) = monitor_containing_point(app, center_x, center_y) {
             return Some(monitor);
         }
     }
@@ -376,7 +374,7 @@ fn popover_monitor(
     if let Some(monitor) = app
         .cursor_position()
         .ok()
-        .and_then(|pos| app.monitor_from_point(pos.x, pos.y).ok().flatten())
+        .and_then(|pos| monitor_containing_point(app, pos.x, pos.y))
     {
         return Some(monitor);
     }
@@ -385,6 +383,32 @@ fn popover_monitor(
         .ok()
         .flatten()
         .or_else(|| win.primary_monitor().ok().flatten())
+}
+
+/// Trova il monitor che contiene il punto, confrontando nello spazio fisico dei
+/// monitor. Non si può usare `monitor_from_point`: su macOS si aspetta coordinate
+/// logiche, mentre l'evento del tray le fornisce fisiche (già moltiplicate per lo
+/// scale factor dello schermo della menubar). Con scale diversi gli spazi fisici
+/// dei monitor possono sovrapporsi: il punto del tray sta nella menubar, quindi a
+/// parità di contenimento vince il monitor col bordo superiore più vicino.
+fn monitor_containing_point(app: &AppHandle, x: f64, y: f64) -> Option<Monitor> {
+    let mut best: Option<(Monitor, f64)> = None;
+    for monitor in app.available_monitors().ok()? {
+        let pos = monitor.position();
+        let size = monitor.size();
+        let inside = x >= pos.x as f64
+            && x < pos.x as f64 + size.width as f64
+            && y >= pos.y as f64
+            && y < pos.y as f64 + size.height as f64;
+        if !inside {
+            continue;
+        }
+        let from_top = y - pos.y as f64;
+        if best.as_ref().map_or(true, |(_, d)| from_top < *d) {
+            best = Some((monitor, from_top));
+        }
+    }
+    best.map(|(monitor, _)| monitor)
 }
 
 fn fit_popover_to_monitor(
@@ -410,6 +434,15 @@ fn fit_popover_to_monitor(
         .min(max_height);
 
     let size = PhysicalSize { width, height };
+    // Su macOS `set_size(Physical)` converte con lo scale factor corrente della
+    // *finestra*, che da nascosta può essere quello di un altro schermo: passiamo
+    // noi la misura logica calcolata con lo scale del monitor di destinazione.
+    #[cfg(target_os = "macos")]
+    let _ = win.set_size(Size::Logical(tauri::LogicalSize {
+        width: width as f64 / monitor.scale_factor(),
+        height: height as f64 / monitor.scale_factor(),
+    }));
+    #[cfg(not(target_os = "macos"))]
     let _ = win.set_size(Size::Physical(size));
     size
 }
@@ -459,10 +492,21 @@ fn position_popover(
         )
     };
 
-    let _ = win.set_position(Position::Physical(PhysicalPosition {
-        x: clamp_axis(x, min_x, max_x),
-        y: clamp_axis(y, min_y, max_y),
+    let x = clamp_axis(x, min_x, max_x);
+    let y = clamp_axis(y, min_y, max_y);
+
+    // Su macOS `set_position(Physical)` divide per lo scale factor corrente della
+    // *finestra*, che da nascosta può essere quello di un altro schermo. Convertiamo
+    // noi con lo scale del monitor della menubar (lo stesso con cui l'evento del
+    // tray ha prodotto le coordinate fisiche) e passiamo coordinate logiche, che su
+    // macOS sono l'unico spazio globale coerente.
+    #[cfg(target_os = "macos")]
+    let _ = win.set_position(Position::Logical(tauri::LogicalPosition {
+        x: x as f64 / monitor.scale_factor(),
+        y: y as f64 / monitor.scale_factor(),
     }));
+    #[cfg(not(target_os = "macos"))]
+    let _ = win.set_position(Position::Physical(PhysicalPosition { x, y }));
 }
 
 fn clamp_axis(value: i32, min: i32, max: i32) -> i32 {
