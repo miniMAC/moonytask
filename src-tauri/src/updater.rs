@@ -48,8 +48,17 @@ fn texts(app: &AppHandle) -> Texts {
 }
 
 fn error_dialog(app: &AppHandle, t: &Texts, detail: &str) {
+    let message = if detail.contains("404") {
+        format!(
+            "{}\n\nAggiornamento non riuscito: il pacchetto non è stato trovato sul server (404). Controlla che il file `latest.json` punti all'URL corretto e che l'artifact sia caricato in /downloads/.",
+            detail
+        )
+    } else {
+        detail.to_string()
+    };
+
     app.dialog()
-        .message(detail)
+        .message(&message)
         .title(&t.error_title)
         .kind(MessageDialogKind::Error)
         .blocking_show();

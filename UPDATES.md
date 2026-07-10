@@ -104,6 +104,8 @@ Note:
 4. Aggiorna `latest.json` con nuova `version`, URL e firme, e caricalo per **ultimo**.
 5. Verifica: apri l'app vecchia → menu → Controlla aggiornamenti…
 
+> Se l'aggiornamento fallisce con `404 Not Found`, significa che il pacchetto indicato in `latest.json` non esiste sul server. Verifica che l'URL punti al file corretto in `/downloads/` e che il nome dell'artifact corrisponda esattamente.
+
 ## 5. Pacchetto RPM (Fedora / openSUSE)
 
 L'RPM viene generato dalla build Linux del workflow. In `tauri.conf.json` ora sono
