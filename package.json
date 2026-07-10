@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "build:mac": "TAURI_SIGNING_PRIVATE_KEY_PATH=$HOME/.tauri/moonytask.key tauri build",
-    "android:apk": "JAVA_HOME=/opt/homebrew/opt/openjdk@17 ANDROID_HOME=/opt/homebrew/share/android-commandlinetools NDK_HOME=/opt/homebrew/share/android-commandlinetools/ndk/27.2.12479018 tauri android build --apk --target aarch64 && cp src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk ~/Desktop/MoonyTask-android.apk"
+    "android:apk": "JAVA_HOME=/opt/homebrew/opt/openjdk@17 ANDROID_HOME=$HOME/Library/Android/sdk NDK_HOME=$HOME/Library/Android/sdk/ndk/$(ls -1 $HOME/Library/Android/sdk/ndk | tail -1) tauri android build --apk --target aarch64 && mkdir -p $HOME/Desktop/MoonyTask && cp src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk $HOME/Desktop/MoonyTask/MoonyTask-android.apk"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.2",
@@ -23,7 +23,7 @@
     "tailwindcss": "^4.3.2"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2",
+    "@tauri-apps/cli": "^2.11.4",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
