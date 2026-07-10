@@ -15,6 +15,8 @@ Time tracker per progetti, nativo per macOS (Tauri 2), pronto per essere portato
 
 Prerequisiti: Rust (`rustup`), Node.js, Xcode Command Line Tools.
 
+Per il build Android, `rustup` deve essere installato e disponibile in PATH perché `tauri android` aggiunge i target necessari.
+
 ```bash
 npm install
 npm run tauri dev     # avvio in sviluppo
