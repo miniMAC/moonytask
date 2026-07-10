@@ -10,7 +10,7 @@
     "tauri": "tauri",
     "build:mac": "TAURI_SIGNING_PRIVATE_KEY_PATH=$HOME/.tauri/moonytask.key tauri build",
     "preandroid:apk": "command -v rustup >/dev/null 2>&1 || { echo 'rustup not found. Install rustup and ensure it is on PATH.'; exit 1; }",
-    "android:apk": "JAVA_HOME=/opt/homebrew/opt/openjdk@17 ANDROID_HOME=$HOME/Library/Android/sdk NDK_HOME=$HOME/Library/Android/sdk/ndk/$(ls -1 $HOME/Library/Android/sdk/ndk | tail -1) tauri android build --apk --target aarch64 && mkdir -p $HOME/Desktop/MoonyTask && cp src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk $HOME/Desktop/MoonyTask/MoonyTask-android.apk"
+    "android:apk": "node scripts/build-android-apk.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.2",

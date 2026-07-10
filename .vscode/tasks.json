@@ -78,7 +78,7 @@
     {
       "label": "Build: Android APK (release)",
       "type": "shell",
-      "command": "npm run android:apk && mkdir -p ~/Desktop/MoonyTask && cp src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk ~/Desktop/MoonyTask/MoonyTask-android.apk && echo 'APK copiato in ~/Desktop/MoonyTask/MoonyTask-android.apk'",
+      "command": "npm run android:apk",
       "options": {
         "cwd": "${workspaceFolder}"
       },

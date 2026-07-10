@@ -30,8 +30,10 @@ pub struct SyncStatus {
     pub in_progress: bool,
 }
 
-/// Credenziali OAuth incorporate in fase di build (src-tauri/google_credentials.json).
-const EMBEDDED_CREDENTIALS: &str = include_str!("../../google_credentials.json");
+/// Credenziali OAuth incorporate in fase di build. Il file reale è locale/secret;
+/// build.rs usa il template vuoto nelle build che non configurano Google Drive.
+const EMBEDDED_CREDENTIALS: &str =
+    include_str!(concat!(env!("OUT_DIR"), "/google_credentials.json"));
 
 #[derive(serde::Deserialize)]
 struct EmbeddedCreds {

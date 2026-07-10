@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Credenziali OAuth locali: in CI arrivano dai GitHub Secrets.
+src-tauri/google_credentials.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

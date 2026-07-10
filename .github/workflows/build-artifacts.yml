@@ -21,6 +21,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Configure Google OAuth
+        if: ${{ secrets.GOOGLE_CREDENTIALS_JSON != '' }}
+        env:
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+        run: printf '%s' "$GOOGLE_CREDENTIALS_JSON" > src-tauri/google_credentials.json
+
       - name: Import Apple Developer Certificate
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -93,6 +99,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Configure Google OAuth
+        if: ${{ secrets.GOOGLE_CREDENTIALS_JSON != '' }}
+        shell: bash
+        env:
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+        run: printf '%s' "$GOOGLE_CREDENTIALS_JSON" > src-tauri/google_credentials.json
+
       - name: Build Windows installer
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -135,6 +148,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Configure Google OAuth
+        if: ${{ secrets.GOOGLE_CREDENTIALS_JSON != '' }}
+        env:
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+        run: printf '%s' "$GOOGLE_CREDENTIALS_JSON" > src-tauri/google_credentials.json
 
       - name: Build Linux packages
         env:
