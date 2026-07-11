@@ -22,11 +22,13 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 uuid = { version = "1", features = ["v4"] }
 reqwest = { version = "0.12", features = ["blocking", "json", "rustls-tls"], default-features = false }
+semver = { version = "1", features = ["serde"] }
 sha2 = "0.10"
 base64 = "0.22"
 rand = "0.8"
 tiny_http = "0.12"
 urlencoding = "2"
+tauri-plugin-dialog = "2"
 
 # solo desktop: menu bar (tray + rendering timer), posizionamento del popover,
 # keychain per i token OAuth (su mobile i token stanno nel db in sandbox)
@@ -34,7 +36,6 @@ urlencoding = "2"
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
 tauri-plugin-updater = "2"
-tauri-plugin-dialog = "2"
 fontdue = "0.9"
 keyring = { version = "3", features = ["apple-native"] }
 

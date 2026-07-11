@@ -2,6 +2,8 @@ mod apps;
 mod db;
 #[cfg(desktop)]
 mod idle;
+#[cfg(mobile)]
+mod mobile_updater;
 mod sync;
 mod timer;
 #[cfg(desktop)]
@@ -39,13 +41,13 @@ use tauri::Manager;
 pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_notification::init());
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init());
 
     #[cfg(desktop)]
     let builder = builder
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_dialog::init())
         .on_menu_event(|app, event| {
             if event.id().as_ref() == "check_updates" {
                 updater::check_interactive(app);
@@ -82,6 +84,9 @@ pub fn run() {
                 idle::spawn(handle.clone());
                 updater::spawn_startup_check(&handle);
             }
+
+            #[cfg(mobile)]
+            mobile_updater::spawn_startup_check(&handle);
 
             // menu applicazione macOS con "Controlla aggiornamenti…"
             #[cfg(target_os = "macos")]

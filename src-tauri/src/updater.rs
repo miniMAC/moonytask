@@ -74,7 +74,6 @@ pub fn check_interactive(app: &AppHandle) {
 pub fn spawn_startup_check(app: &AppHandle) {
     let app = app.clone();
     std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_secs(15));
         tauri::async_runtime::block_on(check(app, false));
     });
 }
