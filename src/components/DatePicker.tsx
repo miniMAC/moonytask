@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 interface Props {
@@ -22,12 +23,50 @@ export default function DatePicker({
     () => new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
   );
   const rootRef = useRef<HTMLDivElement>(null);
+  // il popup vive in un portal su document.body, così non viene tagliato
+  // dall'overflow delle modali; la posizione è calcolata dal bottone
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
+
+  useLayoutEffect(() => {
+    if (!open) return;
+
+    const place = () => {
+      const anchor = rootRef.current?.getBoundingClientRect();
+      const popup = popupRef.current;
+      if (!anchor || !popup) return;
+      const margin = 8;
+      let top = anchor.bottom + margin;
+      if (top + popup.offsetHeight > window.innerHeight - margin) {
+        top = Math.max(margin, anchor.top - popup.offsetHeight - margin);
+      }
+      const left = Math.min(
+        anchor.left,
+        Math.max(margin, window.innerWidth - popup.offsetWidth - margin),
+      );
+      setPopupPos({ top, left });
+    };
+
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
 
     const closeOnOutsideClick = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (
+        !rootRef.current?.contains(target) &&
+        !popupRef.current?.contains(target)
+      ) {
+        setOpen(false);
+      }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
@@ -92,11 +131,14 @@ export default function DatePicker({
         <CalendarIcon />
       </button>
 
-      {open && (
+      {open &&
+        createPortal(
         <div
+          ref={popupRef}
           role="dialog"
           aria-label={t("calendar.chooseDate")}
-          className="absolute left-0 top-[calc(100%+0.5rem)] z-[70] w-[min(22rem,calc(100vw-5rem))] rounded-2xl border border-neutral-200 bg-white p-4 text-neutral-900 shadow-2xl dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100 pro:border-[#44475a] pro:bg-[#21222c] pro:text-[#f8f8f2]"
+          style={{ top: popupPos.top, left: popupPos.left }}
+          className="fixed z-[70] w-[min(22rem,calc(100vw-5rem))] rounded-2xl border border-neutral-200 bg-white p-4 text-neutral-900 shadow-2xl dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100 pro:border-[#44475a] pro:bg-[#21222c] pro:text-[#f8f8f2]"
         >
           <div className="mb-4 flex items-center justify-between gap-3">
             <button
@@ -182,7 +224,8 @@ export default function DatePicker({
           >
             {t("calendar.today")}
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

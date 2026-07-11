@@ -56,7 +56,25 @@ function main() {
     fail(`Build completata, ma non ho trovato artifact scaricabili in ${runDir}`);
   }
 
+  // genera latest.json dagli artefatti updater appena scaricati (firme incluse)
+  const generatorArgs = [
+    path.join(__dirname, "generate-latest-json.mjs"),
+    "--dir",
+    runDir,
+  ];
+  const notes = argValue("--notes");
+  if (notes) {
+    generatorArgs.push("--notes", notes);
+  }
+  run(process.execPath, generatorArgs);
+
   console.log(`Done. ${copied} file ready in ${outDir}`);
+}
+
+function argValue(name) {
+  const args = process.argv.slice(2);
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : undefined;
 }
 
 function resolveCommand(command, candidates = []) {

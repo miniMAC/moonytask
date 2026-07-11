@@ -21,13 +21,23 @@ const CURRENCIES = ["EUR", "USD", "GBP", "CHF"];
 const SETTINGS_TABS = ["general", "rates", "apps", "sync", "support"] as const;
 const PAYMENT_TYPES: PaymentType[] = ["hourly", "retainer", "fixed"];
 
-// input neutro usato solo nei modali (fuori dai box colorati)
+// stile neutro condiviso: le Impostazioni usano i colori dell'interfaccia,
+// i box colorati restano solo nelle altre parti dell'app (es. scheda progetto)
 const inputCls =
-  "h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2]";
-// stile condiviso dei box colorati, come Tariffa/Pagamenti nella scheda progetto
-const sectionTitleCls = "text-sm font-bold uppercase tracking-wide text-white";
-const fieldLabelCls = "mb-1 block text-sm font-medium text-white/85";
-const helpTextCls = "text-sm text-white/75";
+  "h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base outline-none transition focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2] pro:focus:border-[#bd93f9]";
+const sectionCls =
+  "rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-700 dark:bg-neutral-800/60 pro:border-[#44475a] pro:bg-[#21222c]";
+const sectionTitleCls =
+  "text-sm font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400 pro:text-[#b9b9c8]";
+const fieldLabelCls =
+  "mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-300 pro:text-[#c9c9d6]";
+const helpTextCls =
+  "text-sm text-neutral-500 dark:text-neutral-400 pro:text-[#b9b9c8]";
+const ghostBtnCls =
+  "h-11 rounded-xl border border-neutral-300 px-5 text-base font-medium text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-700 pro:border-[#44475a] pro:text-[#f8f8f2] pro:hover:bg-[#343746]";
+const primaryBtnCls =
+  "h-11 rounded-xl bg-blue-600 px-6 text-base font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 pro:bg-[#bd93f9] pro:text-[#282a36] pro:hover:bg-[#a77bf3]";
+const checkboxCls = "accent-blue-600 pro:accent-[#bd93f9]";
 
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
@@ -85,12 +95,6 @@ export default function SettingsView(p: Props) {
   );
 }
 
-// box viola: preferenze generali
-const generalInputCls =
-  "h-11 rounded-xl border border-white/45 bg-[#5C4FBF] px-3 text-base text-white outline-none transition placeholder:text-white/50 focus:border-white";
-const generalGhostBtnCls =
-  "h-11 rounded-xl border border-white/60 px-5 text-base font-medium text-white transition hover:bg-white hover:text-[#5C4FBF] disabled:opacity-50";
-
 function GeneralSection({
   currency,
   onCurrencyChange,
@@ -142,7 +146,7 @@ function GeneralSection({
   };
 
   return (
-    <section className="rounded-2xl border border-[#5C4FBF] bg-[#7A6BD9] p-5 text-white shadow-[0_14px_35px_rgba(122,107,217,0.18)]">
+    <section className={sectionCls}>
       <h2 className={sectionTitleCls}>{t("settings.general")}</h2>
       <div className="mt-4 flex flex-wrap gap-6">
         <label className="block">
@@ -153,7 +157,7 @@ function GeneralSection({
               i18n.changeLanguage(e.target.value);
               api.settingsSet("language", e.target.value);
             }}
-            className={generalInputCls}
+            className={inputCls}
           >
             <option value="it">Italiano</option>
             <option value="en">English</option>
@@ -164,7 +168,7 @@ function GeneralSection({
           <select
             value={pref}
             onChange={(e) => setPref(e.target.value as ThemePref)}
-            className={generalInputCls}
+            className={inputCls}
           >
             <option value="auto">{t("settings.themeAuto")}</option>
             <option value="light">{t("settings.themeLight")}</option>
@@ -180,7 +184,7 @@ function GeneralSection({
               onCurrencyChange(e.target.value);
               api.settingsSet("currency", e.target.value);
             }}
-            className={generalInputCls}
+            className={inputCls}
           >
             {CURRENCIES.map((c) => (
               <option key={c} value={c}>
@@ -200,7 +204,7 @@ function GeneralSection({
                 setMenubarWindowWidth(e.target.value);
                 api.settingsSet("menubar_window_width", e.target.value);
               }}
-              className={generalInputCls}
+              className={inputCls}
             >
               <option value="small">{t("settings.windowWidthSmall")}</option>
               <option value="medium">{t("settings.windowWidthMedium")}</option>
@@ -213,7 +217,7 @@ function GeneralSection({
         <label className="flex items-center gap-2 text-base">
           <input
             type="checkbox"
-            className="accent-white"
+            className={checkboxCls}
             checked={autoMergeDaily}
             onChange={(e) => {
               setAutoMergeDaily(e.target.checked);
@@ -239,18 +243,18 @@ function GeneralSection({
               onChange={(e) => setPdfDir(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && savePdfDir()}
               placeholder={t("settings.pdfExportDirPlaceholder")}
-              className={`min-w-0 flex-1 ${generalInputCls}`}
+              className={`min-w-0 flex-1 ${inputCls}`}
             />
             <button
               onClick={choosePdfDir}
               disabled={pdfSelecting}
-              className={generalGhostBtnCls}
+              className={ghostBtnCls}
             >
               {pdfSelecting
                 ? t("common.loading")
                 : t("settings.chooseFolder")}
             </button>
-            <button onClick={savePdfDir} className={generalGhostBtnCls}>
+            <button onClick={savePdfDir} className={ghostBtnCls}>
               {pdfSaved ? t("common.saved") : t("common.save")}
             </button>
           </div>
@@ -261,7 +265,7 @@ function GeneralSection({
         <label className="mt-4 flex items-center gap-2 text-base">
           <input
             type="checkbox"
-            className="accent-white"
+            className={checkboxCls}
             checked={pdfTotalsOnly}
             onChange={(e) => {
               setPdfTotalsOnly(e.target.checked);
@@ -290,17 +294,17 @@ function SupportSection() {
   }, []);
 
   return (
-    <section className="rounded-2xl border border-[#A84369] bg-[#C95D87] p-5 text-white shadow-[0_14px_35px_rgba(201,93,135,0.18)]">
+    <section className={sectionCls}>
       <h2 className={sectionTitleCls}>{t("settings.support.title")}</h2>
       <p className={`mt-2 max-w-2xl ${helpTextCls}`}>
         {t("settings.support.help")}
       </p>
-      <p className="mt-3 text-sm font-medium text-white/85">
+      <p className="mt-3 text-sm font-medium text-neutral-600 dark:text-neutral-300 pro:text-[#c9c9d6]">
         {t("settings.support.version")}: {version ?? "—"}
       </p>
       <button
         onClick={() => openUrl(`mailto:${email}?subject=${subject}`)}
-        className="mt-4 h-11 rounded-xl bg-white px-5 text-base font-semibold text-[#A84369] transition hover:bg-white/90"
+        className={`mt-4 ${primaryBtnCls}`}
       >
         {t("settings.support.email")}
       </button>
@@ -311,8 +315,7 @@ function SupportSection() {
 // ---------- rate profiles ----------
 
 // box blu, in tinta con la card Tariffa della scheda progetto
-const rateFieldCls =
-  "h-11 w-full rounded-md border border-white/45 bg-[#23768D] px-3 text-base text-white outline-none transition placeholder:text-white/50 focus:border-white";
+const rateFieldCls = `w-full ${inputCls}`;
 
 function RateProfilesSection() {
   const { t } = useTranslation();
@@ -370,7 +373,7 @@ function RateProfilesSection() {
   };
 
   return (
-    <section className="rounded-2xl border border-[#2D8FA8] bg-[#45B0CB] p-5 text-white shadow-[0_14px_35px_rgba(69,176,203,0.18)]">
+    <section className={sectionCls}>
       <h2 className={sectionTitleCls}>{t("settings.rates.title")}</h2>
       <p className={`mt-2 max-w-2xl ${helpTextCls}`}>
         {t("settings.rates.help")}
@@ -383,10 +386,10 @@ function RateProfilesSection() {
         {profiles.map((profile) => (
           <div
             key={profile.id}
-            className={`rounded-xl border bg-[#2D8FA8] p-4 transition ${
+            className={`rounded-xl border bg-neutral-50 p-4 transition dark:bg-neutral-800 pro:bg-[#282a36] ${
               defaultId === profile.id
-                ? "border-[#7CF5A4]"
-                : "border-white/35"
+                ? "border-emerald-500"
+                : "border-neutral-200 dark:border-neutral-700 pro:border-[#44475a]"
             }`}
           >
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_170px_140px_auto] xl:items-end">
@@ -443,8 +446,8 @@ function RateProfilesSection() {
                   onClick={() => saveProfiles(profiles, profile.id)}
                   className={`h-11 flex-1 rounded-md border px-4 text-base font-semibold transition xl:flex-none ${
                     defaultId === profile.id
-                      ? "border-[#7CF5A4] bg-[#7CF5A4]/15 text-[#D9FFE6]"
-                      : "border-white/50 text-white hover:bg-white hover:text-[#2D8FA8]"
+                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 pro:text-[#50fa7b]"
+                      : "border-neutral-300 text-neutral-700 hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-700 pro:border-[#44475a] pro:text-[#f8f8f2] pro:hover:bg-[#343746]"
                   }`}
                 >
                   {defaultId === profile.id
@@ -453,7 +456,7 @@ function RateProfilesSection() {
                 </button>
                 <button
                   onClick={() => removeProfile(profile.id)}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/40 text-white/80 transition hover:border-white hover:bg-white hover:text-red-600"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-neutral-300 text-neutral-500 transition hover:border-red-500 hover:text-red-600 dark:border-neutral-600 dark:text-neutral-400 dark:hover:border-red-500 dark:hover:text-red-400 pro:border-[#44475a] pro:text-[#b9b9c8] pro:hover:border-[#ff5555] pro:hover:text-[#ff5555]"
                   title={t("common.delete")}
                 >
                   <TrashIcon size={16} />
@@ -466,7 +469,7 @@ function RateProfilesSection() {
 
       <button
         onClick={addProfile}
-        className="mt-4 flex h-11 items-center gap-1.5 rounded-xl border border-white/60 px-5 text-base font-medium text-white transition hover:bg-white hover:text-[#2D8FA8]"
+        className={`mt-4 flex items-center gap-1.5 ${ghostBtnCls}`}
       >
         <PlusIcon size={14} />
         {t("settings.rates.add")}
@@ -513,8 +516,10 @@ function DangerSection({ projects }: { projects: Project[] }) {
   };
 
   return (
-    <section className="rounded-2xl border border-[#C4373C] bg-[#E5484D] p-5 text-white shadow-[0_14px_35px_rgba(229,72,77,0.18)]">
-      <h2 className={sectionTitleCls}>{t("settings.danger.title")}</h2>
+    <section className={sectionCls}>
+      <h2 className="text-sm font-bold uppercase tracking-wide text-red-600 dark:text-red-400 pro:text-[#ff5555]">
+        {t("settings.danger.title")}
+      </h2>
       <p className={`mt-2 max-w-2xl ${helpTextCls}`}>
         {t("settings.danger.resetHelp")}
       </p>
@@ -523,12 +528,12 @@ function DangerSection({ projects }: { projects: Project[] }) {
           setDone(false);
           setStep(1);
         }}
-        className="mt-3 h-11 rounded-xl border border-white/60 px-5 text-base font-semibold text-white transition hover:bg-white hover:text-[#C4373C]"
+        className="mt-3 h-11 rounded-xl border border-red-300 px-5 text-base font-semibold text-red-600 transition hover:bg-red-600 hover:text-white dark:border-red-500/50 dark:text-red-400 dark:hover:bg-red-600 dark:hover:text-white pro:border-[#ff5555]/50 pro:text-[#ff5555] pro:hover:bg-[#ff5555] pro:hover:text-[#282a36]"
       >
         {t("settings.danger.resetButton")}
       </button>
       {done && (
-        <p className="mt-2 text-sm font-semibold text-white">
+        <p className="mt-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400 pro:text-[#50fa7b]">
           {t("settings.danger.resetDone")}
         </p>
       )}
@@ -600,8 +605,7 @@ function newLocalId() {
 // ---------- watched apps ----------
 
 // box ambra: app monitorate
-const appsInputCls =
-  "h-11 rounded-lg border border-white/45 bg-[#B5661A] px-3 text-base text-white outline-none transition placeholder:text-white/50 focus:border-white";
+const appsInputCls = inputCls;
 
 function WatchedAppsSection({ projects }: { projects: Project[] }) {
   const { t } = useTranslation();
@@ -619,7 +623,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
   }, []);
 
   return (
-    <section className="rounded-2xl border border-[#B5661A] bg-[#D9822B] p-5 text-white shadow-[0_14px_35px_rgba(217,130,43,0.18)]">
+    <section className={sectionCls}>
       <h2 className={sectionTitleCls}>{t("settings.watchedApps")}</h2>
       <p className={`mt-2 ${helpTextCls}`}>
         {t("settings.watchedAppsHelp")}
@@ -628,7 +632,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
       <label className="mt-3 flex items-center gap-2 text-base">
         <input
           type="checkbox"
-          className="accent-white"
+          className={checkboxCls}
           checked={notifOn}
           onChange={(e) => {
             setNotifOn(e.target.checked);
@@ -645,11 +649,11 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
         {watched.map((w) => (
           <div
             key={w.id}
-            className="grid items-center gap-3 rounded-xl border border-white/35 bg-[#B5661A]/40 px-3 py-2 text-base md:grid-cols-[auto_minmax(0,1fr)_minmax(170px,220px)_150px_auto]"
+            className="grid items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-base dark:border-neutral-700 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#282a36] md:grid-cols-[auto_minmax(0,1fr)_minmax(170px,220px)_150px_auto]"
           >
             <input
               type="checkbox"
-              className="accent-white"
+              className={checkboxCls}
               checked={w.enabled === 1}
               onChange={(e) =>
                 api
@@ -664,7 +668,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
             />
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{w.appName}</p>
-              <p className="truncate text-sm text-white/70">{w.bundleId}</p>
+              <p className="truncate text-sm text-neutral-500 dark:text-neutral-400 pro:text-[#b9b9c8]">{w.bundleId}</p>
             </div>
             <select
               value={w.projectId ?? ""}
@@ -690,7 +694,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
                   </option>
                 ))}
             </select>
-            <label className="flex items-center gap-1.5 text-sm text-white/80">
+            <label className="flex items-center gap-1.5 text-sm text-neutral-600 dark:text-neutral-300 pro:text-[#c9c9d6]">
               <span className="whitespace-nowrap">
                 {t("settings.reminderAfter")}
               </span>
@@ -719,7 +723,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
             </label>
             <button
               onClick={() => api.watchedRemove(w.id).then(load)}
-              className="rounded p-1 text-white/70 transition hover:text-white"
+              className="rounded p-1 text-neutral-400 transition hover:text-red-600 dark:hover:text-red-400 pro:text-[#b9b9c8] pro:hover:text-[#ff5555]"
             >
               <TrashIcon size={14} />
             </button>
@@ -729,7 +733,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
 
       <button
         onClick={() => setPickerOpen(true)}
-        className="mt-4 flex h-11 items-center gap-1.5 rounded-xl border border-white/60 px-5 text-base font-medium text-white transition hover:bg-white hover:text-[#B5661A]"
+        className={`mt-4 flex items-center gap-1.5 ${ghostBtnCls}`}
       >
         <PlusIcon size={14} />
         {t("settings.addApp")}
@@ -809,8 +813,7 @@ function AppPickerModal({
 // ---------- sync ----------
 
 // box verde: sync
-const syncInputCls =
-  "h-11 rounded-xl border border-white/45 bg-[#2C8A52] px-3 text-base text-white outline-none transition placeholder:text-white/50 focus:border-white";
+const syncInputCls = inputCls;
 
 function SyncSection() {
   const { t, i18n } = useTranslation();
@@ -846,19 +849,19 @@ function SyncSection() {
   const locale = i18n.language === "it" ? "it-IT" : "en-US";
 
   return (
-    <section className="rounded-2xl border border-[#2C8A52] bg-[#3EA96B] p-5 text-white shadow-[0_14px_35px_rgba(62,169,107,0.18)]">
+    <section className={sectionCls}>
       <h2 className={sectionTitleCls}>{t("settings.sync.title")}</h2>
       <p className={`mt-2 ${helpTextCls}`}>{t("settings.sync.help")}</p>
 
       {!status.configured ? (
-        <p className="mt-3 rounded-lg bg-white/15 px-3 py-2 text-sm text-white">
+        <p className="mt-3 rounded-lg bg-neutral-100 px-3 py-2 text-sm text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 pro:bg-[#343746] pro:text-[#c9c9d6]">
           {t("settings.sync.notConfigured")}
         </p>
       ) : (
         <div className="mt-3 space-y-2">
           {status.connected ? (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-white/20 px-2.5 py-1 text-sm font-medium text-white">
+              <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-300 pro:text-[#50fa7b]">
                 {status.email
                   ? t("settings.sync.connectedAs", { email: status.email })
                   : t("settings.sync.connected")}
@@ -876,7 +879,7 @@ function SyncSection() {
                   }
                 }}
                 disabled={busy || status.inProgress}
-                className="h-11 rounded-xl border border-white/60 px-5 text-base font-medium text-white transition hover:bg-white hover:text-[#2C8A52] disabled:opacity-50"
+                className={ghostBtnCls}
               >
                 {busy || status.inProgress
                   ? t("settings.sync.syncing")
@@ -884,7 +887,7 @@ function SyncSection() {
               </button>
               <button
                 onClick={() => api.syncLogout().then(refresh)}
-                className="h-11 rounded-xl border border-white/60 px-5 text-base font-medium text-white transition hover:bg-white hover:text-red-600"
+                className="h-11 rounded-xl border border-neutral-300 px-5 text-base font-medium text-neutral-700 transition hover:border-red-500 hover:text-red-600 dark:border-neutral-600 dark:text-neutral-200 dark:hover:border-red-500 dark:hover:text-red-400 pro:border-[#44475a] pro:text-[#f8f8f2] pro:hover:border-[#ff5555] pro:hover:text-[#ff5555]"
               >
                 {t("settings.sync.disconnect")}
               </button>
@@ -906,7 +909,7 @@ function SyncSection() {
                 <button
                   onClick={doLogin}
                   disabled={busy || !email.trim()}
-                  className="h-11 rounded-xl bg-white px-6 text-base font-semibold text-[#2C8A52] transition hover:bg-white/90 disabled:opacity-50"
+                  className={primaryBtnCls}
                 >
                   {busy ? t("settings.sync.syncing") : t("settings.sync.connect")}
                 </button>
@@ -925,7 +928,7 @@ function SyncSection() {
             </p>
           )}
           {status.lastError && (
-            <p className="text-sm font-semibold text-[#FFE1E1]">
+            <p className="text-sm font-semibold text-red-600 dark:text-red-400 pro:text-[#ff5555]">
               {t("settings.sync.error", { error: status.lastError })}
             </p>
           )}

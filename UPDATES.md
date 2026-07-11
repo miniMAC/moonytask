@@ -52,9 +52,15 @@ dal sito la prima volta.
 
 ## 3. Il file `latest.json`
 
-Il template pronto da compilare sta nella repo del sito: `miniMAC/moonytaskweb`,
-file `downloads/latest.json`. A ogni release aggiorni versione, URL e firme e lo
-carichi via FTP in `/downloads/` insieme ai pacchetti.
+**Generazione automatica**: `npm run release:latest` (o in automatico alla fine di
+`npm run build:all`) legge versione e firme dagli artefatti di build, copia gli
+artefatti updater con i nomi versionati in `Desktop/MoonyTask` e scrive lì
+`latest.json` pronto da caricare. Aggiorna anche la copia in
+`../moonytaskweb/downloads/latest.json`, così non va più compilata a mano.
+Le note di rilascio si passano con `--notes "testo"`
+(es. `npm run build:all -- --notes "Novità…"`).
+
+Il formato del file, per riferimento:
 
 ```json
 {
@@ -97,12 +103,12 @@ Note:
 
 1. Aggiorna la versione in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` e
    `package.json` (devono coincidere).
-2. Lancia il workflow **Build desktop artifacts** su GitHub (o builda in locale con la
-   variabile `TAURI_SIGNING_PRIVATE_KEY_PATH` impostata).
-3. Scarica gli artefatti e carica su FTP in `/downloads/` gli installer e gli artefatti
-   updater della tabella sopra.
-4. Aggiorna `latest.json` con nuova `version`, URL e firme, e caricalo per **ultimo**.
-5. Verifica: apri l'app vecchia → menu → Controlla aggiornamenti…
+2. Lancia `npm run build:all -- --notes "Novità…"`: fa partire il workflow
+   **Build desktop artifacts**, scarica gli artefatti sul Desktop e genera
+   `latest.json` con firme e URL già compilati.
+3. Carica su FTP in `/downloads/` i file in `Desktop/MoonyTask` (installer e
+   artefatti updater versionati) e per **ultimo** `latest.json`.
+4. Verifica: apri l'app vecchia → menu → Controlla aggiornamenti…
 
 > Se l'aggiornamento fallisce con `404 Not Found`, significa che il pacchetto indicato in `latest.json` non esiste sul server. Verifica che l'URL punti al file corretto in `/downloads/` e che il nome dell'artifact corrisponda esattamente.
 

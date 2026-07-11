@@ -1,7 +1,7 @@
 {
   "name": "moonytask",
   "private": true,
-  "version": "0.1.5",
+  "version": "0.1.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "build:mac": "TAURI_SIGNING_PRIVATE_KEY_PATH=$HOME/.tauri/moonytask.key tauri build",
+    "build:all": "node scripts/ci-build-all.mjs",
+    "release:latest": "node scripts/generate-latest-json.mjs",
     "preandroid:apk": "command -v rustup >/dev/null 2>&1 || { echo 'rustup not found. Install rustup and ensure it is on PATH.'; exit 1; }",
     "android:apk": "node scripts/build-android-apk.mjs"
   },
