@@ -850,6 +850,46 @@ pub fn entry_update_note(db: State<Db>, id: String, note: Option<String>) -> Res
 }
 
 #[tauri::command]
+pub fn entry_update(
+    db: State<Db>,
+    id: String,
+    started_at: i64,
+    note: Option<String>,
+) -> Result<(), String> {
+    let conn = db.0.lock().unwrap();
+    let clean_note = note.and_then(|value| {
+        let trimmed = value.trim().to_string();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
+    });
+    let duration_secs = conn
+        .query_row(
+            "SELECT duration_secs FROM time_entries WHERE id = ?1 AND deleted = 0",
+            [&id],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(|_| "entry_not_found".to_string())?;
+    conn.execute(
+        "UPDATE time_entries
+         SET started_at = ?2, ended_at = ?3, note = ?4, updated_at = ?5
+         WHERE id = ?1 AND deleted = 0",
+        rusqlite::params![
+            id,
+            started_at,
+            started_at.saturating_add(duration_secs),
+            clean_note,
+            now_secs()
+        ],
+    )
+    .map_err(err)?;
+    crate::sync::mark_dirty();
+    Ok(())
+}
+
+#[tauri::command]
 pub fn entries_merge(db: State<Db>, ids: Vec<String>) -> Result<TimeEntry, String> {
     let mut unique_ids = Vec::new();
     let mut seen = HashSet::new();

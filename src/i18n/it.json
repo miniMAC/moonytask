@@ -32,6 +32,7 @@
     "noEntries": "Nessuna registrazione ancora. Avvia il timer!",
     "addManual": "Aggiungi tempo manualmente",
     "date": "Data",
+    "time": "Ora",
     "durationMinutes": "Durata (minuti)",
     "note": "Nota (opzionale)",
     "totalCost": "Costo totale",
@@ -60,6 +61,12 @@
     "rateTitle": "Tariffa",
     "rateHelp": "Scegli un profilo o imposta un costo orario manuale. Report e costi usano questa tariffa.",
     "rateManualHint": "Modificando il costo a mano il progetto passa a tariffa manuale."
+  },
+  "calendar": {
+    "chooseDate": "Scegli una data",
+    "previousMonth": "Mese precedente",
+    "nextMonth": "Mese successivo",
+    "today": "Oggi"
   },
   "timer": {
     "start": "Avvia",

@@ -141,6 +141,7 @@ pub fn run() {
             db::entries_range,
             db::entry_delete,
             db::entry_update_note,
+            db::entry_update,
             db::entries_merge,
             db::entry_add_manual,
             db::project_payments_list,

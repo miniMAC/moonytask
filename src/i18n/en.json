@@ -32,6 +32,7 @@
     "noEntries": "No entries yet. Start the timer!",
     "addManual": "Add time manually",
     "date": "Date",
+    "time": "Time",
     "durationMinutes": "Duration (minutes)",
     "note": "Note (optional)",
     "totalCost": "Total cost",
@@ -60,6 +61,12 @@
     "rateTitle": "Rate",
     "rateHelp": "Pick a profile or set a manual hourly rate. Reports and costs use this rate.",
     "rateManualHint": "Editing the rate by hand switches the project to a manual rate."
+  },
+  "calendar": {
+    "chooseDate": "Choose a date",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "today": "Today"
   },
   "timer": {
     "start": "Start",

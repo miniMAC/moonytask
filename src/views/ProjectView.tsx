@@ -19,6 +19,7 @@ import {
   startOfWeek,
 } from "../lib/time";
 import Modal from "../components/Modal";
+import DatePicker from "../components/DatePicker";
 import { isMobilePlatform } from "../lib/platform";
 import {
   BackIcon,
@@ -30,8 +31,6 @@ import {
   TrashIcon,
 } from "../components/Icons";
 
-const fieldCls =
-  "h-11 w-full rounded-md border border-neutral-300 bg-white px-3 text-base outline-none transition focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2] pro:focus:border-[#bd93f9]";
 const sectionLabelCls = "text-sm font-bold uppercase tracking-wide";
 
 interface Props {
@@ -337,14 +336,14 @@ export default function ProjectView(p: Props) {
       {/* tariffa del progetto */}
       <RateCard project={p.project} currency={p.currency} locale={locale} />
 
-      <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50/30 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/10 pro:border-[#50fa7b]/30 pro:bg-[#50fa7b]/5">
+      <div className="mt-6 rounded-2xl border border-[#D94700] bg-[#FF5600] p-5 text-white shadow-[0_14px_35px_rgba(255,86,0,0.18)]">
         <div className="flex items-center justify-between gap-3">
-          <h2 className={`${sectionLabelCls} text-emerald-700 dark:text-emerald-400 pro:text-[#50fa7b]`}>
+          <h2 className={`${sectionLabelCls} text-white`}>
             {t("projects.payments")}
           </h2>
           <button
             onClick={() => setPaymentOpen(true)}
-            className="flex items-center gap-1 rounded-md border border-neutral-200 px-4 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+            className="flex items-center gap-1 rounded-xl border border-white/60 px-4 py-2 text-base font-semibold text-white transition hover:bg-white hover:text-[#D94700]"
           >
             <PlusIcon size={13} />
             {t("projects.markPaid")}
@@ -363,20 +362,21 @@ export default function ProjectView(p: Props) {
                 ? `${t("projects.paidAt")} ${fmtDate(payments[0].paidAt, locale)}`
                 : null
             }
+            tone="onColor"
           />
           <ProjectStatTile
             label={t("projects.amountDue")}
             value={fmtCost(residualCost, p.currency, locale)}
             detail={fmtDuration(residualSecsWithLive)}
-            tone={residualCost > 0 ? "due" : "default"}
+            tone="onColor"
           />
         </div>
         {payments.length === 0 ? (
-          <p className="mt-4 text-base text-neutral-600 dark:text-neutral-400 pro:text-[#b9b9c8]">
+          <p className="mt-4 text-base text-white/85">
             {t("projects.noPayments")}
           </p>
         ) : (
-          <ul className="mt-4 divide-y divide-neutral-100 overflow-hidden rounded-lg border border-neutral-200 text-base dark:divide-neutral-800 dark:border-neutral-700 pro:divide-[#44475a] pro:border-[#44475a]">
+          <ul className="mt-4 divide-y divide-white/25 overflow-hidden rounded-xl border border-white/40 text-base">
             {payments.slice(0, 5).map((payment) => (
               <li
                 key={payment.id}
@@ -386,14 +386,14 @@ export default function ProjectView(p: Props) {
                   <span className="block truncate font-medium">
                     {t("projects.paidThrough")} {fmtDate(payment.paidThroughAt, locale)}
                   </span>
-                  <span className="block truncate text-sm text-neutral-600 dark:text-neutral-400 pro:text-[#b9b9c8]">
+                  <span className="block truncate text-sm text-white/80">
                     {t("projects.paidAt")} {fmtDate(payment.paidAt, locale)}
                     {payment.note ? ` · ${payment.note}` : ""}
                   </span>
                 </span>
                 <button
                   onClick={() => api.projectPaymentDelete(payment.id).then(load)}
-                  className="flex h-10 w-10 items-center justify-center rounded text-neutral-400 hover:text-red-600 md:invisible md:group-hover:visible"
+                  className="flex h-10 w-10 items-center justify-center rounded text-white/70 hover:bg-white/15 hover:text-white md:invisible md:group-hover:visible"
                 >
                   <TrashIcon size={13} />
                 </button>
@@ -546,22 +546,32 @@ function ProjectStatTile({
   label: string;
   value: string;
   detail?: string | null;
-  tone?: "default" | "due";
+  tone?: "default" | "due" | "onColor";
 }) {
   return (
     <div
       className={`rounded-xl border p-4 ${
-        tone === "due"
+        tone === "onColor"
+          ? "border-white/45 bg-transparent text-white"
+          : tone === "due"
           ? "border-amber-300 bg-amber-50/60 dark:border-amber-700/60 dark:bg-amber-950/20 pro:border-[#ffb86c]/50 pro:bg-[#ffb86c]/10"
           : "border-neutral-200 bg-neutral-50/60 dark:border-neutral-700 dark:bg-neutral-800/40 pro:border-[#44475a] pro:bg-[#21222c]"
       }`}
     >
-      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400 pro:text-[#c9c9d6]">
+      <p
+        className={`text-xs font-semibold uppercase tracking-wide ${
+          tone === "onColor"
+            ? "text-white/75"
+            : "text-neutral-600 dark:text-neutral-400 pro:text-[#c9c9d6]"
+        }`}
+      >
         {label}
       </p>
       <p
         className={`mt-1 text-xl font-bold tabular-nums ${
-          tone === "due"
+          tone === "onColor"
+            ? "text-white"
+            : tone === "due"
             ? "text-amber-700 dark:text-amber-300 pro:text-[#ffb86c]"
             : ""
         }`}
@@ -569,7 +579,13 @@ function ProjectStatTile({
         {value}
       </p>
       {detail && (
-        <p className="mt-0.5 text-sm text-neutral-600 dark:text-neutral-400 pro:text-[#b9b9c8]">
+        <p
+          className={`mt-0.5 text-sm ${
+            tone === "onColor"
+              ? "text-white/80"
+              : "text-neutral-600 dark:text-neutral-400 pro:text-[#b9b9c8]"
+          }`}
+        >
           {detail}
         </p>
       )}
@@ -622,12 +638,12 @@ function RateCard({
   );
 
   return (
-    <div className="mt-6 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/15 pro:border-[#bd93f9]/40 pro:bg-[#bd93f9]/5">
+    <div className="mt-6 rounded-2xl border border-[#2D8FA8] bg-[#45B0CB] p-5 text-white shadow-[0_14px_35px_rgba(69,176,203,0.18)]">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className={`${sectionLabelCls} text-indigo-700 dark:text-indigo-300 pro:text-[#bd93f9]`}>
+        <h2 className={`${sectionLabelCls} text-white`}>
           {t("projects.rateTitle")}
         </h2>
-        <span className="text-base font-semibold text-indigo-900 dark:text-indigo-200 pro:text-[#f8f8f2]">
+        <span className="text-base font-semibold text-white">
           {fmtCost(project.hourlyRate, currency, locale)}/
           {t("common.hours").slice(0, 1)}
           {" · "}
@@ -636,13 +652,13 @@ function RateCard({
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px]">
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300 pro:text-[#c9c9d6]">
+          <span className="mb-1 block text-sm font-medium text-white/90">
             {t("projects.rateProfile")}
           </span>
           <select
             value={project.rateProfileId ?? ""}
             onChange={(e) => selectProfile(e.target.value)}
-            className={fieldCls}
+            className="h-11 w-full rounded-xl border border-white/45 bg-[#2D8FA8] px-3 text-base text-white outline-none transition focus:border-white"
           >
             <option value="">{t("projects.manualRate")}</option>
             {profiles.map((profile) => (
@@ -653,7 +669,7 @@ function RateCard({
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300 pro:text-[#c9c9d6]">
+          <span className="mb-1 block text-sm font-medium text-white/90">
             {t("projects.hourlyRate")}
           </span>
           <input
@@ -664,11 +680,11 @@ function RateCard({
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
             }}
-            className={fieldCls}
+            className="h-11 w-full rounded-xl border border-white/45 bg-[#2D8FA8] px-3 text-base text-white outline-none transition focus:border-white"
           />
         </label>
       </div>
-      <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400 pro:text-[#b9b9c8]">
+      <p className="mt-3 text-sm leading-relaxed text-white/85">
         {t("projects.rateHelp")} {t("projects.rateManualHint")}
       </p>
     </div>
@@ -705,17 +721,16 @@ function ManualEntryModal({
     <Modal title={t("projects.addManual")} onClose={onClose}>
       <div className="space-y-3">
         <div className="flex gap-3">
-          <label className="block flex-1">
+          <div className="block flex-1">
             <span className="mb-1 block text-sm font-medium text-neutral-600">
               {t("projects.date")}
             </span>
-            <input
-              type="date"
+            <DatePicker
               value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-base outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+              onChange={setDate}
+              ariaLabel={t("projects.date")}
             />
-          </label>
+          </div>
           <label className="block w-40">
             <span className="mb-1 block text-sm font-medium text-neutral-600">
               {t("projects.durationMinutes")}
@@ -766,12 +781,15 @@ function EntryNoteModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t, i18n } = useTranslation();
-  const locale = i18n.language === "it" ? "it-IT" : "en-US";
+  const { t } = useTranslation();
   const [note, setNote] = useState(entry.note ?? "");
+  const entryDate = new Date(entry.startedAt * 1000);
+  const [date, setDate] = useState(toDateInput(entryDate));
+  const [time, setTime] = useState(toTimeInput(entryDate));
 
   const save = async () => {
-    await api.entryUpdateNote(entry.id, note.trim() || null);
+    const startedAt = epochFromDateAndTime(date, time);
+    await api.entryUpdate(entry.id, startedAt, note.trim() || null);
     onSaved();
   };
 
@@ -781,18 +799,41 @@ function EntryNoteModal({
       onClose={onClose}
     >
       <div className="space-y-3">
-        <label className="block">
+        <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-3">
+          <div className="block">
+            <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-300">
+              {t("projects.date")}
+            </span>
+            <DatePicker
+              value={date}
+              onChange={setDate}
+              ariaLabel={t("projects.date")}
+            />
+          </div>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-300">
+              {t("projects.time")}
+            </span>
+            <input
+              type="time"
+              step="60"
+              value={time}
+              onChange={(event) => setTime(event.target.value)}
+              className="w-full rounded-[10px] border border-neutral-300 bg-white px-3 text-base outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+            />
+          </label>
+        </div>
+        <div className="block">
           <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-300">
-            {fmtDateTime(entry.startedAt, locale)}
+            {t("projects.note")}
           </span>
           <textarea
-            autoFocus
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={4}
             className="w-full resize-none rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-base outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
           />
-        </label>
+        </div>
         <div className="flex justify-end gap-2 pt-2">
           <button
             onClick={onClose}
@@ -838,17 +879,16 @@ function PaymentModal({
   return (
     <Modal title={t("projects.markPaid")} onClose={onClose}>
       <div className="space-y-3">
-        <label className="block">
+        <div className="block">
           <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-300">
             {t("projects.paymentThroughDate")}
           </span>
-          <input
-            type="date"
+          <DatePicker
             value={paidThroughDate}
-            onChange={(e) => setPaidThroughDate(e.target.value)}
-            className="w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-base outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
+            onChange={setPaidThroughDate}
+            ariaLabel={t("projects.paymentThroughDate")}
           />
-        </label>
+        </div>
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-300">
             {t("projects.paymentNote")}
@@ -889,6 +929,19 @@ function fmtDate(epochSecs: number, locale: string): string {
 
 function toDateInput(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function toTimeInput(date: Date): string {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function epochFromDateAndTime(dateValue: string, timeValue: string): number {
+  const [year, month, day] = dateValue.split("-").map(Number);
+  const [hours, minutes] = timeValue.split(":").map(Number);
+  return Math.floor(
+    new Date(year, month - 1, day, hours || 0, minutes || 0, 0).getTime() /
+      1000,
+  );
 }
 
 function endOfDateInput(value: string): number {

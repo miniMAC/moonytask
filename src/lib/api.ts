@@ -61,6 +61,11 @@ export const entriesRange = (from: number, to: number) =>
 export const entryDelete = (id: string) => invoke<void>("entry_delete", { id });
 export const entryUpdateNote = (id: string, note: string | null) =>
   invoke<void>("entry_update_note", { id, note });
+export const entryUpdate = (
+  id: string,
+  startedAt: number,
+  note: string | null,
+) => invoke<void>("entry_update", { id, startedAt, note });
 export const entriesMerge = (ids: string[]) =>
   invoke<TimeEntry>("entries_merge", { ids });
 export const entryAddManual = (
