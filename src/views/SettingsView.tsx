@@ -21,14 +21,13 @@ const CURRENCIES = ["EUR", "USD", "GBP", "CHF"];
 const SETTINGS_TABS = ["general", "rates", "apps", "sync", "support"] as const;
 const PAYMENT_TYPES: PaymentType[] = ["hourly", "retainer", "fixed"];
 
+// input neutro usato solo nei modali (fuori dai box colorati)
 const inputCls =
   "h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2]";
-const rateFieldCls =
-  "h-11 w-full rounded-md border border-neutral-300 bg-white px-3 text-base outline-none transition focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#343746] pro:text-[#f8f8f2] pro:focus:border-[#bd93f9]";
-const fieldLabelCls =
-  "mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300 pro:text-[#c9c9d6]";
-const helpTextCls =
-  "text-sm text-neutral-600 dark:text-neutral-400 pro:text-[#b9b9c8]";
+// stile condiviso dei box colorati, come Tariffa/Pagamenti nella scheda progetto
+const sectionTitleCls = "text-sm font-bold uppercase tracking-wide text-white";
+const fieldLabelCls = "mb-1 block text-sm font-medium text-white/85";
+const helpTextCls = "text-sm text-white/75";
 
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
@@ -86,6 +85,12 @@ export default function SettingsView(p: Props) {
   );
 }
 
+// box viola: preferenze generali
+const generalInputCls =
+  "h-11 rounded-xl border border-white/45 bg-[#5C4FBF] px-3 text-base text-white outline-none transition placeholder:text-white/50 focus:border-white";
+const generalGhostBtnCls =
+  "h-11 rounded-xl border border-white/60 px-5 text-base font-medium text-white transition hover:bg-white hover:text-[#5C4FBF] disabled:opacity-50";
+
 function GeneralSection({
   currency,
   onCurrencyChange,
@@ -137,35 +142,29 @@ function GeneralSection({
   };
 
   return (
-    <section>
-      <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
-        {t("settings.general")}
-      </h2>
-      <div className="mt-3 flex flex-wrap gap-6">
+    <section className="rounded-2xl border border-[#5C4FBF] bg-[#7A6BD9] p-5 text-white shadow-[0_14px_35px_rgba(122,107,217,0.18)]">
+      <h2 className={sectionTitleCls}>{t("settings.general")}</h2>
+      <div className="mt-4 flex flex-wrap gap-6">
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
-            {t("settings.language")}
-          </span>
+          <span className={fieldLabelCls}>{t("settings.language")}</span>
           <select
             value={i18n.language}
             onChange={(e) => {
               i18n.changeLanguage(e.target.value);
               api.settingsSet("language", e.target.value);
             }}
-            className={inputCls}
+            className={generalInputCls}
           >
             <option value="it">Italiano</option>
             <option value="en">English</option>
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
-            {t("settings.theme")}
-          </span>
+          <span className={fieldLabelCls}>{t("settings.theme")}</span>
           <select
             value={pref}
             onChange={(e) => setPref(e.target.value as ThemePref)}
-            className={inputCls}
+            className={generalInputCls}
           >
             <option value="auto">{t("settings.themeAuto")}</option>
             <option value="light">{t("settings.themeLight")}</option>
@@ -174,16 +173,14 @@ function GeneralSection({
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
-            {t("settings.currency")}
-          </span>
+          <span className={fieldLabelCls}>{t("settings.currency")}</span>
           <select
             value={currency}
             onChange={(e) => {
               onCurrencyChange(e.target.value);
               api.settingsSet("currency", e.target.value);
             }}
-            className={inputCls}
+            className={generalInputCls}
           >
             {CURRENCIES.map((c) => (
               <option key={c} value={c}>
@@ -194,7 +191,7 @@ function GeneralSection({
         </label>
         {!isMobilePlatform && (
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
+            <span className={fieldLabelCls}>
               {t("settings.menubarWindowWidth")}
             </span>
             <select
@@ -203,7 +200,7 @@ function GeneralSection({
                 setMenubarWindowWidth(e.target.value);
                 api.settingsSet("menubar_window_width", e.target.value);
               }}
-              className={inputCls}
+              className={generalInputCls}
             >
               <option value="small">{t("settings.windowWidthSmall")}</option>
               <option value="medium">{t("settings.windowWidthMedium")}</option>
@@ -216,6 +213,7 @@ function GeneralSection({
         <label className="flex items-center gap-2 text-base">
           <input
             type="checkbox"
+            className="accent-white"
             checked={autoMergeDaily}
             onChange={(e) => {
               setAutoMergeDaily(e.target.checked);
@@ -232,7 +230,7 @@ function GeneralSection({
       {!isMobilePlatform && (
       <div className="mt-6 max-w-2xl">
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
+          <span className={fieldLabelCls}>
             {t("settings.pdfExportDir")}
           </span>
           <div className="flex flex-wrap gap-2">
@@ -241,21 +239,18 @@ function GeneralSection({
               onChange={(e) => setPdfDir(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && savePdfDir()}
               placeholder={t("settings.pdfExportDirPlaceholder")}
-              className={`min-w-0 flex-1 ${inputCls}`}
+              className={`min-w-0 flex-1 ${generalInputCls}`}
             />
             <button
               onClick={choosePdfDir}
               disabled={pdfSelecting}
-              className="h-11 rounded-lg border border-neutral-300 px-5 text-base font-medium hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+              className={generalGhostBtnCls}
             >
               {pdfSelecting
                 ? t("common.loading")
                 : t("settings.chooseFolder")}
             </button>
-            <button
-              onClick={savePdfDir}
-              className="h-11 rounded-lg border border-neutral-300 px-5 text-base font-medium hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
-            >
+            <button onClick={savePdfDir} className={generalGhostBtnCls}>
               {pdfSaved ? t("common.saved") : t("common.save")}
             </button>
           </div>
@@ -266,6 +261,7 @@ function GeneralSection({
         <label className="mt-4 flex items-center gap-2 text-base">
           <input
             type="checkbox"
+            className="accent-white"
             checked={pdfTotalsOnly}
             onChange={(e) => {
               setPdfTotalsOnly(e.target.checked);
@@ -294,19 +290,17 @@ function SupportSection() {
   }, []);
 
   return (
-    <section>
-      <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
-        {t("settings.support.title")}
-      </h2>
-      <p className={`mt-1 max-w-2xl ${helpTextCls}`}>
+    <section className="rounded-2xl border border-[#A84369] bg-[#C95D87] p-5 text-white shadow-[0_14px_35px_rgba(201,93,135,0.18)]">
+      <h2 className={sectionTitleCls}>{t("settings.support.title")}</h2>
+      <p className={`mt-2 max-w-2xl ${helpTextCls}`}>
         {t("settings.support.help")}
       </p>
-      <p className="mt-3 text-sm font-medium text-neutral-500 dark:text-neutral-400 pro:text-[#b9b9c8]">
+      <p className="mt-3 text-sm font-medium text-white/85">
         {t("settings.support.version")}: {version ?? "—"}
       </p>
       <button
         onClick={() => openUrl(`mailto:${email}?subject=${subject}`)}
-        className="mt-4 h-11 rounded-lg bg-neutral-950 px-5 text-base font-semibold text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 pro:bg-[#50fa7b] pro:text-[#282a36]"
+        className="mt-4 h-11 rounded-xl bg-white px-5 text-base font-semibold text-[#A84369] transition hover:bg-white/90"
       >
         {t("settings.support.email")}
       </button>
@@ -315,6 +309,10 @@ function SupportSection() {
 }
 
 // ---------- rate profiles ----------
+
+// box blu, in tinta con la card Tariffa della scheda progetto
+const rateFieldCls =
+  "h-11 w-full rounded-md border border-white/45 bg-[#23768D] px-3 text-base text-white outline-none transition placeholder:text-white/50 focus:border-white";
 
 function RateProfilesSection() {
   const { t } = useTranslation();
@@ -372,11 +370,9 @@ function RateProfilesSection() {
   };
 
   return (
-    <section>
-      <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
-        {t("settings.rates.title")}
-      </h2>
-      <p className={`mt-1 max-w-2xl ${helpTextCls}`}>
+    <section className="rounded-2xl border border-[#2D8FA8] bg-[#45B0CB] p-5 text-white shadow-[0_14px_35px_rgba(69,176,203,0.18)]">
+      <h2 className={sectionTitleCls}>{t("settings.rates.title")}</h2>
+      <p className={`mt-2 max-w-2xl ${helpTextCls}`}>
         {t("settings.rates.help")}
       </p>
 
@@ -387,10 +383,10 @@ function RateProfilesSection() {
         {profiles.map((profile) => (
           <div
             key={profile.id}
-            className={`rounded-xl border p-4 transition ${
+            className={`rounded-xl border bg-[#2D8FA8] p-4 transition ${
               defaultId === profile.id
-                ? "border-emerald-400 bg-emerald-50/50 dark:border-emerald-700 dark:bg-emerald-950/20 pro:border-[#50fa7b]/60 pro:bg-[#50fa7b]/5"
-                : "border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900/40 pro:border-[#44475a] pro:bg-[#21222c]"
+                ? "border-[#7CF5A4]"
+                : "border-white/35"
             }`}
           >
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_170px_140px_auto] xl:items-end">
@@ -447,8 +443,8 @@ function RateProfilesSection() {
                   onClick={() => saveProfiles(profiles, profile.id)}
                   className={`h-11 flex-1 rounded-md border px-4 text-base font-semibold transition xl:flex-none ${
                     defaultId === profile.id
-                      ? "border-emerald-500 bg-emerald-100 text-emerald-800 dark:border-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-200 pro:border-[#50fa7b] pro:bg-[#50fa7b]/15 pro:text-[#50fa7b]"
-                      : "border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:text-[#c9c9d6] pro:hover:bg-[#343746]"
+                      ? "border-[#7CF5A4] bg-[#7CF5A4]/15 text-[#D9FFE6]"
+                      : "border-white/50 text-white hover:bg-white hover:text-[#2D8FA8]"
                   }`}
                 >
                   {defaultId === profile.id
@@ -457,7 +453,7 @@ function RateProfilesSection() {
                 </button>
                 <button
                   onClick={() => removeProfile(profile.id)}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-red-950/40 pro:border-[#44475a]"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/40 text-white/80 transition hover:border-white hover:bg-white hover:text-red-600"
                   title={t("common.delete")}
                 >
                   <TrashIcon size={16} />
@@ -470,7 +466,7 @@ function RateProfilesSection() {
 
       <button
         onClick={addProfile}
-        className="mt-3 flex items-center gap-1.5 h-11 rounded-lg border border-neutral-300 px-5 text-base hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800 pro:border-[#44475a] pro:hover:bg-[#343746]"
+        className="mt-4 flex h-11 items-center gap-1.5 rounded-xl border border-white/60 px-5 text-base font-medium text-white transition hover:bg-white hover:text-[#2D8FA8]"
       >
         <PlusIcon size={14} />
         {t("settings.rates.add")}
@@ -517,11 +513,9 @@ function DangerSection({ projects }: { projects: Project[] }) {
   };
 
   return (
-    <section className="rounded-xl border border-red-200 bg-red-50/40 p-4 dark:border-red-900/60 dark:bg-red-950/10 pro:border-[#ff5555]/40 pro:bg-[#ff5555]/5">
-      <h2 className="text-base font-semibold text-red-700 dark:text-red-400 pro:text-[#ff5555]">
-        {t("settings.danger.title")}
-      </h2>
-      <p className={`mt-1 max-w-2xl ${helpTextCls}`}>
+    <section className="rounded-2xl border border-[#C4373C] bg-[#E5484D] p-5 text-white shadow-[0_14px_35px_rgba(229,72,77,0.18)]">
+      <h2 className={sectionTitleCls}>{t("settings.danger.title")}</h2>
+      <p className={`mt-2 max-w-2xl ${helpTextCls}`}>
         {t("settings.danger.resetHelp")}
       </p>
       <button
@@ -529,12 +523,12 @@ function DangerSection({ projects }: { projects: Project[] }) {
           setDone(false);
           setStep(1);
         }}
-        className="mt-3 h-11 rounded-lg border border-red-300 px-5 text-base font-semibold text-red-700 transition hover:bg-red-100 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40 pro:border-[#ff5555]/60 pro:text-[#ff5555] pro:hover:bg-[#ff5555]/10"
+        className="mt-3 h-11 rounded-xl border border-white/60 px-5 text-base font-semibold text-white transition hover:bg-white hover:text-[#C4373C]"
       >
         {t("settings.danger.resetButton")}
       </button>
       {done && (
-        <p className="mt-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 pro:text-[#50fa7b]">
+        <p className="mt-2 text-sm font-semibold text-white">
           {t("settings.danger.resetDone")}
         </p>
       )}
@@ -605,6 +599,10 @@ function newLocalId() {
 
 // ---------- watched apps ----------
 
+// box ambra: app monitorate
+const appsInputCls =
+  "h-11 rounded-lg border border-white/45 bg-[#B5661A] px-3 text-base text-white outline-none transition placeholder:text-white/50 focus:border-white";
+
 function WatchedAppsSection({ projects }: { projects: Project[] }) {
   const { t } = useTranslation();
   const [watched, setWatched] = useState<WatchedApp[]>([]);
@@ -621,17 +619,16 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
   }, []);
 
   return (
-    <section>
-      <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
-        {t("settings.watchedApps")}
-      </h2>
-      <p className={`mt-1 ${helpTextCls}`}>
+    <section className="rounded-2xl border border-[#B5661A] bg-[#D9822B] p-5 text-white shadow-[0_14px_35px_rgba(217,130,43,0.18)]">
+      <h2 className={sectionTitleCls}>{t("settings.watchedApps")}</h2>
+      <p className={`mt-2 ${helpTextCls}`}>
         {t("settings.watchedAppsHelp")}
       </p>
 
       <label className="mt-3 flex items-center gap-2 text-base">
         <input
           type="checkbox"
+          className="accent-white"
           checked={notifOn}
           onChange={(e) => {
             setNotifOn(e.target.checked);
@@ -648,10 +645,11 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
         {watched.map((w) => (
           <div
             key={w.id}
-            className="grid items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 text-base dark:border-neutral-700 md:grid-cols-[auto_minmax(0,1fr)_minmax(170px,220px)_150px_auto]"
+            className="grid items-center gap-3 rounded-xl border border-white/35 bg-[#B5661A]/40 px-3 py-2 text-base md:grid-cols-[auto_minmax(0,1fr)_minmax(170px,220px)_150px_auto]"
           >
             <input
               type="checkbox"
+              className="accent-white"
               checked={w.enabled === 1}
               onChange={(e) =>
                 api
@@ -666,7 +664,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
             />
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{w.appName}</p>
-              <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{w.bundleId}</p>
+              <p className="truncate text-sm text-white/70">{w.bundleId}</p>
             </div>
             <select
               value={w.projectId ?? ""}
@@ -680,7 +678,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
                   )
                   .then(load)
               }
-              className={`w-full text-sm ${inputCls}`}
+              className={`w-full text-sm ${appsInputCls}`}
               title={t("settings.linkedProject")}
             >
               <option value="">{t("settings.noLinkedProject")}</option>
@@ -692,7 +690,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
                   </option>
                 ))}
             </select>
-            <label className="flex items-center gap-1.5 text-sm text-neutral-500 dark:text-neutral-400">
+            <label className="flex items-center gap-1.5 text-sm text-white/80">
               <span className="whitespace-nowrap">
                 {t("settings.reminderAfter")}
               </span>
@@ -715,13 +713,13 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
                     )
                     .then(load);
                 }}
-                className={`w-16 text-sm ${inputCls}`}
+                className={`w-16 text-sm ${appsInputCls}`}
               />
               <span>{t("settings.minutesShort")}</span>
             </label>
             <button
               onClick={() => api.watchedRemove(w.id).then(load)}
-              className="rounded p-1 text-neutral-400 hover:text-red-600"
+              className="rounded p-1 text-white/70 transition hover:text-white"
             >
               <TrashIcon size={14} />
             </button>
@@ -731,7 +729,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
 
       <button
         onClick={() => setPickerOpen(true)}
-        className="mt-3 flex items-center gap-1.5 h-11 rounded-lg border border-neutral-300 px-5 text-base hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
+        className="mt-4 flex h-11 items-center gap-1.5 rounded-xl border border-white/60 px-5 text-base font-medium text-white transition hover:bg-white hover:text-[#B5661A]"
       >
         <PlusIcon size={14} />
         {t("settings.addApp")}
@@ -810,6 +808,10 @@ function AppPickerModal({
 
 // ---------- sync ----------
 
+// box verde: sync
+const syncInputCls =
+  "h-11 rounded-xl border border-white/45 bg-[#2C8A52] px-3 text-base text-white outline-none transition placeholder:text-white/50 focus:border-white";
+
 function SyncSection() {
   const { t, i18n } = useTranslation();
   const [status, setStatus] = useState<SyncStatus | null>(null);
@@ -844,21 +846,19 @@ function SyncSection() {
   const locale = i18n.language === "it" ? "it-IT" : "en-US";
 
   return (
-    <section>
-      <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
-        {t("settings.sync.title")}
-      </h2>
-      <p className={`mt-1 ${helpTextCls}`}>{t("settings.sync.help")}</p>
+    <section className="rounded-2xl border border-[#2C8A52] bg-[#3EA96B] p-5 text-white shadow-[0_14px_35px_rgba(62,169,107,0.18)]">
+      <h2 className={sectionTitleCls}>{t("settings.sync.title")}</h2>
+      <p className={`mt-2 ${helpTextCls}`}>{t("settings.sync.help")}</p>
 
       {!status.configured ? (
-        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+        <p className="mt-3 rounded-lg bg-white/15 px-3 py-2 text-sm text-white">
           {t("settings.sync.notConfigured")}
         </p>
       ) : (
         <div className="mt-3 space-y-2">
           {status.connected ? (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-green-100 px-2.5 py-1 text-sm font-medium text-green-800 dark:bg-green-950/60 dark:text-green-300">
+              <span className="rounded-full bg-white/20 px-2.5 py-1 text-sm font-medium text-white">
                 {status.email
                   ? t("settings.sync.connectedAs", { email: status.email })
                   : t("settings.sync.connected")}
@@ -876,7 +876,7 @@ function SyncSection() {
                   }
                 }}
                 disabled={busy || status.inProgress}
-                className="h-11 rounded-lg border border-neutral-300 px-5 text-base hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
+                className="h-11 rounded-xl border border-white/60 px-5 text-base font-medium text-white transition hover:bg-white hover:text-[#2C8A52] disabled:opacity-50"
               >
                 {busy || status.inProgress
                   ? t("settings.sync.syncing")
@@ -884,14 +884,14 @@ function SyncSection() {
               </button>
               <button
                 onClick={() => api.syncLogout().then(refresh)}
-                className="h-11 rounded-lg border border-neutral-300 px-5 text-base text-red-600 hover:bg-red-50 dark:border-neutral-600 dark:hover:bg-red-950/40"
+                className="h-11 rounded-xl border border-white/60 px-5 text-base font-medium text-white transition hover:bg-white hover:text-red-600"
               >
                 {t("settings.sync.disconnect")}
               </button>
             </div>
           ) : (
             <div>
-              <label className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
+              <label className={fieldLabelCls}>
                 {t("settings.sync.emailLabel")}
               </label>
               <div className="flex flex-wrap gap-2">
@@ -901,12 +901,12 @@ function SyncSection() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={t("settings.sync.emailPlaceholder")}
                   onKeyDown={(e) => e.key === "Enter" && email.trim() && !busy && doLogin()}
-                  className={`w-full sm:w-64 ${inputCls}`}
+                  className={`w-full sm:w-64 ${syncInputCls}`}
                 />
                 <button
                   onClick={doLogin}
                   disabled={busy || !email.trim()}
-                  className="h-11 rounded-lg bg-blue-600 px-6 text-base font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="h-11 rounded-xl bg-white px-6 text-base font-semibold text-[#2C8A52] transition hover:bg-white/90 disabled:opacity-50"
                 >
                   {busy ? t("settings.sync.syncing") : t("settings.sync.connect")}
                 </button>
@@ -925,7 +925,7 @@ function SyncSection() {
             </p>
           )}
           {status.lastError && (
-            <p className="text-sm text-red-600 dark:text-red-400">
+            <p className="text-sm font-semibold text-[#FFE1E1]">
               {t("settings.sync.error", { error: status.lastError })}
             </p>
           )}
