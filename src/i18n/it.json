@@ -203,6 +203,7 @@
     "support": {
       "title": "Supporto",
       "help": "Per segnalare bug o problemi puoi scrivere direttamente al supporto MoonyTask.",
+      "version": "Versione",
       "email": "Scrivi a info@moonytask.com"
     },
     "danger": {

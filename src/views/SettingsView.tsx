@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
+import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type {
   InstalledApp,
@@ -284,8 +285,13 @@ function GeneralSection({
 
 function SupportSection() {
   const { t } = useTranslation();
+  const [version, setVersion] = useState<string | null>(null);
   const email = "info@moonytask.com";
   const subject = encodeURIComponent("MoonyTask support");
+
+  useEffect(() => {
+    getVersion().then(setVersion).catch(() => setVersion(null));
+  }, []);
 
   return (
     <section>
@@ -294,6 +300,9 @@ function SupportSection() {
       </h2>
       <p className={`mt-1 max-w-2xl ${helpTextCls}`}>
         {t("settings.support.help")}
+      </p>
+      <p className="mt-3 text-sm font-medium text-neutral-500 dark:text-neutral-400 pro:text-[#b9b9c8]">
+        {t("settings.support.version")}: {version ?? "—"}
       </p>
       <button
         onClick={() => openUrl(`mailto:${email}?subject=${subject}`)}

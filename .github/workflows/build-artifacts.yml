@@ -2,6 +2,9 @@ name: Build desktop artifacts
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - "v*"
 
 jobs:
   macos-universal:

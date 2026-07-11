@@ -49,7 +49,14 @@ if (target && target !== "--copy-only") {
     !env.TAURI_SIGNING_PRIVATE_KEY_PATH &&
     existsSync(localKey)
   ) {
-    env.TAURI_SIGNING_PRIVATE_KEY_PATH = localKey;
+    // La CLI Tauri corrente richiede il contenuto della chiave; leggere qui il
+    // file evita di inserirlo nella command line o nei log della build.
+    env.TAURI_SIGNING_PRIVATE_KEY = readFileSync(localKey, "utf8");
+    // La chiave locale del progetto è stata creata senza password: impostare
+    // esplicitamente la stringa vuota evita il prompt interattivo della CLI.
+    if (!("TAURI_SIGNING_PRIVATE_KEY_PASSWORD" in env)) {
+      env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "";
+    }
   }
 
   const result = spawnSync(npm, args, {
