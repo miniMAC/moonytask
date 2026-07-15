@@ -26,11 +26,15 @@ const env = {
   NDK_HOME: ndk,
 };
 const tauri = path.join(root, "node_modules", ".bin", process.platform === "win32" ? "tauri.cmd" : "tauri");
+if (!existsSync(tauri)) {
+  fail("Tauri CLI non trovata. Esegui `npm install` nella cartella del progetto e riprova.");
+}
 const result = spawnSync(tauri, ["android", "build", "--apk", "--target", "aarch64"], {
   cwd: root,
   env,
   stdio: "inherit",
 });
+if (result.error) fail(`Impossibile avviare Tauri CLI: ${result.error.message}`);
 if (result.status !== 0) process.exit(result.status ?? 1);
 
 const apk = path.join(
