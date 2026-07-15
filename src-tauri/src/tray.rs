@@ -18,10 +18,40 @@ struct PopoverAnchor {
 
 impl PopoverAnchor {
     fn from_tray_event(position: PhysicalPosition<f64>, rect: Rect) -> Self {
+        // On macOS the click position is reported in physical screen coordinates,
+        // while the tray rect can be logical (notably on Retina displays).  Tauri's
+        // `Rect::to_physical(1.0)` cannot fix that without knowing the monitor scale
+        // factor and made the popover use an x coordinate roughly divided by two.
+        // The click is necessarily inside the tray item, so it is the safest anchor;
+        // a zero-sized rect also makes positioning clamp y to the work-area top,
+        // immediately below the menu bar.
+        #[cfg(target_os = "macos")]
+        let _ = rect;
+        #[cfg(target_os = "macos")]
+        return Self {
+            click_position: position,
+            tray_position: position,
+            tray_size: PhysicalSize::new(0.0, 0.0),
+        };
+
+        #[cfg(not(target_os = "macos"))]
         Self {
             click_position: position,
             tray_position: rect.position.to_physical(1.0),
             tray_size: rect.size.to_physical(1.0),
+        }
+    }
+
+    fn from_tray_rect(rect: Rect) -> Self {
+        let tray_position = rect.position.to_physical(1.0);
+        let tray_size = rect.size.to_physical(1.0);
+        Self {
+            click_position: PhysicalPosition::new(
+                tray_position.x + tray_size.width / 2.0,
+                tray_position.y + tray_size.height / 2.0,
+            ),
+            tray_position,
+            tray_size,
         }
     }
 }
@@ -343,6 +373,14 @@ pub fn show_popover(app: &AppHandle) {
 }
 
 fn show_popover_window(app: &AppHandle, win: &WebviewWindow, anchor: Option<PopoverAnchor>) {
+    // Le aperture automatiche (per esempio i promemoria delle app monitorate)
+    // non hanno un evento click. Recuperiamo comunque il rettangolo della tray,
+    // altrimenti il fallback centrerebbe la finestra sullo schermo.
+    let anchor = anchor.or_else(|| {
+        app.tray_by_id(TRAY_ID)
+            .and_then(|tray| tray.rect().ok().flatten())
+            .map(PopoverAnchor::from_tray_rect)
+    });
     let Some(monitor) = popover_monitor(app, win, anchor.as_ref()) else {
         return;
     };
