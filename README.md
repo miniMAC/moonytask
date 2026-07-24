@@ -9,6 +9,8 @@ Time tracker per progetti, nativo per macOS (Tauri 2), pronto per essere portato
 - **App monitorate**: scegli app installate sul Mac; se ne usi una per 1 minuto senza timer attivo ricevi una notifica che ti propone di avviarlo
 - **Report** con grafico tempo/giorno, ripartizione per progetto, tabella giornaliera e stima dei costi
 - **Sync con Google Drive** (appDataFolder) per usare MoonyTask su più dispositivi — vedi [SETUP.md](SETUP.md)
+- **Master / API Web opzionale**: licenza legata all’identità Google, scelta
+  delle cartelle e pubblicazione in background di `PublishedSnapshotV1`
 - Interfaccia **italiano / inglese**
 
 ## Sviluppo
@@ -26,7 +28,9 @@ npm run tauri build   # crea MoonyTask.app / dmg in src-tauri/target/release/bun
 ## Struttura
 
 - `src/` — frontend React + TypeScript + Tailwind (i18n in `src/i18n/`)
-- `src-tauri/src/` — backend Rust: `db.rs` (SQLite), `timer.rs`, `tray.rs`, `watcher.rs` (rilevamento app in primo piano), `apps.rs` (scan app installate), `sync/` (OAuth PKCE + Google Drive + merge)
+- `src-tauri/src/` — backend Rust: `db.rs` (SQLite), `master.rs` (licenza, DTO e
+  pubblicazione), `timer.rs`, `tray.rs`, `watcher.rs`, `apps.rs`, `sync/`
+  (OAuth PKCE + Google Drive + merge)
 
 ## Dati
 

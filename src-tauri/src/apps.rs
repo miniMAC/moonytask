@@ -1,5 +1,7 @@
 use serde::Serialize;
+#[cfg(target_os = "macos")]
 use std::collections::BTreeMap;
+#[cfg(target_os = "macos")]
 use std::path::Path;
 
 #[derive(Serialize, Clone)]
@@ -84,7 +86,7 @@ pub fn frontmost_app() -> Option<(String, String)> {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(not(target_os = "macos"), desktop))]
 pub fn frontmost_app() -> Option<(String, String)> {
     None
 }

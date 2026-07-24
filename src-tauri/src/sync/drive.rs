@@ -50,7 +50,9 @@ fn find_by_name(token: &str, name: &str) -> Result<Option<String>, String> {
 
 pub fn delete_file(token: &str, file_id: &str) -> Result<(), String> {
     client()
-        .delete(format!("https://www.googleapis.com/drive/v3/files/{file_id}"))
+        .delete(format!(
+            "https://www.googleapis.com/drive/v3/files/{file_id}"
+        ))
         .bearer_auth(token)
         .send()
         .map_err(|e| e.to_string())?

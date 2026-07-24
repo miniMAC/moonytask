@@ -58,6 +58,13 @@ fn credentials(app: &AppHandle) -> Option<(String, String)> {
     Some((id, secret))
 }
 
+/// Returns the access token belonging to the Google account already connected
+/// to Drive. Master uses it only to establish a short backend identity session.
+pub(crate) fn identity_access_token(app: &AppHandle) -> Result<String, String> {
+    let (client_id, client_secret) = credentials(app).ok_or("not_configured")?;
+    oauth::valid_access_token(app, &client_id, &client_secret)
+}
+
 fn status(app: &AppHandle) -> SyncStatus {
     let configured = credentials(app).is_some();
     let connected = oauth::load_tokens(app).is_some();
@@ -121,9 +128,9 @@ fn perform_sync(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-fn run_sync(app: &AppHandle) {
+fn run_sync_mode(app: &AppHandle, publish_after_success: bool) -> Result<(), String> {
     if SYNC_IN_PROGRESS.swap(true, Ordering::SeqCst) {
-        return;
+        return Err("sync_in_progress".into());
     }
     emit_status(app);
     let result = perform_sync(app);
@@ -134,6 +141,24 @@ fn run_sync(app: &AppHandle) {
     }
     SYNC_IN_PROGRESS.store(false, Ordering::SeqCst);
     emit_status(app);
+    if result.is_ok() && publish_after_success {
+        crate::master::request_publication(app);
+    }
+    result
+}
+
+fn run_sync(app: &AppHandle) {
+    let _ = run_sync_mode(app, true);
+}
+
+/// Used exactly once after a publication `412`. It refreshes the local Drive
+/// snapshot without scheduling a second publication loop; the caller retries
+/// the upload once with the new backend revision.
+pub(crate) fn sync_for_master_retry(app: &AppHandle) -> Result<(), String> {
+    if !ready(app) {
+        return Err("not_connected".into());
+    }
+    run_sync_mode(app, false)
 }
 
 fn ready(app: &AppHandle) -> bool {
@@ -239,6 +264,7 @@ pub fn sync_login(app: AppHandle, email: Option<String>) -> Result<SyncStatus, S
 #[tauri::command]
 pub fn sync_logout(app: AppHandle, db: State<Db>) -> Result<(), String> {
     oauth::clear_tokens(&app);
+    crate::master::clear_device_token(&app);
     {
         let conn = db.0.lock().unwrap();
         let _ = db::set_setting(&conn, "google_email", "");

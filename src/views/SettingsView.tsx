@@ -4,7 +4,9 @@ import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type {
+  Folder,
   InstalledApp,
+  MasterStatus,
   PaymentType,
   Project,
   RateProfile,
@@ -18,7 +20,14 @@ import Modal from "../components/Modal";
 import { PlusIcon, TrashIcon } from "../components/Icons";
 
 const CURRENCIES = ["EUR", "USD", "GBP", "CHF"];
-const SETTINGS_TABS = ["general", "rates", "apps", "sync", "support"] as const;
+const SETTINGS_TABS = [
+  "general",
+  "rates",
+  "apps",
+  "sync",
+  "master",
+  "support",
+] as const;
 const PAYMENT_TYPES: PaymentType[] = ["hourly", "retainer", "fixed"];
 
 // stile neutro condiviso: le Impostazioni usano i colori dell'interfaccia,
@@ -89,6 +98,7 @@ export default function SettingsView(p: Props) {
         {tab === "rates" && <RateProfilesSection />}
         {tab === "apps" && <WatchedAppsSection projects={p.projects} />}
         {tab === "sync" && <SyncSection />}
+        {tab === "master" && <MasterSection />}
         {tab === "support" && <SupportSection />}
       </div>
     </div>
@@ -935,5 +945,374 @@ function SyncSection() {
         </div>
       )}
     </section>
+  );
+}
+
+// ---------- Master / Web API ----------
+
+function MasterSection() {
+  const { t, i18n } = useTranslation();
+  const [sync, setSync] = useState<SyncStatus | null>(null);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [status, setStatus] = useState<MasterStatus | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [licenseCode, setLicenseCode] = useState("");
+  const [engaged, setEngaged] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const locale = i18n.language === "it" ? "it-IT" : "en-US";
+
+  const applyStatus = (next: MasterStatus) => {
+    setStatus(next);
+    setSelected(new Set(next.selectedFolders.map((folder) => folder.id)));
+    if (next.license?.code) setLicenseCode(next.license.code);
+  };
+
+  const refresh = async (markEngaged = true) => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      if (markEngaged) {
+        setEngaged(true);
+        await api.settingsSet("master_engaged", "1");
+      }
+      applyStatus(await api.masterStatus());
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    Promise.all([
+      api.syncStatus(),
+      api.foldersList(),
+      api.settingsGet("master_engaged"),
+    ]).then(([syncStatus, localFolders, storedEngagement]) => {
+      setSync(syncStatus);
+      setFolders(localFolders);
+      const hasEngaged = storedEngagement === "1";
+      setEngaged(hasEngaged);
+      if (hasEngaged && syncStatus.connected) {
+        setBusy(true);
+        api
+          .masterStatus()
+          .then(applyStatus)
+          .catch((reason) => setError(String(reason)))
+          .finally(() => setBusy(false));
+      }
+    });
+  }, []);
+
+  const createRequest = async (type: "initial" | "renewal") => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      setEngaged(true);
+      await api.settingsSet("master_engaged", "1");
+      applyStatus(await api.masterRequest(type));
+      setNotice(t("settings.master.requestSent"));
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const activate = async () => {
+    if (!licenseCode.trim() || busy) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      applyStatus(await api.masterActivate(licenseCode.trim()));
+      setNotice(t("settings.master.activated"));
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveFolders = async () => {
+    if (busy || !status?.deviceActivated) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const chosen = folders
+        .filter((folder) => selected.has(folder.id))
+        .map((folder) => ({ id: folder.id, name: folder.name }));
+      applyStatus(await api.masterSetFolders(chosen));
+      setNotice(t("settings.master.foldersSaved"));
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const schedulePublication = async () => {
+    setError(null);
+    try {
+      await api.masterPublishNow();
+      setNotice(t("settings.master.publicationScheduled"));
+    } catch (reason) {
+      setError(String(reason));
+    }
+  };
+
+  return (
+    <section className={sectionCls}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className={sectionTitleCls}>{t("settings.master.title")}</h2>
+          <p className={`mt-2 max-w-2xl ${helpTextCls}`}>
+            {t("settings.master.help")}
+          </p>
+        </div>
+        <button
+          onClick={() => refresh()}
+          disabled={busy || !sync?.connected}
+          className={ghostBtnCls}
+        >
+          {busy
+            ? t("common.loading")
+            : t("settings.master.refresh")}
+        </button>
+      </div>
+
+      <div
+        className={`mt-4 rounded-xl border px-4 py-3 ${
+          sync?.connected
+            ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200 pro:border-[#50fa7b]/30 pro:bg-[#50fa7b]/10 pro:text-[#50fa7b]"
+            : "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200 pro:border-[#f1fa8c]/30 pro:bg-[#f1fa8c]/10 pro:text-[#f1fa8c]"
+        }`}
+      >
+        <p className="font-semibold">
+          {sync?.connected
+            ? t("settings.master.driveReady", { email: sync.email ?? "Google" })
+            : t("settings.master.driveRequired")}
+        </p>
+        {!sync?.connected && (
+          <p className="mt-1 text-sm">{t("settings.master.driveRequiredHelp")}</p>
+        )}
+      </div>
+
+      {!engaged && sync?.connected && (
+        <div className="mt-4 rounded-xl border border-neutral-200 p-4 dark:border-neutral-700 pro:border-[#44475a]">
+          <p className={helpTextCls}>{t("settings.master.optional")}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              onClick={() => createRequest("initial")}
+              disabled={busy}
+              className={primaryBtnCls}
+            >
+              {t("settings.master.request")}
+            </button>
+            <button
+              onClick={() => refresh()}
+              disabled={busy}
+              className={ghostBtnCls}
+            >
+              {t("settings.master.alreadyRequested")}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {status && (
+        <div className="mt-5 space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <MasterFact
+              label={t("settings.master.requestState")}
+              value={status.request?.status ?? t("settings.master.notRequested")}
+            />
+            <MasterFact
+              label={t("settings.master.licenseState")}
+              value={status.license?.status ?? t("settings.master.noLicense")}
+            />
+            <MasterFact
+              label={t("settings.master.apiState")}
+              value={
+                status.api.enabled
+                  ? t("settings.master.enabled")
+                  : t("settings.master.disabled")
+              }
+            />
+            <MasterFact
+              label={t("settings.master.lastUpload")}
+              value={
+                status.publication.lastUpload
+                  ? new Date(
+                      status.publication.lastUpload * 1000,
+                    ).toLocaleString(locale)
+                  : t("settings.master.never")
+              }
+            />
+          </div>
+
+          {status.request?.status === "rejected" &&
+            status.request.rejectionReason && (
+              <p className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 dark:border-red-700 dark:bg-red-950/30 dark:text-red-300 pro:border-[#ff5555]/40 pro:bg-[#ff5555]/10 pro:text-[#ff5555]">
+                {t("settings.master.rejectionReason", {
+                  reason: status.request.rejectionReason,
+                })}
+              </p>
+            )}
+
+          {!status.license && status.request?.status !== "pending" && (
+            <button
+              onClick={() => createRequest("initial")}
+              disabled={busy}
+              className={primaryBtnCls}
+            >
+              {t("settings.master.request")}
+            </button>
+          )}
+
+          {status.license && (
+            <div className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-700 pro:border-[#44475a]">
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="min-w-0 flex-1">
+                  <span className={fieldLabelCls}>
+                    {t("settings.master.licenseCode")}
+                  </span>
+                  <input
+                    value={licenseCode}
+                    onChange={(event) => setLicenseCode(event.target.value)}
+                    className={`w-full font-mono ${inputCls}`}
+                  />
+                </label>
+                <button
+                  onClick={() => navigator.clipboard.writeText(licenseCode)}
+                  className={ghostBtnCls}
+                >
+                  {t("common.copy", { defaultValue: "Copy" })}
+                </button>
+                {!status.deviceActivated && (
+                  <button
+                    onClick={activate}
+                    disabled={busy || !licenseCode.trim()}
+                    className={primaryBtnCls}
+                  >
+                    {t("settings.master.activate")}
+                  </button>
+                )}
+              </div>
+              <p className={`mt-2 ${helpTextCls}`}>
+                {t("settings.master.expires", {
+                  time: new Date(status.license.expiresAt * 1000).toLocaleString(
+                    locale,
+                  ),
+                })}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={() => createRequest("renewal")}
+                  disabled={busy || status.request?.status === "pending"}
+                  className={ghostBtnCls}
+                >
+                  {t("settings.master.renew")}
+                </button>
+                <button
+                  onClick={() => openUrl("https://moonytask.com/portal/")}
+                  className={ghostBtnCls}
+                >
+                  {t("settings.master.openPortal")}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {status.deviceActivated && status.license?.status === "active" && (
+            <div className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-700 pro:border-[#44475a]">
+              <h3 className="font-semibold">
+                {t("settings.master.folderSelection")}
+              </h3>
+              <p className={`mt-1 ${helpTextCls}`}>
+                {t("settings.master.folderSelectionHelp")}
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {folders.map((folder) => (
+                  <label
+                    key={folder.id}
+                    className="flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 dark:border-neutral-700 pro:border-[#44475a]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected.has(folder.id)}
+                      className={checkboxCls}
+                      onChange={(event) => {
+                        const next = new Set(selected);
+                        if (event.target.checked) next.add(folder.id);
+                        else next.delete(folder.id);
+                        setSelected(next);
+                      }}
+                    />
+                    {folder.name}
+                  </label>
+                ))}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={saveFolders}
+                  disabled={busy}
+                  className={primaryBtnCls}
+                >
+                  {t("settings.master.saveFolders")}
+                </button>
+                <button
+                  onClick={schedulePublication}
+                  disabled={busy || !status.api.enabled}
+                  className={ghostBtnCls}
+                >
+                  {t("settings.master.publishNow")}
+                </button>
+              </div>
+              {status.api.waitingForApp && (
+                <p className="mt-2 text-sm font-semibold text-amber-700 dark:text-amber-300 pro:text-[#f1fa8c]">
+                  {t("settings.master.waitingForApp")}
+                </p>
+              )}
+            </div>
+          )}
+
+          {status.lastError && (
+            <p className="text-sm font-semibold text-red-600 dark:text-red-400 pro:text-[#ff5555]">
+              {t("settings.master.lastError", { error: status.lastError })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {notice && (
+        <p className="mt-3 text-sm font-semibold text-emerald-600 dark:text-emerald-400 pro:text-[#50fa7b]">
+          {notice}
+        </p>
+      )}
+      {error && (
+        <p className="mt-3 text-sm font-semibold text-red-600 dark:text-red-400 pro:text-[#ff5555]">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function MasterFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-900/40 pro:border-[#44475a] pro:bg-[#282a36]">
+      <p className="text-xs font-bold uppercase tracking-wide text-neutral-500 dark:text-neutral-400 pro:text-[#b9b9c8]">
+        {label}
+      </p>
+      <p className="mt-1 font-semibold">{value}</p>
+    </div>
   );
 }

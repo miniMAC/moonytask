@@ -54,6 +54,23 @@ Le credenziali sono dentro l'app: sugli altri tuoi computer basta copiare la
 
 ## Note
 
-- I dati stanno solo nel tuo Drive (spazio nascosto dedicato all'app, non visibile tra i file).
+- Nell’uso standard i dati stanno sul dispositivo e, se abiliti la sync, nel
+  tuo Drive (spazio nascosto dedicato all'app, non visibile tra i file).
+- La modalità **Master / API Web** è separata e opzionale: soltanto dopo una
+  richiesta esplicita pubblica sul backend le cartelle selezionate. Il backend
+  non legge Drive e non conserva access token o refresh token Google.
 - Il "Client secret" delle app desktop non è considerato segreto da Google, ma evita comunque di pubblicarlo.
 - Per revocare l'accesso: <https://myaccount.google.com/permissions>.
+
+## Backend Master per sviluppo e staging
+
+L’app usa `https://api.moonytask.com` per default. Per una build di sviluppo o
+staging imposta `MOONYTASK_API_URL` durante la compilazione Rust:
+
+```bash
+MOONYTASK_API_URL="https://staging-api.example.com" npm run tauri build
+```
+
+Il token dispositivo Master viene conservato nel keychain su macOS, Windows e
+Linux e nello storage privato dell’app su Android. Le impostazioni Master e
+qualunque credenziale sono escluse dall’export manuale JSON/CSV.

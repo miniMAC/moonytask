@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "macos")]
 use std::process::Command;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -10,6 +11,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 pub struct Db(pub Mutex<Connection>);
 
+#[cfg(desktop)]
 pub fn setting_value(app: &AppHandle, key: &str) -> Option<String> {
     let db = app.state::<Db>();
     let conn = db.0.lock().ok()?;
@@ -1633,7 +1635,7 @@ fn export_data_inner(conn: &Connection) -> rusqlite::Result<ExportData> {
         time_entries: query_entries_all(conn)?,
         project_payments: query_project_payments_all(conn)?,
         watched_apps: query_watched_all(conn)?,
-        settings: query_settings_all(conn)?,
+        settings: query_exportable_settings(conn)?,
     })
 }
 
@@ -1788,15 +1790,32 @@ fn query_watched_all(conn: &Connection) -> rusqlite::Result<Vec<WatchedApp>> {
     rows
 }
 
-fn query_settings_all(conn: &Connection) -> rusqlite::Result<Vec<SettingRow>> {
+// Manual exports are portable user data, not a database dump. This allowlist
+// deliberately excludes OAuth credentials, device/session tokens, local paths
+// and every future setting until it is explicitly reviewed.
+const EXPORTABLE_SETTING_KEYS: &[&str] = &[
+    "language",
+    "theme",
+    "currency",
+    "pdf_totals_only",
+    "auto_merge_daily",
+    "menubar_window_width",
+    "rate_profiles",
+    "default_rate_profile_id",
+    "watch_notifications",
+];
+
+fn query_exportable_settings(conn: &Connection) -> rusqlite::Result<Vec<SettingRow>> {
     let mut stmt = conn.prepare("SELECT key, value FROM settings ORDER BY key")?;
     let rows = stmt
-        .query_map([], |r| {
-            Ok(SettingRow {
-                key: r.get(0)?,
-                value: r.get(1)?,
-            })
-        })?
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+        .filter_map(|row| match row {
+            Ok((key, value)) if EXPORTABLE_SETTING_KEYS.contains(&key.as_str()) => {
+                Some(Ok(SettingRow { key, value }))
+            }
+            Ok(_) => None,
+            Err(error) => Some(Err(error)),
+        })
         .collect();
     rows
 }
@@ -2267,6 +2286,7 @@ fn select_folder_dialog(_current: Option<&str>) -> Result<Option<String>, String
     Err("folder_dialog_not_supported".into())
 }
 
+#[cfg(target_os = "macos")]
 fn escape_applescript_string(value: &str) -> String {
     value
         .replace('\\', "\\\\")
@@ -2277,6 +2297,8 @@ fn escape_applescript_string(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use rusqlite::Connection;
+
     #[test]
     fn report_pdf_renders() {
         let path = std::env::temp_dir().join("moonytask-test-report.pdf");
@@ -2304,5 +2326,59 @@ mod tests {
         )
         .unwrap();
         assert!(path.metadata().unwrap().len() > 500);
+    }
+
+    #[test]
+    fn manual_exports_use_a_strict_settings_allowlist() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             INSERT INTO settings VALUES ('language', 'it');
+             INSERT INTO settings VALUES ('currency', 'EUR');
+             INSERT INTO settings VALUES ('google_oauth_tokens', 'oauth-secret');
+             INSERT INTO settings VALUES ('google_client_secret', 'client-secret');
+             INSERT INTO settings VALUES ('google_access_token_backup', 'access-secret');
+             INSERT INTO settings VALUES ('master_device_token', 'device-secret');
+             INSERT INTO settings VALUES ('master_app_session', 'session-secret');
+             INSERT INTO settings VALUES ('api_key', 'api-secret');
+             INSERT INTO settings VALUES ('pdf_export_dir', '/private/local/path');",
+        )
+        .unwrap();
+
+        let settings = super::query_exportable_settings(&conn).unwrap();
+        assert_eq!(
+            settings
+                .iter()
+                .map(|setting| setting.key.as_str())
+                .collect::<Vec<_>>(),
+            vec!["currency", "language"]
+        );
+
+        let data = super::ExportData {
+            exported_at: 1,
+            folders: Vec::new(),
+            projects: Vec::new(),
+            time_entries: Vec::new(),
+            project_payments: Vec::new(),
+            watched_apps: Vec::new(),
+            settings,
+        };
+        let json = serde_json::to_string(&data).unwrap();
+        let csv = super::export_data_csv(&data);
+        for secret in [
+            "oauth-secret",
+            "client-secret",
+            "access-secret",
+            "device-secret",
+            "session-secret",
+            "api-secret",
+            "/private/local/path",
+            "google_oauth_tokens",
+            "google_client_secret",
+            "master_device_token",
+        ] {
+            assert!(!json.contains(secret), "secret leaked in JSON: {secret}");
+            assert!(!csv.contains(secret), "secret leaked in CSV: {secret}");
+        }
     }
 }

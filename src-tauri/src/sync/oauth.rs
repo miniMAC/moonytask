@@ -67,8 +67,12 @@ pub fn save_tokens(app: &AppHandle, tokens: &StoredTokens) -> Result<(), String>
     use tauri::Manager;
     let db = app.state::<crate::db::Db>();
     let conn = db.0.lock().unwrap();
-    crate::db::set_setting(&conn, TOKENS_SETTING, &serde_json::to_string(tokens).unwrap())
-        .map_err(|e| e.to_string())
+    crate::db::set_setting(
+        &conn,
+        TOKENS_SETTING,
+        &serde_json::to_string(tokens).unwrap(),
+    )
+    .map_err(|e| e.to_string())
 }
 
 #[cfg(mobile)]

@@ -17,6 +17,7 @@ struct UpdateManifest {
 #[derive(Deserialize)]
 struct MobileDownloads {
     android: Option<MobileDownload>,
+    #[allow(dead_code)]
     ios: Option<MobileDownload>,
 }
 

@@ -2,6 +2,7 @@ mod apps;
 mod db;
 #[cfg(desktop)]
 mod idle;
+mod master;
 #[cfg(mobile)]
 mod mobile_updater;
 mod sync;
@@ -127,6 +128,7 @@ pub fn run() {
             }
             timer::spawn_tick_thread(handle.clone());
             sync::spawn_auto_sync(handle.clone());
+            master::spawn_publication_worker(handle.clone());
             sync::request_sync(&handle);
 
             Ok(())
@@ -178,6 +180,11 @@ pub fn run() {
             sync::sync_login,
             sync::sync_logout,
             sync::sync_now,
+            master::master_status,
+            master::master_request,
+            master::master_activate,
+            master::master_set_folders,
+            master::master_publish_now,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

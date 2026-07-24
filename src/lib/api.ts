@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   Folder,
   InstalledApp,
+  MasterFolderSelection,
+  MasterStatus,
   Project,
   ProjectPayment,
   RateProfile,
@@ -185,3 +187,14 @@ export const syncLogin = (email: string | null) =>
 export const syncLogout = () => invoke<void>("sync_logout");
 export const syncNow = () => invoke<SyncStatus>("sync_now");
 export const quitNow = () => invoke<void>("quit_now");
+
+// Master / Web API. These calls are made only after the user explicitly
+// engages the optional Master section.
+export const masterStatus = () => invoke<MasterStatus>("master_status");
+export const masterRequest = (requestType: "initial" | "renewal") =>
+  invoke<MasterStatus>("master_request", { requestType });
+export const masterActivate = (code: string) =>
+  invoke<MasterStatus>("master_activate", { code });
+export const masterSetFolders = (folders: MasterFolderSelection[]) =>
+  invoke<MasterStatus>("master_set_folders", { folders });
+export const masterPublishNow = () => invoke<void>("master_publish_now");
