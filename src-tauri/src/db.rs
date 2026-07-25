@@ -25,6 +25,13 @@ pub fn now_secs() -> i64 {
         .as_secs() as i64
 }
 
+fn now_millis() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64
+}
+
 pub fn new_id() -> String {
     uuid::Uuid::new_v4().to_string()
 }
@@ -90,6 +97,11 @@ pub fn init(app: &AppHandle) -> Result<Connection, Box<dyn std::error::Error>> {
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS folder_collapse_states (
+            folder_id TEXT PRIMARY KEY,
+            collapsed INTEGER NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL
         );",
     )?;
     // migrazione additiva: colore delle cartelle (ignora l'errore se già presente)
@@ -232,6 +244,14 @@ pub struct Folder {
     pub color: Option<String>,
     pub updated_at: i64,
     pub deleted: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderCollapseState {
+    pub folder_id: String,
+    pub collapsed: bool,
+    pub updated_at: i64,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -515,6 +535,51 @@ pub fn folders_list(db: State<Db>) -> Result<Vec<Folder>, String> {
         .collect::<Result<Vec<_>, _>>()
         .map_err(err)?;
     Ok(rows)
+}
+
+#[tauri::command]
+pub fn folder_collapse_states_list(db: State<Db>) -> Result<Vec<FolderCollapseState>, String> {
+    let conn = db.0.lock().unwrap();
+    let mut stmt = conn
+        .prepare(
+            "SELECT folder_id, collapsed, updated_at
+             FROM folder_collapse_states",
+        )
+        .map_err(err)?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(FolderCollapseState {
+                folder_id: r.get(0)?,
+                collapsed: r.get::<_, i64>(1)? != 0,
+                updated_at: r.get(2)?,
+            })
+        })
+        .map_err(err)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(err)?;
+    Ok(rows)
+}
+
+#[tauri::command]
+pub fn folder_collapsed_set(
+    app: AppHandle,
+    db: State<Db>,
+    folder_id: String,
+    collapsed: bool,
+) -> Result<(), String> {
+    let conn = db.0.lock().unwrap();
+    conn.execute(
+        "INSERT INTO folder_collapse_states (folder_id, collapsed, updated_at)
+         VALUES (?1, ?2, ?3)
+         ON CONFLICT(folder_id) DO UPDATE SET
+           collapsed = excluded.collapsed,
+           updated_at = excluded.updated_at",
+        rusqlite::params![folder_id, i64::from(collapsed), now_millis()],
+    )
+    .map_err(err)?;
+    crate::sync::mark_dirty();
+    let _ = app.emit("data_changed", ());
+    Ok(())
 }
 
 #[tauri::command]
@@ -1135,16 +1200,21 @@ pub fn data_export(app: AppHandle, db: State<Db>, format: String) -> Result<Stri
         export_data_csv(&data)
     };
 
-    let dir = app
-        .path()
-        .download_dir()
-        .or_else(|_| app.path().app_data_dir())
-        .map_err(err)?;
+    let filename = format!("moonytask-export-{}.{}", data.exported_at, format);
+    // Android può risolvere Downloads senza poterci scrivere per via dello
+    // scoped storage. In quel caso mantiene comunque l'export nell'area locale
+    // dell'app.
+    if let Ok(dir) = app.path().download_dir() {
+        let path = dir.join(&filename);
+        if std::fs::create_dir_all(&dir).is_ok() && std::fs::write(&path, &contents).is_ok() {
+            return Ok(path.to_string_lossy().to_string());
+        }
+    }
+
+    let dir = app.path().app_data_dir().map_err(err)?;
     std::fs::create_dir_all(&dir).map_err(err)?;
-
-    let path = dir.join(format!("moonytask-export-{}.{}", data.exported_at, format));
+    let path = dir.join(filename);
     std::fs::write(&path, contents).map_err(err)?;
-
     Ok(path.to_string_lossy().to_string())
 }
 

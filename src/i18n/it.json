@@ -25,6 +25,8 @@
     "deleteConfirm": "Eliminare \"{{name}}\"? Le ore registrate non appariranno più nei report.",
     "empty": "Nessun progetto in questa cartella.",
     "select": "Seleziona un progetto dalla barra laterale",
+    "search": "Cerca tra i progetti…",
+    "noResults": "Nessun progetto trovato.",
     "todayTime": "Oggi",
     "weekTime": "Questa settimana",
     "totalTime": "Totale",
@@ -158,6 +160,15 @@
     "pdfExportDirPlaceholder": "Vuoto = Downloads",
     "pdfExportDirHelp": "Percorso della cartella dove salvare gli export dei progetti (PDF, JSON, CSV). Puoi usare anche ~/Documents/MoonyTask.",
     "chooseFolder": "Scegli…",
+    "dataExport": {
+      "title": "Esporta dati locali",
+      "help": "Salva una copia portabile di cartelle, progetti, tempi, pagamenti e preferenze non sensibili. Le credenziali e i token non vengono inclusi.",
+      "json": "Esporta JSON",
+      "csv": "Esporta CSV",
+      "exporting": "Esportazione…",
+      "saved": "Dati salvati in {{path}}",
+      "failed": "Esportazione non riuscita."
+    },
     "rates": {
       "title": "Profili tariffari",
       "help": "Crea profili riutilizzabili con nome, tipo di pagamento e costo orario. Il profilo predefinito viene applicato ai nuovi progetti e puoi cambiarlo nella scheda progetto.",

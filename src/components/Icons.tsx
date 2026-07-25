@@ -66,3 +66,16 @@ export const FolderIcon = ({ size = 16 }: { size?: number }) => (
     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2Z" />
   </svg>
 );
+
+export const ChevronIcon = ({ size = 16 }: { size?: number }) => (
+  <svg {...base} width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m9 18 6-6-6-6" />
+  </svg>
+);
+
+export const SearchIcon = ({ size = 16 }: { size?: number }) => (
+  <svg {...base} width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-4-4" />
+  </svg>
+);

@@ -135,6 +135,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             db::folders_list,
+            db::folder_collapse_states_list,
+            db::folder_collapsed_set,
             db::folder_create,
             db::folder_update,
             db::folder_delete,

@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Folder, Project, TimerSnapshot } from "../lib/types";
 import { projectColor } from "../lib/colors";
 import {
+  ChevronIcon,
   FolderIcon,
   PencilIcon,
   PlayIcon,
   PlusIcon,
+  SearchIcon,
   TrashIcon,
 } from "./Icons";
 
@@ -13,6 +16,8 @@ interface Props {
   folders: Folder[];
   projects: Project[];
   timer: TimerSnapshot;
+  collapsedFolderIds: ReadonlySet<string>;
+  onFolderCollapsedChange: (folderId: string, collapsed: boolean) => void;
   onSelectProject: (id: string) => void;
   onNewFolder: () => void;
   onRenameFolder: (f: Folder) => void;
@@ -25,6 +30,18 @@ interface Props {
 // azioni sempre visibili (niente hover), niente drag&drop
 export default function MobileProjectList(p: Props) {
   const { t } = useTranslation();
+  const [query, setQuery] = useState("");
+  const queryNorm = query.trim().toLocaleLowerCase();
+  const visibleFolders = queryNorm
+    ? p.folders.filter((folder) =>
+        p.projects.some(
+          (project) =>
+            project.folderId === folder.id &&
+            !project.archived &&
+            project.name.toLocaleLowerCase().includes(queryNorm),
+        ),
+      )
+    : p.folders;
 
   return (
     <div className="px-4 pb-6 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -41,25 +58,70 @@ export default function MobileProjectList(p: Props) {
         </button>
       </div>
 
-      {p.folders.length === 0 && (
+      <label className="relative mb-4 block">
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-neutral-400">
+          <SearchIcon size={18} />
+        </span>
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t("projects.search")}
+          className="h-12 w-full rounded-xl border border-neutral-200 bg-white pl-10 pr-3 text-base outline-none transition placeholder:text-neutral-400 focus:border-blue-500 dark:border-neutral-700 dark:bg-neutral-800/60 pro:border-[#44475a] pro:bg-[#21222c] pro:text-[#f8f8f2] pro:focus:border-[#bd93f9]"
+        />
+      </label>
+
+      {p.folders.length === 0 && !queryNorm && (
         <p className="py-6 text-center text-base text-neutral-500">
           {t("folders.empty")}
         </p>
       )}
 
-      {p.folders.map((folder) => {
+      {queryNorm && visibleFolders.length === 0 && (
+        <p className="py-6 text-center text-base text-neutral-500">
+          {t("projects.noResults")}
+        </p>
+      )}
+
+      {visibleFolders.map((folder) => {
         const items = p.projects.filter(
-          (pr) => pr.folderId === folder.id && !pr.archived,
+          (project) =>
+            project.folderId === folder.id &&
+            !project.archived &&
+            (!queryNorm ||
+              project.name.toLocaleLowerCase().includes(queryNorm)),
         );
+        const collapsed = p.collapsedFolderIds.has(folder.id);
+        const showContents = Boolean(queryNorm) || !collapsed;
         return (
           <div key={folder.id} className="mb-4">
             <div className="flex items-center gap-2 px-1 py-1.5 text-neutral-600 dark:text-neutral-300 pro:text-[#d7d7e2]">
-              <span style={{ color: folder.color ?? undefined }}>
-                <FolderIcon size={15} />
-              </span>
-              <span className="flex-1 truncate text-base font-semibold">
-                {folder.name}
-              </span>
+              <button
+                type="button"
+                aria-expanded={showContents}
+                disabled={Boolean(queryNorm)}
+                onClick={() =>
+                  p.onFolderCollapsedChange(folder.id, !collapsed)
+                }
+                className="flex min-h-10 min-w-0 flex-1 items-center gap-2 text-left"
+              >
+                <span
+                  className={`shrink-0 text-neutral-400 transition-transform ${
+                    showContents ? "rotate-90" : ""
+                  }`}
+                >
+                  <ChevronIcon size={14} />
+                </span>
+                <span
+                  className="shrink-0"
+                  style={{ color: folder.color ?? undefined }}
+                >
+                  <FolderIcon size={15} />
+                </span>
+                <span className="min-w-0 flex-1 truncate text-base font-semibold">
+                  {folder.name}
+                </span>
+              </button>
               <button
                 title={t("projects.new")}
                 onClick={() => p.onNewProject(folder.id)}
@@ -83,7 +145,8 @@ export default function MobileProjectList(p: Props) {
               </button>
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800/60 pro:border-[#44475a] pro:bg-[#21222c]">
+            {showContents && (
+              <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800/60 pro:border-[#44475a] pro:bg-[#21222c]">
               {items.length === 0 && (
                 <p className="px-4 py-3 text-sm text-neutral-400 dark:text-neutral-500">
                   {t("projects.empty")}
@@ -140,7 +203,8 @@ export default function MobileProjectList(p: Props) {
                   </div>
                 );
               })}
-            </div>
+              </div>
+            )}
           </div>
         );
       })}

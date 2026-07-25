@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   Folder,
+  FolderCollapseState,
   InstalledApp,
   MasterFolderSelection,
   MasterStatus,
@@ -16,6 +17,10 @@ import type {
 
 // folders
 export const foldersList = () => invoke<Folder[]>("folders_list");
+export const folderCollapseStatesList = () =>
+  invoke<FolderCollapseState[]>("folder_collapse_states_list");
+export const folderCollapsedSet = (folderId: string, collapsed: boolean) =>
+  invoke<void>("folder_collapsed_set", { folderId, collapsed });
 export const folderCreate = (name: string, color: string | null) =>
   invoke<Folder>("folder_create", { name, color });
 export const folderUpdate = (id: string, name: string, color: string | null) =>

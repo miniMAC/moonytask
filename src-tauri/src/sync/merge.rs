@@ -1,4 +1,4 @@
-use crate::db::{Folder, Project, ProjectPayment, TimeEntry, WatchedApp};
+use crate::db::{Folder, FolderCollapseState, Project, ProjectPayment, TimeEntry, WatchedApp};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -15,6 +15,8 @@ pub struct Snapshot {
     pub project_payments: Vec<ProjectPayment>,
     #[serde(default)]
     pub watched_apps: Vec<WatchedApp>,
+    #[serde(default)]
+    pub folder_collapse_states: Vec<FolderCollapseState>,
 }
 
 /// Legge tutte le righe (incluse quelle soft-deleted: servono come tombstone).
@@ -121,6 +123,24 @@ pub fn load_local(conn: &Connection) -> Result<Snapshot, String> {
         .collect::<Result<_, _>>()
         .map_err(err)?;
 
+    let mut stmt = conn
+        .prepare(
+            "SELECT folder_id, collapsed, updated_at
+             FROM folder_collapse_states",
+        )
+        .map_err(err)?;
+    snap.folder_collapse_states = stmt
+        .query_map([], |r| {
+            Ok(FolderCollapseState {
+                folder_id: r.get(0)?,
+                collapsed: r.get::<_, i64>(1)? != 0,
+                updated_at: r.get(2)?,
+            })
+        })
+        .map_err(err)?
+        .collect::<Result<_, _>>()
+        .map_err(err)?;
+
     Ok(snap)
 }
 
@@ -159,6 +179,11 @@ pub fn merge(local: Snapshot, remote: Snapshot) -> Snapshot {
         watched_apps: merge_rows(local.watched_apps, remote.watched_apps, |r| {
             (r.id.clone(), r.updated_at)
         }),
+        folder_collapse_states: merge_rows(
+            local.folder_collapse_states,
+            remote.folder_collapse_states,
+            |r| (r.folder_id.clone(), r.updated_at),
+        ),
     }
 }
 
@@ -213,5 +238,54 @@ pub fn apply(conn: &mut Connection, snap: &Snapshot) -> Result<(), String> {
         )
         .map_err(err)?;
     }
+    for state in &snap.folder_collapse_states {
+        tx.execute(
+            "INSERT OR REPLACE INTO folder_collapse_states (folder_id, collapsed, updated_at)
+             VALUES (?1, ?2, ?3)",
+            rusqlite::params![
+                state.folder_id,
+                i64::from(state.collapsed),
+                state.updated_at
+            ],
+        )
+        .map_err(err)?;
+    }
     tx.commit().map_err(err)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn folder_collapse_state_uses_last_write_wins() {
+        let local = Snapshot {
+            folder_collapse_states: vec![FolderCollapseState {
+                folder_id: "folder-1".into(),
+                collapsed: false,
+                updated_at: 100,
+            }],
+            ..Snapshot::default()
+        };
+        let remote = Snapshot {
+            folder_collapse_states: vec![FolderCollapseState {
+                folder_id: "folder-1".into(),
+                collapsed: true,
+                updated_at: 200,
+            }],
+            ..Snapshot::default()
+        };
+
+        let merged = merge(local, remote);
+
+        assert_eq!(merged.folder_collapse_states.len(), 1);
+        assert!(merged.folder_collapse_states[0].collapsed);
+        assert_eq!(merged.folder_collapse_states[0].updated_at, 200);
+    }
+
+    #[test]
+    fn old_snapshots_default_to_no_folder_collapse_state() {
+        let snapshot: Snapshot = serde_json::from_str("{}").unwrap();
+        assert!(snapshot.folder_collapse_states.is_empty());
+    }
 }

@@ -11,6 +11,7 @@ import { projectColor } from "../lib/colors";
 import appIcon from "../assets/icon.png";
 import {
   ChartIcon,
+  ChevronIcon,
   FolderIcon,
   GearIcon,
   PencilIcon,
@@ -27,6 +28,8 @@ interface Props {
   view: View;
   selectedId: string | null;
   timer: TimerSnapshot;
+  collapsedFolderIds: ReadonlySet<string>;
+  onFolderCollapsedChange: (folderId: string, collapsed: boolean) => void;
   onNav: (v: View) => void;
   onSelectProject: (id: string) => void;
   onNewFolder: () => void;
@@ -211,6 +214,7 @@ export default function Sidebar(p: Props) {
           const items = p.projects.filter(
             (pr) => pr.folderId === folder.id && !pr.archived,
           );
+          const collapsed = p.collapsedFolderIds.has(folder.id);
           return (
             <div
               key={folder.id}
@@ -227,12 +231,31 @@ export default function Sidebar(p: Props) {
                 }}
                 className="group relative flex min-w-0 items-center gap-1.5 rounded px-2 py-1 pr-20 text-neutral-900 dark:text-neutral-100 pro:text-[#f8f8f2]"
               >
-                <span style={{ color: folder.color ?? undefined }}>
-                  <FolderIcon size={13} />
-                </span>
-                <span className="min-w-0 flex-1 truncate text-base font-medium">
-                  {folder.name}
-                </span>
+                <button
+                  type="button"
+                  aria-expanded={!collapsed}
+                  onClick={() =>
+                    p.onFolderCollapsedChange(folder.id, !collapsed)
+                  }
+                  className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                >
+                  <span
+                    className={`shrink-0 text-neutral-400 transition-transform ${
+                      collapsed ? "" : "rotate-90"
+                    }`}
+                  >
+                    <ChevronIcon size={12} />
+                  </span>
+                  <span
+                    className="shrink-0"
+                    style={{ color: folder.color ?? undefined }}
+                  >
+                    <FolderIcon size={13} />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-base font-medium">
+                    {folder.name}
+                  </span>
+                </button>
                 <span className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                   <HoverIconButton
                     label={t("projects.new")}
@@ -256,7 +279,8 @@ export default function Sidebar(p: Props) {
                 </span>
               </div>
 
-              {items.map((project) => {
+              {!collapsed &&
+                items.map((project) => {
                 const active =
                   p.view === "project" && p.selectedId === project.id;
                 const running =
@@ -312,8 +336,8 @@ export default function Sidebar(p: Props) {
                     )}
                   </div>
                 );
-              })}
-              {items.length === 0 && (
+                })}
+              {!collapsed && items.length === 0 && (
                 <p className="ml-5 py-1 text-sm text-neutral-400 dark:text-neutral-600">
                   {t("projects.empty")}
                 </p>

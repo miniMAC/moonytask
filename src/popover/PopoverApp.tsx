@@ -65,7 +65,9 @@ export default function PopoverApp() {
     elapsedSecs: 0,
   });
   const [tab, setTab] = useState<Tab>("all");
-  const [open, setOpen] = useState<Set<string>>(new Set());
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [query, setQuery] = useState("");
   const [createKind, setCreateKind] = useState<CreateKind | null>(null);
   const [newName, setNewName] = useState("");
@@ -80,17 +82,42 @@ export default function PopoverApp() {
     useState<RateProfile | null>(null);
 
   const loadAll = useCallback(async () => {
-    const [f, p, tot, snap] = await Promise.all([
+    const [f, p, tot, snap, collapseStates] = await Promise.all([
       api.foldersList(),
       api.projectsList(),
       api.projectTotals(),
       api.timerGetState(),
+      api.folderCollapseStatesList(),
     ]);
     setFolders(f);
     setProjects(p);
     setTotals(new Map(tot.map((x) => [x.projectId, x])));
     setTimer(snap);
+    setCollapsedFolderIds(
+      new Set(
+        collapseStates
+          .filter((state) => state.collapsed)
+          .map((state) => state.folderId),
+      ),
+    );
   }, []);
+
+  const updateFolderCollapsed = useCallback(
+    async (folderId: string, collapsed: boolean) => {
+      setCollapsedFolderIds((current) => {
+        const next = new Set(current);
+        if (collapsed) next.add(folderId);
+        else next.delete(folderId);
+        return next;
+      });
+      try {
+        await api.folderCollapsedSet(folderId, collapsed);
+      } catch {
+        await loadAll();
+      }
+    },
+    [loadAll],
+  );
 
   const loadRateProfileDefault = useCallback(async () => {
     const [profiles, defaultId] = await Promise.all([
@@ -311,7 +338,7 @@ export default function PopoverApp() {
     try {
       if (createKind === "folder") {
         const folder = await api.folderCreate(newName.trim(), newColor);
-        setOpen((current) => new Set(current).add(folder.id));
+        await updateFolderCollapsed(folder.id, false);
         setNewFolderId(folder.id);
         setTab("all");
         setQuery("");
@@ -328,7 +355,7 @@ export default function PopoverApp() {
           newColor,
           rateProfileId,
         );
-        setOpen((current) => new Set(current).add(newFolderId));
+        await updateFolderCollapsed(newFolderId, false);
         setTab("all");
         setQuery("");
       }
@@ -630,17 +657,12 @@ export default function PopoverApp() {
         ) : tab === "all" ? (
           folders.map((folder) => {
             const items = active.filter((p) => p.folderId === folder.id);
-            const expanded = open.has(folder.id);
+            const expanded = !collapsedFolderIds.has(folder.id);
             return (
               <div key={folder.id} className="mb-1">
                 <button
                   onClick={() =>
-                    setOpen((s) => {
-                      const n = new Set(s);
-                      if (n.has(folder.id)) n.delete(folder.id);
-                      else n.add(folder.id);
-                      return n;
-                    })
+                    updateFolderCollapsed(folder.id, expanded)
                   }
                   draggable
                   onDragStart={(e) => {

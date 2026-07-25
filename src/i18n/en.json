@@ -25,6 +25,8 @@
     "deleteConfirm": "Delete \"{{name}}\"? Its tracked time will no longer appear in reports.",
     "empty": "No projects in this folder.",
     "select": "Select a project from the sidebar",
+    "search": "Search projects…",
+    "noResults": "No projects found.",
     "todayTime": "Today",
     "weekTime": "This week",
     "totalTime": "Total",
@@ -158,6 +160,15 @@
     "pdfExportDirPlaceholder": "Empty = Downloads",
     "pdfExportDirHelp": "Folder path where project exports (PDF, JSON, CSV) are saved. You can also use ~/Documents/MoonyTask.",
     "chooseFolder": "Choose…",
+    "dataExport": {
+      "title": "Export local data",
+      "help": "Save a portable copy of folders, projects, tracked time, payments, and non-sensitive preferences. Credentials and tokens are never included.",
+      "json": "Export JSON",
+      "csv": "Export CSV",
+      "exporting": "Exporting…",
+      "saved": "Data saved to {{path}}",
+      "failed": "Export failed."
+    },
     "rates": {
       "title": "Rate profiles",
       "help": "Create reusable profiles with a name, payment type, and hourly rate. The default profile is applied to new projects and can be changed in the project sheet.",

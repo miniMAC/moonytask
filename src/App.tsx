@@ -26,6 +26,9 @@ export default function App() {
   const { t, i18n } = useTranslation();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [timer, setTimer] = useState<TimerSnapshot>({
     status: "idle",
     projectId: null,
@@ -52,10 +55,34 @@ export default function App() {
   } | null>(null);
 
   const reload = useCallback(async () => {
-    const [f, p] = await Promise.all([api.foldersList(), api.projectsList()]);
+    const [f, p, collapseStates] = await Promise.all([
+      api.foldersList(),
+      api.projectsList(),
+      api.folderCollapseStatesList(),
+    ]);
     setFolders(f);
     setProjects(p);
+    setCollapsedFolderIds(
+      new Set(
+        collapseStates
+          .filter((state) => state.collapsed)
+          .map((state) => state.folderId),
+      ),
+    );
   }, []);
+
+  const setFolderCollapsed = useCallback(
+    (folderId: string, collapsed: boolean) => {
+      setCollapsedFolderIds((current) => {
+        const next = new Set(current);
+        if (collapsed) next.add(folderId);
+        else next.delete(folderId);
+        return next;
+      });
+      api.folderCollapsedSet(folderId, collapsed).catch(() => reload());
+    },
+    [reload],
+  );
 
   useEffect(() => {
     noteRequestRef.current = noteRequest;
@@ -188,6 +215,8 @@ export default function App() {
         view={view}
         selectedId={selectedId}
         timer={timer}
+        collapsedFolderIds={collapsedFolderIds}
+        onFolderCollapsedChange={setFolderCollapsed}
         onNav={setView}
         onSelectProject={(id) => {
           setSelectedId(id);
@@ -245,6 +274,8 @@ export default function App() {
                   folders={folders}
                   projects={projects}
                   timer={timer}
+                  collapsedFolderIds={collapsedFolderIds}
+                  onFolderCollapsedChange={setFolderCollapsed}
                   onSelectProject={(id) => {
                     setSelectedId(id);
                     setView("project");

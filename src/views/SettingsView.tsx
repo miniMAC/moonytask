@@ -92,6 +92,7 @@ export default function SettingsView(p: Props) {
               currency={p.currency}
               onCurrencyChange={p.onCurrencyChange}
             />
+            <DataExportSection />
             <DangerSection projects={p.projects} />
           </>
         )}
@@ -484,6 +485,62 @@ function RateProfilesSection() {
         <PlusIcon size={14} />
         {t("settings.rates.add")}
       </button>
+    </section>
+  );
+}
+
+function DataExportSection() {
+  const { t } = useTranslation();
+  const [busyFormat, setBusyFormat] = useState<"json" | "csv" | null>(null);
+  const [exportedPath, setExportedPath] = useState("");
+  const [failed, setFailed] = useState(false);
+
+  const exportData = async (format: "json" | "csv") => {
+    if (busyFormat) return;
+    setBusyFormat(format);
+    setExportedPath("");
+    setFailed(false);
+    try {
+      setExportedPath(await api.dataExport(format));
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusyFormat(null);
+    }
+  };
+
+  return (
+    <section className={sectionCls}>
+      <h2 className={sectionTitleCls}>{t("settings.dataExport.title")}</h2>
+      <p className={`mt-2 max-w-2xl ${helpTextCls}`}>
+        {t("settings.dataExport.help")}
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {(["json", "csv"] as const).map((format) => (
+          <button
+            key={format}
+            onClick={() => exportData(format)}
+            disabled={busyFormat !== null}
+            className={format === "json" ? primaryBtnCls : ghostBtnCls}
+          >
+            {busyFormat === format
+              ? t("settings.dataExport.exporting")
+              : t(`settings.dataExport.${format}`)}
+          </button>
+        ))}
+      </div>
+      <div aria-live="polite">
+        {exportedPath && (
+          <p className="mt-3 break-all text-sm font-medium text-emerald-600 dark:text-emerald-400 pro:text-[#50fa7b]">
+            {t("settings.dataExport.saved", { path: exportedPath })}
+          </p>
+        )}
+        {failed && (
+          <p className="mt-3 text-sm font-medium text-red-600 dark:text-red-400 pro:text-[#ff5555]">
+            {t("settings.dataExport.failed")}
+          </p>
+        )}
+      </div>
     </section>
   );
 }

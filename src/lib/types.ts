@@ -7,6 +7,12 @@ export interface Folder {
   deleted: number;
 }
 
+export interface FolderCollapseState {
+  folderId: string;
+  collapsed: boolean;
+  updatedAt: number;
+}
+
 export interface Project {
   id: string;
   folderId: string;
