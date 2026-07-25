@@ -3,6 +3,12 @@
   "tasks": [
     {
       "label": "Build: tutto (desktop CI + Android APK)",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/generate-latest-json.mjs"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
       "dependsOn": [
         "CI: build all desktop artifacts",
         "Build: Android APK (release)"
@@ -13,7 +19,7 @@
         "isDefault": true
       },
       "problemMatcher": [],
-      "detail": "⌘⇧B: genera tutti i pacchetti desktop in CI e l'APK Android firmato in parallelo, salvando tutto in ~/Desktop/MoonyTask."
+      "detail": "⌘⇧B: genera desktop e Android in parallelo, poi crea latest.json soltanto quando versione, firma e hash dell'APK sono stati verificati."
     },
     {
       "label": "Tauri: dev",

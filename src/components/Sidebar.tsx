@@ -6,9 +6,15 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
-import type { Folder, Project, TimerSnapshot } from "../lib/types";
+import type {
+  Folder,
+  MasterSharedData,
+  Project,
+  TimerSnapshot,
+} from "../lib/types";
 import { projectColor } from "../lib/colors";
 import appIcon from "../assets/icon.png";
+import SharedFolderList from "./SharedFolderList";
 import {
   ChartIcon,
   ChevronIcon,
@@ -28,6 +34,10 @@ interface Props {
   view: View;
   selectedId: string | null;
   timer: TimerSnapshot;
+  sharedData: MasterSharedData | null;
+  folderScope: "personal" | "shared";
+  onFolderScopeChange: (scope: "personal" | "shared") => void;
+  onRefreshShared: () => void;
   collapsedFolderIds: ReadonlySet<string>;
   onFolderCollapsedChange: (folderId: string, collapsed: boolean) => void;
   onNav: (v: View) => void;
@@ -190,7 +200,27 @@ export default function Sidebar(p: Props) {
         </span>
       </div>
 
+      {p.sharedData && (
+        <div className="mx-3 mb-1 grid grid-cols-2 rounded-lg bg-neutral-200/70 p-1 text-sm font-semibold dark:bg-neutral-800 pro:bg-[#343746]">
+          {(["personal", "shared"] as const).map((scope) => (
+            <button
+              key={scope}
+              onClick={() => p.onFolderScopeChange(scope)}
+              className={`rounded-md px-2 py-1.5 ${
+                p.folderScope === scope
+                  ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-white pro:bg-[#44475a] pro:text-[#f8f8f2]"
+                  : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+              }`}
+            >
+              {t(`folders.${scope}`)}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto overflow-x-clip px-2 pb-2">
+        {p.folderScope === "personal" || !p.sharedData ? (
+          <>
         <div className="mb-1 flex items-center justify-between px-2 pt-2">
           <span className="text-sm font-semibold uppercase tracking-wider text-neutral-500 pro:text-[#bd93f9]">
             {t("folders.title")}
@@ -345,6 +375,23 @@ export default function Sidebar(p: Props) {
             </div>
           );
         })}
+          </>
+        ) : (
+          <div className="pt-2">
+            <div className="mb-2 flex items-center justify-between px-2">
+              <span className="text-sm font-semibold uppercase tracking-wider text-neutral-500 pro:text-[#bd93f9]">
+                {t("folders.shared")}
+              </span>
+              <button
+                onClick={p.onRefreshShared}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 pro:text-[#8be9fd]"
+              >
+                {t("common.refresh")}
+              </button>
+            </div>
+            <SharedFolderList data={p.sharedData} />
+          </div>
+        )}
       </div>
 
       {projectMenu && (

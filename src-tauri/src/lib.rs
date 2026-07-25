@@ -1,3 +1,5 @@
+#[cfg(target_os = "android")]
+mod android_google_auth;
 mod apps;
 mod db;
 #[cfg(desktop)]
@@ -44,6 +46,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init());
+
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(android_google_auth::init());
 
     #[cfg(desktop)]
     let builder = builder
@@ -184,6 +189,11 @@ pub fn run() {
             sync::sync_now,
             master::master_status,
             master::master_request,
+            master::master_association_request,
+            master::master_associations,
+            master::master_association_approve,
+            master::master_association_remove,
+            master::master_shared_data,
             master::master_activate,
             master::master_set_folders,
             master::master_publish_now,

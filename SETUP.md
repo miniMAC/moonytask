@@ -23,14 +23,32 @@ Per attivare la sincronizzazione serve una credenziale OAuth di Google, da crear
 5. **Utenti di test**: aggiungi il tuo indirizzo Gmail.
    > Finché l'app resta in modalità "test" solo gli utenti di test possono accedere: per uso personale va benissimo.
 
-## 4. Crea le credenziali
+## 4. Crea le credenziali desktop
 
 1. Menu ☰ → **API e servizi** → **Credenziali** → **+ Crea credenziali** → **ID client OAuth**.
 2. Tipo di applicazione: **App desktop**.
 3. Nome: `MoonyTask Mac` → **Crea**.
 4. Copia **Client ID** e **Client secret**.
 
-## 5. Incorporali nell'app
+## 5. Registra anche l'app Android
+
+Nello stesso progetto Google Cloud crea un secondo **ID client OAuth**:
+
+- tipo applicazione: **Android**;
+- nome pacchetto: `com.minimamente.moonytask`;
+- impronta SHA-1 della chiave di produzione:
+  `32:D2:02:0E:2B:59:9A:B5:01:DD:C2:A5:F1:48:12:A8:5B:29:48:7F`.
+
+Questa credenziale non ha un secret da copiare nell'app. Serve a Google Play
+Services per riconoscere il pacchetto e il certificato dell'APK. Se la firma
+cambia, Google rifiuta l'autorizzazione Android.
+
+Se usi anche la modalità **Master / API Web**, aggiungi il Client ID Android
+alla variabile `GOOGLE_APP_CLIENT_IDS` del Worker, separandolo con una virgola
+dal Client ID desktop. In questo modo il backend accetta l'identità verificata
+proveniente da entrambe le app.
+
+## 6. Incorpora le credenziali desktop nell'app
 
 1. Apri il file `src-tauri/google_credentials.json` e incolla i valori:
 
@@ -43,9 +61,12 @@ Per attivare la sincronizzazione serve una credenziale OAuth di Google, da crear
 
 2. Ricompila l'app (`npm run tauri dev` oppure `npm run tauri build`):
    le credenziali vengono incorporate nell'eseguibile.
-3. Apri MoonyTask → **Impostazioni** → **Sincronizzazione Google** → **Connetti account Google**:
-   si apre il browser, accedi e autorizza. Fatto!
-4. La sync avviene automaticamente all'avvio, ogni 5 minuti e a ogni stop del timer.
+3. Apri MoonyTask → **Impostazioni** → **Sincronizzazione Google** →
+   **Connetti account Google**. Su desktop si apre il browser; su Android viene
+   mostrata la schermata nativa di Google e, al termine, si torna direttamente
+   nell'app.
+4. La sync avviene automaticamente all'avvio, ogni 15 minuti e dopo le
+   modifiche locali.
 
 ## Altri dispositivi
 

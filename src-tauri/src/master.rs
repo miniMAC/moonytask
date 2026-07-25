@@ -127,8 +127,32 @@ pub struct MasterAccount {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct MasterAssociationAccount {
+    pub email: String,
+    pub display_name: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MasterAssociationStatus {
+    pub id: String,
+    pub status: String,
+    pub requested_at: i64,
+    pub approved_at: Option<i64>,
+    pub master: MasterAssociationAccount,
+    pub master_license_active: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct MasterStatus {
     pub account: MasterAccount,
+    #[serde(default = "standard_role")]
+    pub role: String,
+    #[serde(default)]
+    pub can_publish: bool,
+    #[serde(default)]
+    pub association: Option<MasterAssociationStatus>,
     pub request: Option<MasterRequestStatus>,
     pub license: Option<MasterLicenseStatus>,
     pub api: MasterApiStatus,
@@ -140,7 +164,11 @@ pub struct MasterStatus {
     pub device_activated: bool,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
+fn standard_role() -> String {
+    "standard".into()
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PublishedFolderV1 {
     pub id: String,
@@ -150,7 +178,7 @@ pub struct PublishedFolderV1 {
     pub updated_at: i64,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PublishedProjectV1 {
     pub id: String,
@@ -173,7 +201,7 @@ pub struct PublishedRateProfileV1 {
     pub hourly_rate: f64,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PublishedTimeEntryV1 {
     pub id: String,
@@ -185,7 +213,7 @@ pub struct PublishedTimeEntryV1 {
     pub updated_at: i64,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PublishedProjectPaymentV1 {
     pub id: String,
@@ -196,7 +224,7 @@ pub struct PublishedProjectPaymentV1 {
     pub updated_at: i64,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PublishedSnapshotV1 {
     pub schema_version: i64,
@@ -207,6 +235,41 @@ pub struct PublishedSnapshotV1 {
     pub rate_profiles: Vec<PublishedRateProfileV1>,
     pub time_entries: Vec<PublishedTimeEntryV1>,
     pub project_payments: Vec<PublishedProjectPaymentV1>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MasterAssociationSummary {
+    pub id: String,
+    pub member_account_id: String,
+    pub email: String,
+    pub display_name: Option<String>,
+    pub status: String,
+    pub requested_at: i64,
+    pub approved_at: Option<i64>,
+    pub selected_folder_count: i64,
+    pub last_upload: Option<i64>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MasterAssociationsResponse {
+    associations: Vec<MasterAssociationSummary>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MasterSharedMember {
+    pub association_id: String,
+    pub account: MasterAssociationAccount,
+    pub publication: MasterPublicationStatus,
+    pub snapshot: Option<PublishedSnapshotV1>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MasterSharedData {
+    pub members: Vec<MasterSharedMember>,
 }
 
 fn http_client() -> Result<Client, MasterError> {
@@ -315,6 +378,23 @@ fn status_with_token(app: &AppHandle, token: &str) -> Result<MasterStatus, Maste
         .map_err(MasterError::from)?;
     let mut status = parse_response::<MasterStatus>(response)?;
     status.device_activated = token.starts_with("mtd_");
+    // Keep existing licensed installations working during a backend-first
+    // rolling deployment where older status responses do not yet include the
+    // role/canPublish fields.
+    if status.role == "standard" && status.license.is_some() {
+        status.role = "master".into();
+    }
+    if status.role == "master"
+        && matches!(
+            status
+                .license
+                .as_ref()
+                .map(|license| license.status.as_str()),
+            Some("active")
+        )
+    {
+        status.can_publish = true;
+    }
     cache_status(app, &status);
     status.last_error = local_last_error(app);
     Ok(status)
@@ -331,6 +411,21 @@ fn load_status(app: &AppHandle) -> Result<MasterStatus, MasterError> {
         };
     }
     status_with_token(app, &app_session(app)?)
+}
+
+fn authenticated_token(app: &AppHandle) -> Result<String, MasterError> {
+    load_device_token(app)
+        .map(Ok)
+        .unwrap_or_else(|| app_session(app))
+}
+
+fn master_engaged(app: &AppHandle) -> bool {
+    let database = app.state::<Db>();
+    let connection = match database.0.lock() {
+        Ok(connection) => connection,
+        Err(_) => return false,
+    };
+    db::get_setting(&connection, "master_engaged").as_deref() == Some("1")
 }
 
 fn cache_status(app: &AppHandle, status: &MasterStatus) {
@@ -453,11 +548,7 @@ fn set_remote_folders(
     app: &AppHandle,
     folders: Vec<MasterFolderSelection>,
 ) -> Result<MasterStatus, MasterError> {
-    let token = load_device_token(app).ok_or_else(|| MasterError {
-        status: Some(401),
-        code: "device_token_required".into(),
-        message: "Activate the Master license on this device first.".into(),
-    })?;
+    let token = authenticated_token(app)?;
     let response = http_client()?
         .put(endpoint("/v1/master/folders"))
         .bearer_auth(&token)
@@ -468,6 +559,74 @@ fn set_remote_folders(
     let status = status_with_token(app, &token)?;
     request_publication(app);
     Ok(status)
+}
+
+fn request_association(app: &AppHandle, master_email: &str) -> Result<MasterStatus, MasterError> {
+    let token = app_session(app)?;
+    let response = http_client()?
+        .post(endpoint("/v1/master/association-requests"))
+        .bearer_auth(&token)
+        .json(&serde_json::json!({ "masterEmail": master_email.trim() }))
+        .send()
+        .map_err(MasterError::from)?;
+    let _: serde_json::Value = parse_response(response)?;
+    status_with_token(app, &token)
+}
+
+fn list_associations(app: &AppHandle) -> Result<Vec<MasterAssociationSummary>, MasterError> {
+    let token = authenticated_token(app)?;
+    let response = http_client()?
+        .get(endpoint("/v1/master/associations"))
+        .bearer_auth(token)
+        .send()
+        .map_err(MasterError::from)?;
+    parse_response::<MasterAssociationsResponse>(response).map(|result| result.associations)
+}
+
+fn update_association(
+    app: &AppHandle,
+    association_id: &str,
+    action: &str,
+) -> Result<Vec<MasterAssociationSummary>, MasterError> {
+    if action != "approve" && action != "remove" {
+        return Err(MasterError {
+            status: None,
+            code: "invalid_association_action".into(),
+            message: "Association action is invalid.".into(),
+        });
+    }
+    let token = authenticated_token(app)?;
+    let request = http_client()?
+        .request(
+            if action == "approve" {
+                reqwest::Method::POST
+            } else {
+                reqwest::Method::DELETE
+            },
+            endpoint(&format!(
+                "/v1/master/associations/{}/{}",
+                association_id, action
+            )),
+        )
+        .bearer_auth(&token);
+    let response = request.send().map_err(MasterError::from)?;
+    let _: serde_json::Value = parse_response(response)?;
+    let response = http_client()?
+        .get(endpoint("/v1/master/associations"))
+        .bearer_auth(token)
+        .send()
+        .map_err(MasterError::from)?;
+    parse_response::<MasterAssociationsResponse>(response).map(|result| result.associations)
+}
+
+fn load_shared_data(app: &AppHandle) -> Result<MasterSharedData, MasterError> {
+    let token = authenticated_token(app)?;
+    let response = http_client()?
+        .get(endpoint("/v1/master/shared-data"))
+        .bearer_auth(token)
+        .send()
+        .map_err(MasterError::from)?;
+    parse_response(response)
 }
 
 pub fn build_published_snapshot(
@@ -640,21 +799,12 @@ pub fn build_published_snapshot(
 }
 
 fn publish_once(app: &AppHandle) -> Result<(), MasterError> {
-    let token = load_device_token(app).ok_or_else(|| MasterError {
-        status: None,
-        code: "not_activated".into(),
-        message: "Master is not activated on this device.".into(),
-    })?;
+    let token = authenticated_token(app)?;
     let status = status_with_token(app, &token)?;
     if !status.api.enabled {
         return Ok(());
     }
-    if !license_allows_publication(
-        status
-            .license
-            .as_ref()
-            .map(|license| license.status.as_str()),
-    ) {
+    if !status_allows_publication(&status, token.starts_with("mtd_")) {
         return Ok(());
     }
 
@@ -718,16 +868,25 @@ fn publish_with_conflict_retry(app: &AppHandle) -> Result<(), MasterError> {
                 code: "drive_resync_failed".into(),
                 message,
             })?;
-            let token = load_device_token(app).ok_or_else(|| MasterError {
-                status: Some(401),
-                code: "device_token_required".into(),
-                message: "Master device token is missing.".into(),
-            })?;
+            let token = authenticated_token(app)?;
             let status = status_with_token(app, &token)?;
             set_cached_snapshot_etag(app, status.publication.etag.as_deref());
             Ok(())
         },
     )
+}
+
+fn status_allows_publication(status: &MasterStatus, has_device_token: bool) -> bool {
+    status.can_publish
+        && (status.role == "member"
+            || (status.role == "master"
+                && has_device_token
+                && license_allows_publication(
+                    status
+                        .license
+                        .as_ref()
+                        .map(|license| license.status.as_str()),
+                )))
 }
 
 fn license_allows_publication(status: Option<&str>) -> bool {
@@ -768,7 +927,7 @@ pub fn spawn_publication_worker(app: AppHandle) {
         {
             continue;
         }
-        if load_device_token(&app).is_none() {
+        if !master_engaged(&app) {
             PUBLICATION_PENDING.store(false, Ordering::SeqCst);
             continue;
         }
@@ -808,6 +967,60 @@ pub async fn master_request(app: AppHandle, request_type: String) -> Result<Mast
 }
 
 #[tauri::command]
+pub async fn master_association_request(
+    app: AppHandle,
+    master_email: String,
+) -> Result<MasterStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        request_association(&app, &master_email).map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn master_associations(app: AppHandle) -> Result<Vec<MasterAssociationSummary>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        list_associations(&app).map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn master_association_approve(
+    app: AppHandle,
+    association_id: String,
+) -> Result<Vec<MasterAssociationSummary>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        update_association(&app, &association_id, "approve").map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn master_association_remove(
+    app: AppHandle,
+    association_id: String,
+) -> Result<Vec<MasterAssociationSummary>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        update_association(&app, &association_id, "remove").map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn master_shared_data(app: AppHandle) -> Result<MasterSharedData, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        load_shared_data(&app).map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 pub async fn master_activate(app: AppHandle, code: String) -> Result<MasterStatus, String> {
     tauri::async_runtime::spawn_blocking(move || {
         activate_master(&app, &code).map_err(|error| error.to_string())
@@ -830,8 +1043,8 @@ pub async fn master_set_folders(
 
 #[tauri::command]
 pub fn master_publish_now(app: AppHandle) -> Result<(), String> {
-    if load_device_token(&app).is_none() {
-        return Err("not_activated".into());
+    if !master_engaged(&app) {
+        return Err("master_not_enabled".into());
     }
     request_publication(&app);
     Ok(())

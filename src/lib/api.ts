@@ -3,7 +3,9 @@ import type {
   Folder,
   FolderCollapseState,
   InstalledApp,
+  MasterAssociationSummary,
   MasterFolderSelection,
+  MasterSharedData,
   MasterStatus,
   Project,
   ProjectPayment,
@@ -71,8 +73,9 @@ export const entryUpdateNote = (id: string, note: string | null) =>
 export const entryUpdate = (
   id: string,
   startedAt: number,
+  durationSecs: number,
   note: string | null,
-) => invoke<void>("entry_update", { id, startedAt, note });
+) => invoke<void>("entry_update", { id, startedAt, durationSecs, note });
 export const entriesMerge = (ids: string[]) =>
   invoke<TimeEntry>("entries_merge", { ids });
 export const entryAddManual = (
@@ -198,6 +201,20 @@ export const quitNow = () => invoke<void>("quit_now");
 export const masterStatus = () => invoke<MasterStatus>("master_status");
 export const masterRequest = (requestType: "initial" | "renewal") =>
   invoke<MasterStatus>("master_request", { requestType });
+export const masterAssociationRequest = (masterEmail: string) =>
+  invoke<MasterStatus>("master_association_request", { masterEmail });
+export const masterAssociations = () =>
+  invoke<MasterAssociationSummary[]>("master_associations");
+export const masterAssociationApprove = (associationId: string) =>
+  invoke<MasterAssociationSummary[]>("master_association_approve", {
+    associationId,
+  });
+export const masterAssociationRemove = (associationId: string) =>
+  invoke<MasterAssociationSummary[]>("master_association_remove", {
+    associationId,
+  });
+export const masterSharedData = () =>
+  invoke<MasterSharedData>("master_shared_data");
 export const masterActivate = (code: string) =>
   invoke<MasterStatus>("master_activate", { code });
 export const masterSetFolders = (folders: MasterFolderSelection[]) =>

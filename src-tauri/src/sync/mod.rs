@@ -32,15 +32,18 @@ pub struct SyncStatus {
 
 /// Credenziali OAuth incorporate in fase di build. Il file reale è locale/secret;
 /// build.rs usa il template vuoto nelle build che non configurano Google Drive.
+#[cfg(not(target_os = "android"))]
 const EMBEDDED_CREDENTIALS: &str =
     include_str!(concat!(env!("OUT_DIR"), "/google_credentials.json"));
 
+#[cfg(not(target_os = "android"))]
 #[derive(serde::Deserialize)]
 struct EmbeddedCreds {
     client_id: String,
     client_secret: String,
 }
 
+#[cfg(not(target_os = "android"))]
 fn credentials(app: &AppHandle) -> Option<(String, String)> {
     if let Ok(c) = serde_json::from_str::<EmbeddedCreds>(EMBEDDED_CREDENTIALS) {
         if !c.client_id.is_empty() && !c.client_secret.is_empty() {
@@ -56,6 +59,13 @@ fn credentials(app: &AppHandle) -> Option<(String, String)> {
         return None;
     }
     Some((id, secret))
+}
+
+// Google Identity Services identifica l'app Android tramite package name e
+// certificato registrati in Google Cloud; non usa client secret incorporati.
+#[cfg(target_os = "android")]
+fn credentials(_app: &AppHandle) -> Option<(String, String)> {
+    Some((String::new(), String::new()))
 }
 
 /// Returns the access token belonging to the Google account already connected

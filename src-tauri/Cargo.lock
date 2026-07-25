@@ -2269,7 +2269,7 @@ dependencies = [
 
 [[package]]
 name = "moonytask"
-version = "0.1.9"
+version = "0.2.1"
 dependencies = [
  "base64 0.22.1",
  "chrono",

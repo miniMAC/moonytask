@@ -52,7 +52,7 @@ l'impronta SHA-256 del certificato atteso e interrompe la build se la firma camb
 - `src/` — frontend React + TypeScript + Tailwind (i18n in `src/i18n/`)
 - `src-tauri/src/` — backend Rust: `db.rs` (SQLite), `master.rs` (licenza, DTO e
   pubblicazione), `timer.rs`, `tray.rs`, `watcher.rs`, `apps.rs`, `sync/`
-  (OAuth PKCE + Google Drive + merge)
+  (OAuth PKCE desktop, Google Identity Services Android, Google Drive + merge)
 
 ## Dati
 

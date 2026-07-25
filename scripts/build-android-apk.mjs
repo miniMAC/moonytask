@@ -1,9 +1,17 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, readdirSync, copyFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 
 const root = path.resolve(import.meta.dirname, "..");
 const sdk = process.env.ANDROID_HOME || path.join(homedir(), "Library", "Android", "sdk");
@@ -65,12 +73,56 @@ const apk = path.join(
 );
 if (!existsSync(apk)) fail(`Build completata, ma APK non trovato in ${apk}`);
 verifyApkCertificate(apk);
+const buildMetadataPath = path.join(
+  root,
+  "src-tauri",
+  "gen",
+  "android",
+  "app",
+  "build",
+  "outputs",
+  "apk",
+  "universal",
+  "release",
+  "output-metadata.json",
+);
+const appVersion = JSON.parse(
+  readFileSync(path.join(root, "src-tauri", "tauri.conf.json"), "utf8"),
+).version;
+const buildMetadata = readAndroidBuildMetadata(buildMetadataPath);
+if (buildMetadata.versionName !== appVersion) {
+  fail(
+    `Versione APK inattesa: configurazione ${appVersion}, APK ${buildMetadata.versionName}.`,
+  );
+}
 
 const outputDir = process.env.MOONYTASK_ARTIFACTS_DIR || path.join(homedir(), "Desktop", "MoonyTask");
 mkdirSync(outputDir, { recursive: true });
-const destination = path.join(outputDir, "MoonyTask-android.apk");
-copyFileSync(apk, destination);
-console.log(`APK copiato in ${destination}`);
+const versionedFileName = `MoonyTask_${appVersion}_android.apk`;
+const versionedDestination = path.join(outputDir, versionedFileName);
+const convenienceDestination = path.join(outputDir, "MoonyTask-android.apk");
+copyFileSync(apk, versionedDestination);
+copyFileSync(apk, convenienceDestination);
+const sha256 = fileSha256(versionedDestination);
+const releaseMetadata = {
+  version: appVersion,
+  versionCode: buildMetadata.versionCode,
+  fileName: versionedFileName,
+  sha256,
+  commitSha: gitOutput(["rev-parse", "HEAD"]),
+  dirty: gitOutput(["status", "--porcelain"]).length > 0,
+};
+const releaseMetadataPath = path.join(
+  outputDir,
+  "MoonyTask-android.metadata.json",
+);
+writeFileSync(
+  releaseMetadataPath,
+  `${JSON.stringify(releaseMetadata, null, 2)}\n`,
+);
+console.log(`APK versionato copiato in ${versionedDestination}`);
+console.log(`Copia locale di comodo: ${convenienceDestination}`);
+console.log(`Metadati verificabili: ${releaseMetadataPath}`);
 
 function newestDirectory(parent) {
   if (!existsSync(parent)) return null;
@@ -116,6 +168,46 @@ function verifyApkCertificate(apk) {
     );
   }
   console.log(`Firma Android verificata: ${certificate}`);
+}
+
+function readAndroidBuildMetadata(metadataPath) {
+  if (!existsSync(metadataPath)) {
+    fail(`Metadati Gradle non trovati in ${metadataPath}.`);
+  }
+  const metadata = JSON.parse(readFileSync(metadataPath, "utf8"));
+  const element = metadata.elements?.find(
+    (candidate) => candidate.outputFile === path.basename(apk),
+  ) ?? metadata.elements?.[0];
+  if (
+    !element ||
+    !Number.isInteger(element.versionCode) ||
+    typeof element.versionName !== "string"
+  ) {
+    fail(`Metadati Gradle Android non validi in ${metadataPath}.`);
+  }
+  return {
+    versionCode: element.versionCode,
+    versionName: element.versionName,
+  };
+}
+
+function fileSha256(filePath) {
+  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+function gitOutput(args) {
+  const result = spawnSync("git", args, {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (result.error || result.status !== 0) {
+    fail(
+      result.error?.message ||
+        result.stderr?.trim() ||
+        `Comando git non riuscito: git ${args.join(" ")}`,
+    );
+  }
+  return result.stdout.trim();
 }
 
 function newestDirectoryWithFile(parent, fileName) {

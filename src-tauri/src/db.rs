@@ -921,6 +921,7 @@ pub fn entry_update(
     db: State<Db>,
     id: String,
     started_at: i64,
+    duration_secs: i64,
     note: Option<String>,
 ) -> Result<(), String> {
     let conn = db.0.lock().unwrap();
@@ -932,27 +933,39 @@ pub fn entry_update(
             Some(trimmed)
         }
     });
-    let duration_secs = conn
-        .query_row(
-            "SELECT duration_secs FROM time_entries WHERE id = ?1 AND deleted = 0",
-            [&id],
-            |row| row.get::<_, i64>(0),
-        )
-        .map_err(|_| "entry_not_found".to_string())?;
-    conn.execute(
-        "UPDATE time_entries
-         SET started_at = ?2, ended_at = ?3, note = ?4, updated_at = ?5
-         WHERE id = ?1 AND deleted = 0",
-        rusqlite::params![
-            id,
-            started_at,
-            started_at.saturating_add(duration_secs),
-            clean_note,
-            now_secs()
-        ],
-    )
-    .map_err(err)?;
+    update_time_entry(&conn, &id, started_at, duration_secs, clean_note.as_deref())?;
     crate::sync::mark_dirty();
+    Ok(())
+}
+
+fn update_time_entry(
+    conn: &Connection,
+    id: &str,
+    started_at: i64,
+    duration_secs: i64,
+    note: Option<&str>,
+) -> Result<(), String> {
+    if duration_secs <= 0 || duration_secs > 366 * 24 * 60 * 60 {
+        return Err("invalid_duration".into());
+    }
+    let changed = conn
+        .execute(
+            "UPDATE time_entries
+         SET started_at = ?2, ended_at = ?3, duration_secs = ?4, note = ?5, updated_at = ?6
+         WHERE id = ?1 AND deleted = 0",
+            rusqlite::params![
+                id,
+                started_at,
+                started_at.saturating_add(duration_secs),
+                duration_secs,
+                note,
+                now_secs()
+            ],
+        )
+        .map_err(err)?;
+    if changed == 0 {
+        return Err("entry_not_found".into());
+    }
     Ok(())
 }
 
@@ -2539,5 +2552,47 @@ mod tests {
             )
             .unwrap()
             .is_none());
+    }
+
+    #[test]
+    fn editing_an_entry_updates_minutes_and_keeps_timestamps_consistent() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE time_entries (
+                id TEXT PRIMARY KEY,
+                started_at INTEGER NOT NULL,
+                ended_at INTEGER NOT NULL,
+                duration_secs INTEGER NOT NULL,
+                note TEXT,
+                updated_at INTEGER NOT NULL,
+                deleted INTEGER NOT NULL
+             );
+             INSERT INTO time_entries
+             VALUES ('entry-1', 100, 460, 360, 'prima', 1, 0);",
+        )
+        .unwrap();
+
+        super::update_time_entry(&conn, "entry-1", 1_000, 42 * 60, Some("corretta")).unwrap();
+
+        let updated = conn
+            .query_row(
+                "SELECT started_at, ended_at, duration_secs, note
+                 FROM time_entries WHERE id = 'entry-1'",
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                    ))
+                },
+            )
+            .unwrap();
+        assert_eq!(updated, (1_000, 3_520, 2_520, Some("corretta".into())));
+        assert_eq!(
+            super::update_time_entry(&conn, "entry-1", 1_000, 0, None),
+            Err("invalid_duration".into())
+        );
     }
 }

@@ -1,11 +1,17 @@
+#[cfg(not(target_os = "android"))]
 use base64::Engine;
+#[cfg(not(target_os = "android"))]
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+#[cfg(not(target_os = "android"))]
 use sha2::{Digest, Sha256};
 use tauri::AppHandle;
 
+#[cfg(not(target_os = "android"))]
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
+#[cfg(not(target_os = "android"))]
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
+#[cfg(not(target_os = "android"))]
 const SCOPE: &str = "https://www.googleapis.com/auth/drive.appdata openid email";
 #[cfg(desktop)]
 const KEYRING_SERVICE: &str = "com.minimamente.moonytask";
@@ -21,6 +27,7 @@ pub struct StoredTokens {
     pub expires_at: i64,
 }
 
+#[cfg(not(target_os = "android"))]
 #[derive(Deserialize)]
 struct TokenResponse {
     access_token: String,
@@ -83,6 +90,7 @@ pub fn clear_tokens(app: &AppHandle) {
     let _ = crate::db::set_setting(&conn, TOKENS_SETTING, "");
 }
 
+#[cfg(not(target_os = "android"))]
 fn random_verifier() -> String {
     const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
     let mut rng = rand::thread_rng();
@@ -91,6 +99,7 @@ fn random_verifier() -> String {
         .collect()
 }
 
+#[cfg(not(target_os = "android"))]
 fn email_from_id_token(id_token: &str) -> Option<String> {
     let payload = id_token.split('.').nth(1)?;
     let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
@@ -103,6 +112,7 @@ fn email_from_id_token(id_token: &str) -> Option<String> {
 /// Esegue il flusso OAuth completo: apre il browser, attende il redirect sul
 /// listener di loopback, scambia il code. `login_hint` pre-seleziona l'account
 /// Google nel browser. Ritorna (tokens, email).
+#[cfg(not(target_os = "android"))]
 pub fn login(
     app: &AppHandle,
     client_id: &str,
@@ -204,7 +214,34 @@ pub fn login(
     Ok((tokens, email))
 }
 
+/// Su Android il callback loopback non è supportato da Google. Usa invece
+/// Google Identity Services, che restituisce direttamente un access token per
+/// Drive e riporta l'utente nell'Activity dell'app.
+#[cfg(target_os = "android")]
+pub fn login(
+    app: &AppHandle,
+    _client_id: &str,
+    _client_secret: &str,
+    login_hint: Option<&str>,
+) -> Result<(StoredTokens, Option<String>), String> {
+    let auth = crate::android_google_auth::authorize(app, true)?;
+    let tokens = StoredTokens {
+        access_token: auth.access_token,
+        refresh_token: String::new(),
+        expires_at: crate::db::now_secs() + auth.expires_in_secs.saturating_sub(60),
+    };
+    let email = auth.email.or_else(|| {
+        login_hint
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+    });
+    save_tokens(app, &tokens)?;
+    Ok((tokens, email))
+}
+
 /// Ritorna un access token valido, rinfrescandolo se scaduto.
+#[cfg(not(target_os = "android"))]
 pub fn valid_access_token(
     app: &AppHandle,
     client_id: &str,
@@ -242,6 +279,41 @@ pub fn valid_access_token(
     Ok(resp.access_token)
 }
 
+/// Google Play Services rinnova il token Android senza aprire schermate se
+/// l'autorizzazione è ancora valida. Se è stata revocata, elimina la sessione
+/// locale così la UI può proporre nuovamente il pulsante di accesso.
+#[cfg(target_os = "android")]
+pub fn valid_access_token(
+    app: &AppHandle,
+    _client_id: &str,
+    _client_secret: &str,
+) -> Result<String, String> {
+    if let Some(tokens) = load_tokens(app) {
+        if tokens.expires_at > crate::db::now_secs() {
+            return Ok(tokens.access_token);
+        }
+    } else {
+        return Err("not_connected".into());
+    }
+
+    let auth = match crate::android_google_auth::authorize(app, false) {
+        Ok(auth) => auth,
+        Err(error) => {
+            clear_tokens(app);
+            return Err(error);
+        }
+    };
+    let tokens = StoredTokens {
+        access_token: auth.access_token,
+        refresh_token: String::new(),
+        expires_at: crate::db::now_secs() + auth.expires_in_secs.saturating_sub(60),
+    };
+    let access_token = tokens.access_token.clone();
+    save_tokens(app, &tokens)?;
+    Ok(access_token)
+}
+
+#[cfg(not(target_os = "android"))]
 fn html_response(msg: &str) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     let body = format!(
         "<html><body style=\"font-family:sans-serif;text-align:center;padding-top:4em\"><h2>{msg}</h2></body></html>"
@@ -254,6 +326,7 @@ fn html_response(msg: &str) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
 
 // il plugin opener apre il browser di sistema su tutte le piattaforme,
 // Android incluso (dove `open` non esiste)
+#[cfg(not(target_os = "android"))]
 fn open_browser(app: &AppHandle, url: &str) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
     app.opener()

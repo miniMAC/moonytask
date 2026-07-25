@@ -22,8 +22,14 @@ struct MobileDownloads {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct MobileDownload {
     url: String,
+    version: Option<Version>,
+    #[allow(dead_code)]
+    version_code: Option<u64>,
+    #[allow(dead_code)]
+    sha256: Option<String>,
 }
 
 struct Texts {
@@ -78,19 +84,19 @@ fn check(app: AppHandle) {
         Err(_) => return, // il controllo all'avvio resta silenzioso senza rete
     };
 
-    if manifest.version <= app.package_info().version {
-        return;
-    }
-
     let Some(download) = platform_download(&manifest) else {
         return;
     };
+    let available_version = download.version.as_ref().unwrap_or(&manifest.version);
+    if available_version <= &app.package_info().version {
+        return;
+    }
     if !download.url.starts_with("https://") {
         return;
     }
 
     let t = texts(&app);
-    let version = manifest.version.to_string();
+    let version = available_version.to_string();
     let mut body = t.body.replace("{version}", &version);
     if let Some(notes) = manifest
         .notes

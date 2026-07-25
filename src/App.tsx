@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
 import type {
   Folder,
+  MasterSharedData,
   Project,
   TimeEntry,
   TimerSnapshot,
@@ -28,6 +29,10 @@ export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(
     new Set(),
+  );
+  const [sharedData, setSharedData] = useState<MasterSharedData | null>(null);
+  const [folderScope, setFolderScope] = useState<"personal" | "shared">(
+    "personal",
   );
   const [timer, setTimer] = useState<TimerSnapshot>({
     status: "idle",
@@ -84,12 +89,24 @@ export default function App() {
     [reload],
   );
 
+  const reloadSharedData = useCallback(async () => {
+    const engaged = await api.settingsGet("master_engaged");
+    if (engaged !== "1") return;
+    try {
+      setSharedData(await api.masterSharedData());
+    } catch {
+      // Only licensed Master accounts can read associated users. Standard
+      // users and members keep the normal local project list.
+    }
+  }, []);
+
   useEffect(() => {
     noteRequestRef.current = noteRequest;
   }, [noteRequest]);
 
   useEffect(() => {
     reload();
+    reloadSharedData();
     api.timerGetState().then(setTimer);
     api.settingsGet("language").then((l) => {
       if (l && l !== i18n.language) i18n.changeLanguage(l);
@@ -105,8 +122,13 @@ export default function App() {
     });
     const unData = listen("data_changed", () => {
       reload();
+      reloadSharedData();
       setRefreshKey((k) => k + 1);
     });
+    const onMasterChanged = () => reloadSharedData();
+    const onFocus = () => reloadSharedData();
+    window.addEventListener("master_changed", onMasterChanged);
+    window.addEventListener("focus", onFocus);
     // il popover chiede di aprire un progetto nella finestra principale
     const unOpen = listen<string>("open_project", (e) => {
       setSelectedId(e.payload);
@@ -143,6 +165,8 @@ export default function App() {
     return () => {
       unTimer.then((f) => f());
       unData.then((f) => f());
+      window.removeEventListener("master_changed", onMasterChanged);
+      window.removeEventListener("focus", onFocus);
       unOpen.then((f) => f());
       unNote.then((f) => f());
       unIdle.then((f) => f());
@@ -215,6 +239,10 @@ export default function App() {
         view={view}
         selectedId={selectedId}
         timer={timer}
+        sharedData={sharedData}
+        folderScope={folderScope}
+        onFolderScopeChange={setFolderScope}
+        onRefreshShared={reloadSharedData}
         collapsedFolderIds={collapsedFolderIds}
         onFolderCollapsedChange={setFolderCollapsed}
         onNav={setView}
@@ -274,6 +302,10 @@ export default function App() {
                   folders={folders}
                   projects={projects}
                   timer={timer}
+                  sharedData={sharedData}
+                  folderScope={folderScope}
+                  onFolderScopeChange={setFolderScope}
+                  onRefreshShared={reloadSharedData}
                   collapsedFolderIds={collapsedFolderIds}
                   onFolderCollapsedChange={setFolderCollapsed}
                   onSelectProject={(id) => {

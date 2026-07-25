@@ -785,11 +785,22 @@ function EntryNoteModal({
   const [note, setNote] = useState(entry.note ?? "");
   const entryDate = new Date(entry.startedAt * 1000);
   const [date, setDate] = useState(toDateInput(entryDate));
-  const [time, setTime] = useState(toTimeInput(entryDate));
+  const [minutes, setMinutes] = useState(
+    String(Math.max(1, Math.round(entry.durationSecs / 60))),
+  );
 
   const save = async () => {
-    const startedAt = epochFromDateAndTime(date, time);
-    await api.entryUpdate(entry.id, startedAt, note.trim() || null);
+    const durationMinutes = Number.parseInt(minutes, 10);
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return;
+    // Cambiando il giorno conserva l'ora originale della registrazione: qui
+    // l'informazione utile da correggere è la durata, non l'ora di inizio.
+    const startedAt = epochFromDateAndTime(date, toTimeInput(entryDate));
+    await api.entryUpdate(
+      entry.id,
+      startedAt,
+      durationMinutes * 60,
+      note.trim() || null,
+    );
     onSaved();
   };
 
@@ -799,7 +810,7 @@ function EntryNoteModal({
       onClose={onClose}
     >
       <div className="space-y-3">
-        <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_9rem] gap-3">
           <div className="block">
             <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-300">
               {t("projects.date")}
@@ -812,13 +823,16 @@ function EntryNoteModal({
           </div>
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-neutral-600 dark:text-neutral-300">
-              {t("projects.time")}
+              {t("projects.durationMinutes")}
             </span>
             <input
-              type="time"
-              step="60"
-              value={time}
-              onChange={(event) => setTime(event.target.value)}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={525600}
+              step={1}
+              value={minutes}
+              onChange={(event) => setMinutes(event.target.value)}
               className="w-full rounded-[10px] border border-neutral-300 bg-white px-3 text-base outline-none focus:border-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
             />
           </label>

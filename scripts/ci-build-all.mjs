@@ -8,6 +8,7 @@ import {
   readdirSync,
   readFileSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -71,22 +72,37 @@ function main() {
   }
 
   if (platform === "all") {
-    // latest.json richiede gli artefatti updater di tutte le piattaforme.
-    const generatorArgs = [
-      path.join(__dirname, "generate-latest-json.mjs"),
-      "--dir",
-      runDir,
-    ];
-    const notes = argValue("--notes");
-    if (notes) {
-      generatorArgs.push("--notes", notes);
-    }
-    run(process.execPath, generatorArgs);
-  } else {
-    console.log(
-      `Build ${platform} completata. latest.json non viene rigenerato da una release parziale.`,
+    const version = JSON.parse(
+      readFileSync(
+        path.join(projectRoot, "src-tauri", "tauri.conf.json"),
+        "utf8",
+      ),
+    ).version;
+    const metadataPath = path.join(
+      outDir,
+      "MoonyTask-desktop.metadata.json",
     );
+    writeFileSync(
+      metadataPath,
+      `${JSON.stringify(
+        {
+          version,
+          commitSha: output("git", ["rev-parse", "HEAD"]).trim(),
+          runId,
+          sourceDir: runDir,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    console.log(`Metadati build desktop: ${metadataPath}`);
   }
+
+  console.log(
+    platform === "all"
+      ? "Build desktop completata. latest.json sarà generato soltanto dopo la verifica dell'APK Android."
+      : `Build ${platform} completata. latest.json non viene rigenerato da una release parziale.`,
+  );
 
   console.log(`Done. ${copied} file ready in ${outDir}`);
 }

@@ -6,6 +6,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import type {
   Folder,
   InstalledApp,
+  MasterAssociationSummary,
   MasterStatus,
   PaymentType,
   Project,
@@ -14,7 +15,7 @@ import type {
   WatchedApp,
 } from "../lib/types";
 import * as api from "../lib/api";
-import { isMobilePlatform } from "../lib/platform";
+import { isAndroidPlatform, isMobilePlatform } from "../lib/platform";
 import { useTheme, type ThemePref } from "../lib/theme";
 import Modal from "../components/Modal";
 import { PlusIcon, TrashIcon } from "../components/Icons";
@@ -716,7 +717,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
         {watched.map((w) => (
           <div
             key={w.id}
-            className="grid items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-base dark:border-neutral-700 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#282a36] md:grid-cols-[auto_minmax(0,1fr)_minmax(170px,220px)_150px_auto]"
+            className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-base dark:border-neutral-700 dark:bg-neutral-800 pro:border-[#44475a] pro:bg-[#282a36] md:grid-cols-[auto_minmax(0,1fr)_minmax(170px,220px)_minmax(180px,auto)_2.5rem]"
           >
             <input
               type="checkbox"
@@ -749,7 +750,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
                   )
                   .then(load)
               }
-              className={`w-full text-sm ${appsInputCls}`}
+              className={`col-span-2 w-full text-sm md:col-span-1 ${appsInputCls}`}
               title={t("settings.linkedProject")}
             >
               <option value="">{t("settings.noLinkedProject")}</option>
@@ -761,7 +762,7 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
                   </option>
                 ))}
             </select>
-            <label className="flex items-center gap-1.5 text-sm text-neutral-600 dark:text-neutral-300 pro:text-[#c9c9d6]">
+            <label className="col-span-2 flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-neutral-600 dark:text-neutral-300 pro:text-[#c9c9d6] md:col-span-1 md:flex-nowrap">
               <span className="whitespace-nowrap">
                 {t("settings.reminderAfter")}
               </span>
@@ -790,7 +791,9 @@ function WatchedAppsSection({ projects }: { projects: Project[] }) {
             </label>
             <button
               onClick={() => api.watchedRemove(w.id).then(load)}
-              className="rounded p-1 text-neutral-400 transition hover:text-red-600 dark:hover:text-red-400 pro:text-[#b9b9c8] pro:hover:text-[#ff5555]"
+              className="col-start-3 row-start-1 inline-flex h-9 w-9 shrink-0 items-center justify-center justify-self-end rounded-lg bg-red-50 text-red-600 transition hover:bg-red-100 hover:text-red-700 dark:bg-red-950/50 dark:text-red-400 dark:hover:bg-red-950 pro:bg-[#ff5555]/15 pro:text-[#ff5555] pro:hover:bg-[#ff5555]/25 md:col-start-5 md:row-start-auto"
+              title={t("common.delete")}
+              aria-label={`${t("common.delete")} ${w.appName}`}
             >
               <TrashIcon size={14} />
             </button>
@@ -900,10 +903,10 @@ function SyncSection() {
   }, []);
 
   const doLogin = async () => {
-    if (!email.trim() || busy) return;
+    if ((!isAndroidPlatform && !email.trim()) || busy) return;
     setBusy(true);
     try {
-      await api.syncLogin(email.trim());
+      await api.syncLogin(isAndroidPlatform ? null : email.trim());
     } catch {
       /* l'errore appare in status */
     } finally {
@@ -914,6 +917,13 @@ function SyncSection() {
 
   if (!status) return null;
   const locale = i18n.language === "it" ? "it-IT" : "en-US";
+  const syncError = status.lastError?.includes(
+    "google_authorization_failed:10",
+  )
+    ? t("settings.sync.androidClientMissing")
+    : status.lastError?.includes("google_authorization_cancelled")
+      ? t("settings.sync.authorizationCancelled")
+      : status.lastError;
 
   return (
     <section className={sectionCls}>
@@ -961,28 +971,38 @@ function SyncSection() {
             </div>
           ) : (
             <div>
-              <label className={fieldLabelCls}>
-                {t("settings.sync.emailLabel")}
-              </label>
+              {!isAndroidPlatform && (
+                <label className={fieldLabelCls}>
+                  {t("settings.sync.emailLabel")}
+                </label>
+              )}
               <div className="flex flex-wrap gap-2">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={t("settings.sync.emailPlaceholder")}
-                  onKeyDown={(e) => e.key === "Enter" && email.trim() && !busy && doLogin()}
-                  className={`w-full sm:w-64 ${syncInputCls}`}
-                />
+                {!isAndroidPlatform && (
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={t("settings.sync.emailPlaceholder")}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && email.trim() && !busy && doLogin()
+                    }
+                    className={`w-full sm:w-64 ${syncInputCls}`}
+                  />
+                )}
                 <button
                   onClick={doLogin}
-                  disabled={busy || !email.trim()}
+                  disabled={busy || (!isAndroidPlatform && !email.trim())}
                   className={primaryBtnCls}
                 >
                   {busy ? t("settings.sync.syncing") : t("settings.sync.connect")}
                 </button>
               </div>
               <p className={`mt-1.5 ${helpTextCls}`}>
-                {t("settings.sync.connectHelp")}
+                {t(
+                  isAndroidPlatform
+                    ? "settings.sync.connectHelpAndroid"
+                    : "settings.sync.connectHelp",
+                )}
               </p>
             </div>
           )}
@@ -994,9 +1014,9 @@ function SyncSection() {
               })}
             </p>
           )}
-          {status.lastError && (
+          {syncError && (
             <p className="text-sm font-semibold text-red-600 dark:text-red-400 pro:text-[#ff5555]">
-              {t("settings.sync.error", { error: status.lastError })}
+              {t("settings.sync.error", { error: syncError })}
             </p>
           )}
         </div>
@@ -1014,6 +1034,10 @@ function MasterSection() {
   const [status, setStatus] = useState<MasterStatus | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [licenseCode, setLicenseCode] = useState("");
+  const [masterEmail, setMasterEmail] = useState("");
+  const [associations, setAssociations] = useState<
+    MasterAssociationSummary[]
+  >([]);
   const [engaged, setEngaged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1024,6 +1048,15 @@ function MasterSection() {
     setStatus(next);
     setSelected(new Set(next.selectedFolders.map((folder) => folder.id)));
     if (next.license?.code) setLicenseCode(next.license.code);
+    window.dispatchEvent(new Event("master_changed"));
+  };
+
+  const refreshAssociations = async (next: MasterStatus) => {
+    if (next.role === "master" && next.license?.status === "active") {
+      setAssociations(await api.masterAssociations());
+    } else {
+      setAssociations([]);
+    }
   };
 
   const refresh = async (markEngaged = true) => {
@@ -1036,7 +1069,9 @@ function MasterSection() {
         setEngaged(true);
         await api.settingsSet("master_engaged", "1");
       }
-      applyStatus(await api.masterStatus());
+      const next = await api.masterStatus();
+      applyStatus(next);
+      await refreshAssociations(next);
     } catch (reason) {
       setError(String(reason));
     } finally {
@@ -1058,7 +1093,10 @@ function MasterSection() {
         setBusy(true);
         api
           .masterStatus()
-          .then(applyStatus)
+          .then(async (next) => {
+            applyStatus(next);
+            await refreshAssociations(next);
+          })
           .catch((reason) => setError(String(reason)))
           .finally(() => setBusy(false));
       }
@@ -1097,8 +1135,60 @@ function MasterSection() {
     }
   };
 
+  const createAssociation = async () => {
+    if (!masterEmail.trim() || busy) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      setEngaged(true);
+      await api.settingsSet("master_engaged", "1");
+      applyStatus(await api.masterAssociationRequest(masterEmail.trim()));
+      setNotice(t("settings.master.associationRequestSent"));
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const associationAction = async (
+    associationId: string,
+    action: "approve" | "remove",
+  ) => {
+    if (busy) return;
+    if (
+      action === "remove" &&
+      !window.confirm(t("settings.master.removeConfirm"))
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const next =
+        action === "approve"
+          ? await api.masterAssociationApprove(associationId)
+          : await api.masterAssociationRemove(associationId);
+      setAssociations(next);
+      window.dispatchEvent(new Event("master_changed"));
+      setNotice(
+        t(
+          action === "approve"
+            ? "settings.master.associationApproved"
+            : "settings.master.associationRemoved",
+        ),
+      );
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const saveFolders = async () => {
-    if (busy || !status?.deviceActivated) return;
+    if (busy || !status?.canPublish) return;
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -1181,6 +1271,30 @@ function MasterSection() {
               {t("settings.master.alreadyRequested")}
             </button>
           </div>
+          <div className="mt-4 border-t border-neutral-200 pt-4 dark:border-neutral-700 pro:border-[#44475a]">
+            <p className="font-semibold">
+              {t("settings.master.joinTitle")}
+            </p>
+            <p className={`mt-1 ${helpTextCls}`}>
+              {t("settings.master.joinHelp")}
+            </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                type="email"
+                value={masterEmail}
+                onChange={(event) => setMasterEmail(event.target.value)}
+                placeholder={t("settings.master.masterEmail")}
+                className={`min-w-0 flex-1 ${inputCls}`}
+              />
+              <button
+                onClick={createAssociation}
+                disabled={busy || !masterEmail.trim()}
+                className={primaryBtnCls}
+              >
+                {t("settings.master.requestAssociation")}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1189,11 +1303,22 @@ function MasterSection() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <MasterFact
               label={t("settings.master.requestState")}
-              value={status.request?.status ?? t("settings.master.notRequested")}
+              value={
+                status.association?.status ??
+                status.request?.status ??
+                t("settings.master.notRequested")
+              }
             />
             <MasterFact
               label={t("settings.master.licenseState")}
-              value={status.license?.status ?? t("settings.master.noLicense")}
+              value={
+                status.license?.status ??
+                (status.association
+                  ? t("settings.master.associatedWith", {
+                      email: status.association.master.email,
+                    })
+                  : t("settings.master.noLicense"))
+              }
             />
             <MasterFact
               label={t("settings.master.apiState")}
@@ -1224,7 +1349,9 @@ function MasterSection() {
               </p>
             )}
 
-          {!status.license && status.request?.status !== "pending" && (
+          {!status.license &&
+            !status.association &&
+            status.request?.status !== "pending" && (
             <button
               onClick={() => createRequest("initial")}
               disabled={busy}
@@ -1232,6 +1359,58 @@ function MasterSection() {
             >
               {t("settings.master.request")}
             </button>
+          )}
+
+          {!status.license && !status.association && (
+            <div className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-700 pro:border-[#44475a]">
+              <h3 className="font-semibold">
+                {t("settings.master.joinTitle")}
+              </h3>
+              <p className={`mt-1 ${helpTextCls}`}>
+                {t("settings.master.joinHelp")}
+              </p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="email"
+                  value={masterEmail}
+                  onChange={(event) => setMasterEmail(event.target.value)}
+                  placeholder={t("settings.master.masterEmail")}
+                  className={`min-w-0 flex-1 ${inputCls}`}
+                />
+                <button
+                  onClick={createAssociation}
+                  disabled={busy || !masterEmail.trim()}
+                  className={primaryBtnCls}
+                >
+                  {t("settings.master.requestAssociation")}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {status.association && (
+            <div className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-700 pro:border-[#44475a]">
+              <h3 className="font-semibold">
+                {t("settings.master.associationTitle")}
+              </h3>
+              <p className={`mt-1 ${helpTextCls}`}>
+                {t("settings.master.associationState", {
+                  email: status.association.master.email,
+                  status: status.association.status,
+                })}
+              </p>
+              {status.association.status === "pending" && (
+                <p className="mt-2 text-sm font-semibold text-amber-700 dark:text-amber-300 pro:text-[#f1fa8c]">
+                  {t("settings.master.associationPending")}
+                </p>
+              )}
+              {status.association.status === "approved" &&
+                !status.association.masterLicenseActive && (
+                  <p className="mt-2 text-sm font-semibold text-red-600 dark:text-red-400 pro:text-[#ff5555]">
+                    {t("settings.master.masterLicenseInactive")}
+                  </p>
+                )}
+            </div>
           )}
 
           {status.license && (
@@ -1288,13 +1467,85 @@ function MasterSection() {
             </div>
           )}
 
-          {status.deviceActivated && status.license?.status === "active" && (
+          {status.role === "master" &&
+            status.license?.status === "active" && (
+              <div className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-700 pro:border-[#44475a]">
+                <h3 className="font-semibold">
+                  {t("settings.master.membersTitle")}
+                </h3>
+                <p className={`mt-1 ${helpTextCls}`}>
+                  {t("settings.master.membersHelp")}
+                </p>
+                {associations.length === 0 ? (
+                  <p className={`mt-3 ${helpTextCls}`}>
+                    {t("settings.master.membersEmpty")}
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {associations.map((association) => (
+                      <div
+                        key={association.id}
+                        className="flex flex-col gap-3 rounded-lg border border-neutral-200 px-3 py-3 sm:flex-row sm:items-center dark:border-neutral-700 pro:border-[#44475a]"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-semibold">
+                            {association.displayName || association.email}
+                          </p>
+                          {association.displayName && (
+                            <p className={`truncate ${helpTextCls}`}>
+                              {association.email}
+                            </p>
+                          )}
+                          <p className={`mt-1 ${helpTextCls}`}>
+                            {association.status === "pending"
+                              ? t("settings.master.memberPending")
+                              : t("settings.master.memberSharing", {
+                                  count: association.selectedFolderCount,
+                                })}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          {association.status === "pending" && (
+                            <button
+                              onClick={() =>
+                                associationAction(association.id, "approve")
+                              }
+                              disabled={busy}
+                              className={primaryBtnCls}
+                            >
+                              {t("settings.master.approve")}
+                            </button>
+                          )}
+                          <button
+                            onClick={() =>
+                              associationAction(association.id, "remove")
+                            }
+                            disabled={busy}
+                            className={ghostBtnCls}
+                          >
+                            {t("settings.master.remove")}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+          {status.canPublish &&
+            ((status.role === "master" && status.deviceActivated) ||
+              status.association?.status === "approved") && (
             <div className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-700 pro:border-[#44475a]">
               <h3 className="font-semibold">
                 {t("settings.master.folderSelection")}
               </h3>
               <p className={`mt-1 ${helpTextCls}`}>
-                {t("settings.master.folderSelectionHelp")}
+                {t(
+                  status.role === "member"
+                    ? "settings.master.memberFolderSelectionHelp"
+                    : "settings.master.folderSelectionHelp",
+                )}
               </p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {folders.map((folder) => (

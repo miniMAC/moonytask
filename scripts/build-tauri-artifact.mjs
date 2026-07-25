@@ -74,9 +74,16 @@ const desktopDir = resolveDesktopDir();
 const outDir = path.join(desktopDir, "MoonyTask");
 mkdirSync(outDir, { recursive: true });
 
-const artifacts = findArtifacts(targetRoot, extensionsByPlatform[platform]);
+const artifactSearchRoot =
+  target && target !== "--copy-only"
+    ? path.join(targetRoot, target)
+    : targetRoot;
+const artifacts = findArtifacts(
+  artifactSearchRoot,
+  extensionsByPlatform[platform],
+);
 if (artifacts.length === 0) {
-  console.error(`No ${platform} artifacts found in ${targetRoot}`);
+  console.error(`No ${platform} artifacts found in ${artifactSearchRoot}`);
   process.exit(1);
 }
 
@@ -124,7 +131,17 @@ function appImageExtension(filePath) {
 function stableArtifactName(filePath) {
   const base = path.basename(filePath);
   if (base.endsWith(".dmg")) {
-    return "MoonyTask-macOS-universal.dmg";
+    const normalized = filePath.split(path.sep).join("/");
+    if (normalized.includes("universal-apple-darwin")) {
+      return "MoonyTask-macOS-universal.dmg";
+    }
+    if (normalized.includes("aarch64-apple-darwin")) {
+      return "MoonyTask-macOS-Apple-Silicon.dmg";
+    }
+    if (normalized.includes("x86_64-apple-darwin")) {
+      return "MoonyTask-macOS-Intel.dmg";
+    }
+    return "MoonyTask-macOS.dmg";
   }
   if (base.endsWith(".AppImage")) {
     return "MoonyTask-Linux-x64.AppImage";

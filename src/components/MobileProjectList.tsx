@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Folder, Project, TimerSnapshot } from "../lib/types";
+import type {
+  Folder,
+  MasterSharedData,
+  Project,
+  TimerSnapshot,
+} from "../lib/types";
 import { projectColor } from "../lib/colors";
+import SharedFolderList from "./SharedFolderList";
 import {
   ChevronIcon,
   FolderIcon,
@@ -16,6 +22,10 @@ interface Props {
   folders: Folder[];
   projects: Project[];
   timer: TimerSnapshot;
+  sharedData: MasterSharedData | null;
+  folderScope: "personal" | "shared";
+  onFolderScopeChange: (scope: "personal" | "shared") => void;
+  onRefreshShared: () => void;
   collapsedFolderIds: ReadonlySet<string>;
   onFolderCollapsedChange: (folderId: string, collapsed: boolean) => void;
   onSelectProject: (id: string) => void;
@@ -49,14 +59,34 @@ export default function MobileProjectList(p: Props) {
         <h1 className="text-lg font-bold tracking-wide text-neutral-700 dark:text-neutral-200 pro:text-[#f8f8f2]">
           MoonyTask
         </h1>
-        <button
-          onClick={p.onNewFolder}
-          className="flex h-11 items-center gap-1.5 rounded-lg border border-neutral-300 px-4 text-base font-medium dark:border-neutral-600 pro:border-[#44475a]"
-        >
-          <PlusIcon size={14} />
-          {t("folders.new")}
-        </button>
+        {p.folderScope === "personal" && (
+          <button
+            onClick={p.onNewFolder}
+            className="flex h-11 items-center gap-1.5 rounded-lg border border-neutral-300 px-4 text-base font-medium dark:border-neutral-600 pro:border-[#44475a]"
+          >
+            <PlusIcon size={14} />
+            {t("folders.new")}
+          </button>
+        )}
       </div>
+
+      {p.sharedData && (
+        <div className="mb-3 grid grid-cols-2 rounded-xl bg-neutral-100 p-1 text-base font-semibold dark:bg-neutral-800 pro:bg-[#343746]">
+          {(["personal", "shared"] as const).map((scope) => (
+            <button
+              key={scope}
+              onClick={() => p.onFolderScopeChange(scope)}
+              className={`min-h-10 rounded-lg ${
+                p.folderScope === scope
+                  ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-white pro:bg-[#44475a] pro:text-[#f8f8f2]"
+                  : "text-neutral-500 dark:text-neutral-400"
+              }`}
+            >
+              {t(`folders.${scope}`)}
+            </button>
+          ))}
+        </div>
+      )}
 
       <label className="relative mb-4 block">
         <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-neutral-400">
@@ -66,11 +96,29 @@ export default function MobileProjectList(p: Props) {
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder={t("projects.search")}
+          placeholder={
+            p.folderScope === "shared"
+              ? t("projects.searchShared")
+              : t("projects.search")
+          }
           className="h-12 w-full rounded-xl border border-neutral-200 bg-white pl-10 pr-3 text-base outline-none transition placeholder:text-neutral-400 focus:border-blue-500 dark:border-neutral-700 dark:bg-neutral-800/60 pro:border-[#44475a] pro:bg-[#21222c] pro:text-[#f8f8f2] pro:focus:border-[#bd93f9]"
         />
       </label>
 
+      {p.folderScope === "shared" && p.sharedData ? (
+        <>
+          <div className="mb-3 flex justify-end">
+            <button
+              onClick={p.onRefreshShared}
+              className="min-h-10 px-2 text-sm font-semibold text-blue-600 dark:text-blue-400 pro:text-[#8be9fd]"
+            >
+              {t("common.refresh")}
+            </button>
+          </div>
+          <SharedFolderList data={p.sharedData} query={query} mobile />
+        </>
+      ) : (
+        <>
       {p.folders.length === 0 && !queryNorm && (
         <p className="py-6 text-center text-base text-neutral-500">
           {t("folders.empty")}
@@ -208,6 +256,8 @@ export default function MobileProjectList(p: Props) {
           </div>
         );
       })}
+        </>
+      )}
     </div>
   );
 }

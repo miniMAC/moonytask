@@ -98,6 +98,19 @@ export interface MasterFolderSelection {
 
 export interface MasterStatus {
   account: { email: string };
+  role: "standard" | "master" | "member";
+  canPublish: boolean;
+  association: {
+    id: string;
+    status: "pending" | "approved";
+    requestedAt: number;
+    approvedAt: number | null;
+    master: {
+      email: string;
+      displayName: string | null;
+    };
+    masterLicenseActive: boolean;
+  } | null;
   request: {
     id: string;
     type: "initial" | "renewal";
@@ -127,6 +140,58 @@ export interface MasterStatus {
   };
   lastError: string | null;
   deviceActivated: boolean;
+}
+
+export interface MasterAssociationSummary {
+  id: string;
+  memberAccountId: string;
+  email: string;
+  displayName: string | null;
+  status: "pending" | "approved";
+  requestedAt: number;
+  approvedAt: number | null;
+  selectedFolderCount: number;
+  lastUpload: number | null;
+}
+
+export interface PublishedFolder {
+  id: string;
+  name: string;
+  position: number;
+  color: string | null;
+  updatedAt: number;
+}
+
+export interface PublishedProject {
+  id: string;
+  folderId: string;
+  name: string;
+  hourlyRate: number;
+  rateProfileId: string | null;
+  color: string | null;
+  archived: boolean;
+  position: number;
+  updatedAt: number;
+}
+
+export interface MasterSharedMember {
+  associationId: string;
+  account: {
+    email: string;
+    displayName: string | null;
+  };
+  publication: MasterStatus["publication"];
+  snapshot: {
+    schemaVersion: 1;
+    generatedAt: number;
+    currency: string;
+    folders: PublishedFolder[];
+    projects: PublishedProject[];
+  } | null;
+}
+
+export interface MasterSharedData {
+  members: MasterSharedMember[];
 }
 
 export interface WatchSuggestion {

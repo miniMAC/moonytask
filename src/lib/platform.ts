@@ -3,3 +3,4 @@
 export const isMobilePlatform = /Android|iPhone|iPad/i.test(
   navigator.userAgent,
 );
+export const isAndroidPlatform = /Android/i.test(navigator.userAgent);
