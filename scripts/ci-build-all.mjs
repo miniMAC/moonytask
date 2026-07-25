@@ -33,7 +33,7 @@ function main() {
   if (!branch) {
     fail("Non riesco a determinare il branch corrente. Passa a un branch prima di lanciare la CI.");
   }
-  requireBranchPushed();
+  requireBranchPushed(branch);
 
   const startedAt = Date.now();
   console.log(`Launching ${workflow} on branch ${branch}...`);
@@ -127,10 +127,57 @@ function requireWorkflowCommitted() {
   }
 }
 
-function requireBranchPushed() {
-  const status = output("git", ["status", "-sb"]);
-  if (status.includes("[ahead ")) {
-    fail("Ci sono commit locali non pushati. Esegui git push, poi rilancia questo task.");
+function requireBranchPushed(branch) {
+  const workingTreeStatus = output("git", ["status", "--porcelain"]).trim();
+  if (workingTreeStatus) {
+    fail(
+      [
+        "Ci sono modifiche locali non committate: la build remota non le includerebbe.",
+        "Esegui commit e push, poi rilancia questo task.",
+      ].join("\n")
+    );
+  }
+
+  const localHead = output("git", ["rev-parse", "HEAD"]).trim();
+  const remoteRef = `refs/heads/${branch}`;
+  const remoteBranch = spawnSync(
+    "git",
+    ["ls-remote", "--exit-code", "--heads", "origin", remoteRef],
+    {
+      cwd: projectRoot,
+      encoding: "utf8",
+    }
+  );
+
+  if (remoteBranch.status === 2 || (remoteBranch.status === 0 && !remoteBranch.stdout.trim())) {
+    fail(
+      [
+        `Il branch corrente "${branch}" non esiste su origin.`,
+        "Pubblicalo con: git push -u origin HEAD",
+        "Poi rilancia questo task.",
+      ].join("\n")
+    );
+  }
+
+  if (remoteBranch.error || remoteBranch.status !== 0) {
+    const details =
+      remoteBranch.error?.message || remoteBranch.stderr?.trim() || remoteBranch.stdout?.trim();
+    fail(
+      [
+        `Non riesco a verificare il branch remoto origin/${branch}.`,
+        details || "Controlla la connessione e la configurazione del remote origin.",
+      ].join("\n")
+    );
+  }
+
+  const remoteHead = remoteBranch.stdout.trim().split(/\s+/)[0];
+  if (remoteHead !== localHead) {
+    fail(
+      [
+        `Il commit locale non coincide con origin/${branch}.`,
+        "Sincronizza il branch e assicurati di aver eseguito il push, poi rilancia questo task.",
+      ].join("\n")
+    );
   }
 }
 
