@@ -25,6 +25,28 @@ npm run tauri dev     # avvio in sviluppo
 npm run tauri build   # crea MoonyTask.app / dmg in src-tauri/target/release/bundle
 ```
 
+### Firma Android
+
+L'APK di produzione usa sempre la stessa chiave. Non è previsto alcun fallback
+alla chiave debug: una chiave diversa impedirebbe ad Android di aggiornare
+un'installazione esistente.
+
+I due file locali, entrambi esclusi da Git, sono:
+
+- `src-tauri/gen/android/moonytask-release.jks`
+- `src-tauri/gen/android/keystore.properties`
+
+Il file `keystore.properties` ha questo formato:
+
+```properties
+storeFile=moonytask-release.jks
+keyAlias=androiddebugkey
+password=LA_PASSWORD_DEL_KEYSTORE
+```
+
+Conserva un backup sicuro di entrambi. `npm run android:apk` verifica anche
+l'impronta SHA-256 del certificato atteso e interrompe la build se la firma cambia.
+
 ## Struttura
 
 - `src/` — frontend React + TypeScript + Tailwind (i18n in `src/i18n/`)

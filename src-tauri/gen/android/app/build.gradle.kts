@@ -13,12 +13,28 @@ val tauriProperties = Properties().apply {
     }
 }
 
-// credenziali per la firma release: gen/android/keystore.properties (non committare)
+// Credenziali per la firma release: gen/android/keystore.properties (non committare).
+// Una release non deve mai ripiegare sulla chiave debug: cambiare certificato rende
+// impossibile aggiornare un'installazione Android esistente.
+val keystoreFile = rootProject.file("keystore.properties")
+if (!keystoreFile.exists()) {
+    throw GradleException(
+        "Firma Android release non configurata: manca ${keystoreFile.path}. " +
+            "Vedi README.md, sezione Firma Android."
+    )
+}
 val keystoreProperties = Properties().apply {
-    val propFile = rootProject.file("keystore.properties")
-    if (propFile.exists()) {
-        propFile.inputStream().use { load(it) }
-    }
+    keystoreFile.inputStream().use { load(it) }
+}
+val requiredSigningProperties = listOf("storeFile", "keyAlias", "password")
+val missingSigningProperties = requiredSigningProperties.filter {
+    keystoreProperties.getProperty(it).isNullOrBlank()
+}
+if (missingSigningProperties.isNotEmpty()) {
+    throw GradleException(
+        "Proprietà firma Android mancanti in ${keystoreFile.path}: " +
+            missingSigningProperties.joinToString(", ")
+    )
 }
 
 android {
@@ -34,12 +50,10 @@ android {
     }
     signingConfigs {
         create("release") {
-            if (keystoreProperties.containsKey("storeFile")) {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["password"] as String
-                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["password"] as String
-            }
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("password")
+            storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+            storePassword = keystoreProperties.getProperty("password")
         }
     }
     buildTypes {
@@ -55,12 +69,7 @@ android {
             }
         }
         getByName("release") {
-            signingConfig = if (keystoreProperties.containsKey("storeFile")) {
-                signingConfigs.getByName("release")
-            } else {
-                logger.warn("keystore.properties non trovato: la build release userà la chiave debug locale.")
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
