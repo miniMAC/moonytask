@@ -8,9 +8,12 @@
         "Build: Android APK (release)"
       ],
       "dependsOrder": "parallel",
-      "group": "build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
       "problemMatcher": [],
-      "detail": "Release completa: lancia la CI per tutti i pacchetti desktop e genera l'APK Android in parallelo. Usala solo quando devi pubblicare tutto."
+      "detail": "⌘⇧B: genera tutti i pacchetti desktop in CI e l'APK Android firmato in parallelo, salvando tutto in ~/Desktop/MoonyTask."
     },
     {
       "label": "Tauri: dev",
@@ -149,12 +152,9 @@
           "CARGO_INCREMENTAL": "1"
         }
       },
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
+      "group": "build",
       "problemMatcher": [],
-      "detail": "⌘⇧B: genera soltanto l'APK Android firmato arm64, riutilizzando la compilazione incrementale, e lo copia in ~/Desktop/MoonyTask.",
+      "detail": "Genera soltanto l'APK Android firmato arm64, riutilizzando la compilazione incrementale, e lo copia in ~/Desktop/MoonyTask.",
       "presentation": {
         "reveal": "always",
         "panel": "dedicated"
