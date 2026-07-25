@@ -2223,6 +2223,50 @@ pub fn select_pdf_export_dir(current: Option<String>) -> Result<Option<String>, 
     select_folder_dialog(current.as_deref())
 }
 
+#[derive(Deserialize)]
+struct StoredRateProfileRef {
+    id: String,
+}
+
+fn clear_orphaned_rate_profile_links(
+    conn: &Connection,
+    profiles_json: &str,
+) -> rusqlite::Result<usize> {
+    let profiles = match serde_json::from_str::<Vec<StoredRateProfileRef>>(profiles_json) {
+        Ok(profiles) => profiles,
+        Err(_) => return Ok(0),
+    };
+    let valid_ids = profiles
+        .into_iter()
+        .map(|profile| profile.id)
+        .collect::<HashSet<_>>();
+    let mut statement = conn.prepare(
+        "SELECT id, rate_profile_id
+         FROM projects
+         WHERE rate_profile_id IS NOT NULL AND deleted = 0",
+    )?;
+    let orphaned = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter_map(|(project_id, profile_id)| {
+            (!valid_ids.contains(&profile_id)).then_some(project_id)
+        })
+        .collect::<Vec<_>>();
+    drop(statement);
+
+    let updated_at = now_secs();
+    for project_id in &orphaned {
+        conn.execute(
+            "UPDATE projects SET rate_profile_id = NULL, updated_at = ?2 WHERE id = ?1",
+            rusqlite::params![project_id, updated_at],
+        )?;
+    }
+    Ok(orphaned.len())
+}
+
 #[tauri::command]
 pub fn settings_set(
     app: tauri::AppHandle,
@@ -2233,8 +2277,13 @@ pub fn settings_set(
     {
         let conn = db.0.lock().unwrap();
         set_setting(&conn, &key, &value).map_err(err)?;
+        if key == "rate_profiles"
+            && clear_orphaned_rate_profile_links(&conn, &value).map_err(err)? > 0
+        {
+            crate::sync::mark_dirty();
+            let _ = app.emit("data_changed", ());
+        }
     }
-    use tauri::Emitter;
     let _ = app.emit("setting_changed", (key, value));
     Ok(())
 }
@@ -2380,5 +2429,45 @@ mod tests {
             assert!(!json.contains(secret), "secret leaked in JSON: {secret}");
             assert!(!csv.contains(secret), "secret leaked in CSV: {secret}");
         }
+    }
+
+    #[test]
+    fn saving_rate_profiles_clears_orphaned_project_links() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE projects (
+                id TEXT PRIMARY KEY,
+                rate_profile_id TEXT,
+                updated_at INTEGER NOT NULL,
+                deleted INTEGER NOT NULL
+             );
+             INSERT INTO projects VALUES ('valid', 'profile-1', 1, 0);
+             INSERT INTO projects VALUES ('orphaned', 'removed-profile', 1, 0);
+             INSERT INTO projects VALUES ('deleted', 'removed-profile', 1, 1);",
+        )
+        .unwrap();
+
+        let cleared =
+            super::clear_orphaned_rate_profile_links(&conn, r#"[{"id":"profile-1"}]"#).unwrap();
+
+        assert_eq!(cleared, 1);
+        assert_eq!(
+            conn.query_row(
+                "SELECT rate_profile_id FROM projects WHERE id = 'valid'",
+                [],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .unwrap()
+            .as_deref(),
+            Some("profile-1")
+        );
+        assert!(conn
+            .query_row(
+                "SELECT rate_profile_id FROM projects WHERE id = 'orphaned'",
+                [],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .unwrap()
+            .is_none());
     }
 }

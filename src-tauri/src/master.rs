@@ -537,6 +537,24 @@ pub fn build_published_snapshot(
             }
         }
     }
+
+    let available_rate_profiles = db::get_setting(connection, "rate_profiles")
+        .and_then(|raw| serde_json::from_str::<Vec<PublishedRateProfileV1>>(&raw).ok())
+        .unwrap_or_default();
+    let available_rate_ids = available_rate_profiles
+        .iter()
+        .map(|profile| profile.id.as_str())
+        .collect::<HashSet<_>>();
+    for project in &mut projects {
+        if project
+            .rate_profile_id
+            .as_ref()
+            .is_some_and(|profile_id| !available_rate_ids.contains(profile_id.as_str()))
+        {
+            project.rate_profile_id = None;
+        }
+    }
+
     let project_ids = projects
         .iter()
         .map(|project| project.id.clone())
@@ -545,10 +563,7 @@ pub fn build_published_snapshot(
         .iter()
         .filter_map(|project| project.rate_profile_id.clone())
         .collect::<HashSet<_>>();
-
-    let rate_profiles = db::get_setting(connection, "rate_profiles")
-        .and_then(|raw| serde_json::from_str::<Vec<PublishedRateProfileV1>>(&raw).ok())
-        .unwrap_or_default()
+    let rate_profiles = available_rate_profiles
         .into_iter()
         .filter(|profile| referenced_rate_ids.contains(&profile.id))
         .collect::<Vec<_>>();
@@ -858,6 +873,7 @@ mod tests {
                  INSERT INTO projects VALUES ('p1', 'f1', 'Active', 50, 'r1', NULL, 0, 0, 20, 0);
                  INSERT INTO projects VALUES ('p2', 'f1', 'Archived', 80, 'r2', NULL, 1, 1, 21, 0);
                  INSERT INTO projects VALUES ('p3', 'f2', 'Other folder', 90, NULL, NULL, 0, 0, 22, 0);
+                 INSERT INTO projects VALUES ('orphan-profile', 'f1', 'Orphan profile', 75, 'missing-rate-profile', NULL, 0, 2, 23, 0);
                  INSERT INTO projects VALUES ('deleted-project', 'f1', 'Deleted', 10, NULL, NULL, 0, 2, 23, 1);
                  INSERT INTO time_entries VALUES ('e1', 'p1', 100, 200, 100, 'note', 30, 0);
                  INSERT INTO time_entries VALUES ('e2', 'p2', 200, 300, 100, NULL, 31, 0);
@@ -882,8 +898,15 @@ mod tests {
     fn one_folder_contains_only_related_complete_data() {
         let snapshot = build_published_snapshot(&database(), &["f1".into()]).unwrap();
         assert_eq!(snapshot.folders.len(), 1);
-        assert_eq!(snapshot.projects.len(), 2);
+        assert_eq!(snapshot.projects.len(), 3);
         assert!(snapshot.projects.iter().any(|project| project.archived));
+        assert!(snapshot
+            .projects
+            .iter()
+            .find(|project| project.id == "orphan-profile")
+            .unwrap()
+            .rate_profile_id
+            .is_none());
         assert_eq!(snapshot.time_entries.len(), 2);
         assert_eq!(snapshot.project_payments.len(), 1);
         assert_eq!(snapshot.rate_profiles.len(), 2);
@@ -901,6 +924,7 @@ mod tests {
             "master_device_token",
             "secret-device",
             "watched_apps",
+            "missing-rate-profile",
             "settings",
         ] {
             assert!(
@@ -917,7 +941,7 @@ mod tests {
     fn multiple_folders_include_the_union_without_deleted_rows() {
         let snapshot = build_published_snapshot(&database(), &["f1".into(), "f2".into()]).unwrap();
         assert_eq!(snapshot.folders.len(), 2);
-        assert_eq!(snapshot.projects.len(), 3);
+        assert_eq!(snapshot.projects.len(), 4);
         assert_eq!(snapshot.time_entries.len(), 3);
         assert_eq!(snapshot.project_payments.len(), 2);
         assert_eq!(snapshot.rate_profiles.len(), 2);
