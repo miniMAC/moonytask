@@ -8,12 +8,9 @@
         "Build: Android APK (release)"
       ],
       "dependsOrder": "parallel",
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
+      "group": "build",
       "problemMatcher": [],
-      "detail": "⌘⇧B: lancia la CI per i pacchetti desktop e intanto genera l'APK Android in locale (tutto finisce in ~/Desktop/MoonyTask)."
+      "detail": "Release completa: lancia la CI per tutti i pacchetti desktop e genera l'APK Android in parallelo. Usala solo quando devi pubblicare tutto."
     },
     {
       "label": "Tauri: dev",
@@ -24,6 +21,24 @@
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Android: dev (hot reload)",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "tauri", "--", "android", "dev"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "CARGO_INCREMENTAL": "1"
+        }
+      },
+      "problemMatcher": [],
+      "detail": "Avvia l'app sul dispositivo/emulatore Android per lavorare rapidamente senza creare ogni volta l'APK release.",
       "presentation": {
         "reveal": "always",
         "panel": "dedicated"
@@ -76,15 +91,70 @@
       }
     },
     {
-      "label": "Build: Android APK (release)",
+      "label": "CI: build macOS only",
       "type": "shell",
-      "command": "npm run android:apk",
+      "command": "node",
+      "args": ["scripts/ci-build-all.mjs", "--platform", "macos"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
       "group": "build",
       "problemMatcher": [],
-      "detail": "Genera l'APK Android firmato (arm64) e lo copia in ~/Desktop/MoonyTask.",
+      "detail": "Lancia soltanto la build macOS universale e scarica il DMG in ~/Desktop/MoonyTask.",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "CI: build Windows only",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/ci-build-all.mjs", "--platform", "windows"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "detail": "Lancia soltanto le build Windows x64 e ARM64 e scarica gli installer in ~/Desktop/MoonyTask.",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "CI: build Linux only",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/ci-build-all.mjs", "--platform", "linux"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "detail": "Lancia soltanto la build Linux e scarica AppImage, DEB e RPM in ~/Desktop/MoonyTask.",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Build: Android APK (release)",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "android:apk"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "CARGO_INCREMENTAL": "1"
+        }
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "detail": "⌘⇧B: genera soltanto l'APK Android firmato arm64, riutilizzando la compilazione incrementale, e lo copia in ~/Desktop/MoonyTask.",
       "presentation": {
         "reveal": "always",
         "panel": "dedicated"

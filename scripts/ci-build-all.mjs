@@ -18,6 +18,7 @@ const projectRoot = path.resolve(__dirname, "..");
 const workflow = "build-artifacts.yml";
 const workflowPath = path.join(projectRoot, ".github", "workflows", workflow);
 const artifactExtensions = new Set([".dmg", ".msi", ".exe", ".AppImage", ".deb", ".rpm"]);
+const supportedPlatforms = new Set(["all", "macos", "windows", "linux"]);
 
 main();
 
@@ -35,9 +36,22 @@ function main() {
   }
   requireBranchPushed(branch);
 
+  const platform = argValue("--platform") ?? "all";
+  if (!supportedPlatforms.has(platform)) {
+    fail(`Piattaforma non supportata: ${platform}. Usa all, macos, windows o linux.`);
+  }
+
   const startedAt = Date.now();
-  console.log(`Launching ${workflow} on branch ${branch}...`);
-  run(gh, ["workflow", "run", workflow, "--ref", branch]);
+  console.log(`Launching ${workflow} (${platform}) on branch ${branch}...`);
+  run(gh, [
+    "workflow",
+    "run",
+    workflow,
+    "--ref",
+    branch,
+    "-f",
+    `platform=${platform}`,
+  ]);
 
   const runId = waitForRunId(gh, branch, startedAt);
   console.log(`Watching GitHub Actions run ${runId}...`);
@@ -56,17 +70,23 @@ function main() {
     fail(`Build completata, ma non ho trovato artifact scaricabili in ${runDir}`);
   }
 
-  // genera latest.json dagli artefatti updater appena scaricati (firme incluse)
-  const generatorArgs = [
-    path.join(__dirname, "generate-latest-json.mjs"),
-    "--dir",
-    runDir,
-  ];
-  const notes = argValue("--notes");
-  if (notes) {
-    generatorArgs.push("--notes", notes);
+  if (platform === "all") {
+    // latest.json richiede gli artefatti updater di tutte le piattaforme.
+    const generatorArgs = [
+      path.join(__dirname, "generate-latest-json.mjs"),
+      "--dir",
+      runDir,
+    ];
+    const notes = argValue("--notes");
+    if (notes) {
+      generatorArgs.push("--notes", notes);
+    }
+    run(process.execPath, generatorArgs);
+  } else {
+    console.log(
+      `Build ${platform} completata. latest.json non viene rigenerato da una release parziale.`,
+    );
   }
-  run(process.execPath, generatorArgs);
 
   console.log(`Done. ${copied} file ready in ${outDir}`);
 }
