@@ -20,7 +20,7 @@ Per attivare la sincronizzazione serve una credenziale OAuth di Google, da crear
 2. Tipo di utenti: **Esterni** → **Crea**.
 3. Nome app: `MoonyTask`; email di assistenza: la tua; contatto sviluppatore: la tua email → **Salva e continua**.
 4. Ambiti (scopes): puoi saltare → **Salva e continua**.
-5. **Utenti di test**: aggiungi il tuo indirizzo Gmail (es. `minimamente.info@gmail.com`).
+5. **Utenti di test**: aggiungi il tuo indirizzo Gmail.
    > Finché l'app resta in modalità "test" solo gli utenti di test possono accedere: per uso personale va benissimo.
 
 ## 4. Crea le credenziali
