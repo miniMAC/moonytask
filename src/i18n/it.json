@@ -17,7 +17,8 @@
     "sharedEmpty": "Nessun utente associato sta condividendo cartelle.",
     "sharedWaiting": "In attesa della prima pubblicazione da questo utente.",
     "sharedNoneSelected": "Questo utente non ha selezionato cartelle.",
-    "sharedReadOnly": "Le cartelle degli associati sono mostrate in sola lettura."
+    "sharedReadOnly": "Le cartelle degli associati sono mostrate in sola lettura.",
+    "noSearchResults": "Nessuna cartella o progetto trovato."
   },
   "projects": {
     "new": "Nuovo progetto",
@@ -31,7 +32,7 @@
     "deleteConfirm": "Eliminare \"{{name}}\"? Le ore registrate non appariranno più nei report.",
     "empty": "Nessun progetto in questa cartella.",
     "select": "Seleziona un progetto dalla barra laterale",
-    "search": "Cerca tra i progetti…",
+    "search": "Cerca tra cartelle e progetti…",
     "searchShared": "Cerca tra le cartelle condivise…",
     "noResults": "Nessun progetto trovato.",
     "todayTime": "Oggi",
@@ -85,6 +86,10 @@
     "entryCount": "{{count}} registrazioni",
     "noEntries": "Nessuna registrazione condivisa per questo progetto.",
     "amountDue": "Residuo stimato",
+    "lastPayment": "Ultimo pagamento",
+    "paymentHistory": "Storico pagamenti",
+    "paymentCount_one": "{{count}} pagamento registrato",
+    "paymentCount_other": "{{count}} pagamenti registrati",
     "notPaid": "Nessun saldo registrato",
     "noPayments": "Nessun pagamento condiviso per questo progetto."
   },

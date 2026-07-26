@@ -59,7 +59,7 @@ export default function SharedFolderList({
   if (visibleMembers.length === 0) {
     return (
       <p className="px-2 py-6 text-center text-sm text-neutral-500">
-        {t("projects.noResults")}
+        {t("folders.noSearchResults")}
       </p>
     );
   }
@@ -86,7 +86,7 @@ export default function SharedFolderList({
           ) : folders.length === 0 ? (
             <p className="px-2 py-2 text-sm text-neutral-400">
               {normalized
-                ? t("projects.noResults")
+                ? t("folders.noSearchResults")
                 : t("folders.sharedNoneSelected")}
             </p>
           ) : (

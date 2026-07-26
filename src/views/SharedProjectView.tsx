@@ -2,13 +2,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { BackIcon } from "../components/Icons";
 import { projectColor } from "../lib/colors";
-import {
-  fmtCost,
-  fmtDateTime,
-  fmtDuration,
-  startOfDay,
-  startOfWeek,
-} from "../lib/time";
+import { fmtDateTime, fmtDuration, startOfDay, startOfWeek } from "../lib/time";
 import type {
   MasterSharedMember,
   PublishedFolder,
@@ -49,36 +43,20 @@ export default function SharedProjectView({
         .sort((a, b) => b.paidAt - a.paidAt),
     [project.id, snapshot.projectPayments],
   );
-  const rateProfile =
-    snapshot.rateProfiles.find((profile) => profile.id === project.rateProfileId) ??
-    null;
   const stats = useMemo(() => {
     const today = startOfDay(new Date());
     const week = startOfWeek(new Date());
-    const latestPaidThrough = payments.reduce(
-      (latest, payment) => Math.max(latest, payment.paidThroughAt),
-      0,
-    );
     let todaySecs = 0;
     let weekSecs = 0;
     let totalSecs = 0;
-    let residualSecs = 0;
     for (const entry of entries) {
       totalSecs += entry.durationSecs;
       if (entry.startedAt >= week) weekSecs += entry.durationSecs;
       if (entry.startedAt >= today) todaySecs += entry.durationSecs;
-      if (entry.endedAt > latestPaidThrough) residualSecs += entry.durationSecs;
     }
-    return {
-      todaySecs,
-      weekSecs,
-      totalSecs,
-      residualSecs,
-      latestPaidThrough,
-    };
-  }, [entries, payments]);
-  const totalValue = (stats.totalSecs / 3600) * project.hourlyRate;
-  const residualValue = (stats.residualSecs / 3600) * project.hourlyRate;
+    return { todaySecs, weekSecs, totalSecs };
+  }, [entries]);
+  const lastPayment = payments[0] ?? null;
   const ownerName = member.account.displayName || member.account.email;
 
   return (
@@ -114,13 +92,6 @@ export default function SharedProjectView({
           </div>
           <p className="mt-1 text-base text-neutral-600 dark:text-neutral-400 pro:text-[#c9c9d6]">
             {folder.name}
-            {project.hourlyRate > 0 && (
-              <>
-                {" · "}
-                {fmtCost(project.hourlyRate, snapshot.currency, locale)}/
-                {t("sharedProject.hour")}
-              </>
-            )}
           </p>
         </div>
       </div>
@@ -139,43 +110,40 @@ export default function SharedProjectView({
           detail={t("sharedProject.sourceHelp")}
         />
         <SharedMetadata
-          label={t("sharedProject.hourlyValue")}
-          value={fmtCost(project.hourlyRate, snapshot.currency, locale)}
-          detail={
-            rateProfile
-              ? `${rateProfile.name} · ${t(
-                  `settings.rates.payment.${rateProfile.paymentType}`,
-                )}`
-              : t("sharedProject.manualRate")
-          }
-        />
-        <SharedMetadata
           label={t("sharedProject.projectUpdatedAt")}
           value={fmtDateTime(project.updatedAt, locale)}
           detail={`${entries.length} ${t("sharedProject.entries").toLocaleLowerCase()}`}
         />
+        <SharedMetadata
+          label={t("sharedProject.lastPayment")}
+          value={
+            lastPayment
+              ? fmtDateTime(lastPayment.paidAt, locale)
+              : t("sharedProject.notPaid")
+          }
+          detail={
+            lastPayment
+              ? `${t("projects.paidThrough")} ${fmtDateTime(
+                  lastPayment.paidThroughAt,
+                  locale,
+                )}`
+              : undefined
+          }
+        />
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <SharedStat
           label={t("projects.todayTime")}
           value={fmtDuration(stats.todaySecs)}
-          detail={valueDetail(stats.todaySecs, project.hourlyRate, snapshot.currency, locale)}
         />
         <SharedStat
           label={t("projects.weekTime")}
           value={fmtDuration(stats.weekSecs)}
-          detail={valueDetail(stats.weekSecs, project.hourlyRate, snapshot.currency, locale)}
         />
         <SharedStat
           label={t("projects.totalTime")}
           value={fmtDuration(stats.totalSecs)}
-          detail={fmtCost(totalValue, snapshot.currency, locale)}
-        />
-        <SharedStat
-          label={t("sharedProject.amountDue")}
-          value={fmtCost(residualValue, snapshot.currency, locale)}
-          detail={fmtDuration(stats.residualSecs)}
         />
       </div>
 
@@ -223,14 +191,11 @@ export default function SharedProjectView({
       <section className="mt-8 rounded-2xl border border-[#D94700] bg-[#FF5600] p-5 text-white shadow-[0_14px_35px_rgba(255,86,0,0.18)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className={`${sectionLabelCls} text-white`}>
-            {t("projects.payments")}
+            {t("sharedProject.paymentHistory")}
           </h2>
           <span className="text-sm text-white/80">
-            {stats.latestPaidThrough > 0
-              ? `${t("projects.paidThrough")} ${fmtDateTime(
-                  stats.latestPaidThrough,
-                  locale,
-                )}`
+            {payments.length > 0
+              ? t("sharedProject.paymentCount", { count: payments.length })
               : t("sharedProject.notPaid")}
           </span>
         </div>
@@ -247,8 +212,7 @@ export default function SharedProjectView({
               >
                 <span className="min-w-0">
                   <span className="block font-medium">
-                    {t("projects.paidThrough")}{" "}
-                    {fmtDateTime(payment.paidThroughAt, locale)}
+                    {t("projects.paidAt")} {fmtDateTime(payment.paidAt, locale)}
                   </span>
                   {payment.note && (
                     <span className="mt-1 block whitespace-pre-wrap break-words text-sm text-white/85">
@@ -257,7 +221,8 @@ export default function SharedProjectView({
                   )}
                 </span>
                 <span className="text-sm text-white/80">
-                  {t("projects.paidAt")} {fmtDateTime(payment.paidAt, locale)}
+                  {t("projects.paidThrough")}{" "}
+                  {fmtDateTime(payment.paidThroughAt, locale)}
                 </span>
               </li>
             ))}
@@ -268,24 +233,12 @@ export default function SharedProjectView({
   );
 }
 
-function valueDetail(
-  seconds: number,
-  hourlyRate: number,
-  currency: string,
-  locale: string,
-): string | null {
-  if (hourlyRate <= 0) return null;
-  return fmtCost((seconds / 3600) * hourlyRate, currency, locale);
-}
-
 function SharedStat({
   label,
   value,
-  detail,
 }: {
   label: string;
   value: string;
-  detail: string | null;
 }) {
   return (
     <div className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-700 pro:border-[#44475a]">
@@ -293,11 +246,6 @@ function SharedStat({
         {label}
       </p>
       <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
-      {detail && (
-        <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-          {detail}
-        </p>
-      )}
     </div>
   );
 }

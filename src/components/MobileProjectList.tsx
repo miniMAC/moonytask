@@ -48,14 +48,20 @@ export default function MobileProjectList(p: Props) {
   const [query, setQuery] = useState("");
   const queryNorm = query.trim().toLocaleLowerCase();
   const visibleFolders = queryNorm
-    ? p.folders.filter((folder) =>
-        p.projects.some(
-          (project) =>
-            project.folderId === folder.id &&
-            !project.archived &&
-            project.name.toLocaleLowerCase().includes(queryNorm),
-        ),
-      )
+    ? p.folders.filter((folder) => {
+        const folderMatches = folder.name
+          .toLocaleLowerCase()
+          .includes(queryNorm);
+        return (
+          folderMatches ||
+          p.projects.some(
+            (project) =>
+              project.folderId === folder.id &&
+              !project.archived &&
+              project.name.toLocaleLowerCase().includes(queryNorm),
+          )
+        );
+      })
     : p.folders;
 
   return (
@@ -138,16 +144,20 @@ export default function MobileProjectList(p: Props) {
 
       {queryNorm && visibleFolders.length === 0 && (
         <p className="py-6 text-center text-base text-neutral-500">
-          {t("projects.noResults")}
+          {t("folders.noSearchResults")}
         </p>
       )}
 
       {visibleFolders.map((folder) => {
+        const folderMatches = folder.name
+          .toLocaleLowerCase()
+          .includes(queryNorm);
         const items = p.projects.filter(
           (project) =>
             project.folderId === folder.id &&
             !project.archived &&
             (!queryNorm ||
+              folderMatches ||
               project.name.toLocaleLowerCase().includes(queryNorm)),
         );
         const collapsed = p.collapsedFolderIds.has(folder.id);

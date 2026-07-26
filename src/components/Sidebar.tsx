@@ -23,6 +23,7 @@ import {
   PencilIcon,
   PlayIcon,
   PlusIcon,
+  SearchIcon,
   TrashIcon,
 } from "./Icons";
 
@@ -75,6 +76,10 @@ function halfOf(event: DragEvent): "before" | "after" {
 export default function Sidebar(p: Props) {
   const { t } = useTranslation();
   const [dropHint, setDropHint] = useState<DropHint>(null);
+  const [searchQueries, setSearchQueries] = useState({
+    personal: "",
+    shared: "",
+  });
   const [projectMenu, setProjectMenu] = useState<{
     project: Project;
     x: number;
@@ -191,6 +196,27 @@ export default function Sidebar(p: Props) {
           ? "shadow-[inset_0_-2px_0_0_#60a5fa]"
           : "";
 
+  const searchScope =
+    p.folderScope === "shared" && p.sharedData ? "shared" : "personal";
+  const query = searchQueries[searchScope];
+  const queryNorm = query.trim().toLocaleLowerCase();
+  const visiblePersonalFolders = queryNorm
+    ? p.folders.filter((folder) => {
+        const folderMatches = folder.name
+          .toLocaleLowerCase()
+          .includes(queryNorm);
+        return (
+          folderMatches ||
+          p.projects.some(
+            (project) =>
+              project.folderId === folder.id &&
+              !project.archived &&
+              project.name.toLocaleLowerCase().includes(queryNorm),
+          )
+        );
+      })
+    : p.folders;
+
   return (
     <aside className="hidden w-72 shrink-0 flex-col border-r border-neutral-200 bg-neutral-100 md:flex dark:border-neutral-800 dark:bg-neutral-900 pro:border-[#44475a] pro:bg-[#21222c]">
       <div className="flex items-center gap-2 px-4 pb-2 pt-4">
@@ -223,6 +249,28 @@ export default function Sidebar(p: Props) {
         </div>
       )}
 
+      <label className="relative mx-3 mb-1 mt-1 block">
+        <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-neutral-400">
+          <SearchIcon size={15} />
+        </span>
+        <input
+          type="search"
+          value={query}
+          onChange={(event) =>
+            setSearchQueries((current) => ({
+              ...current,
+              [searchScope]: event.target.value,
+            }))
+          }
+          placeholder={
+            searchScope === "shared"
+              ? t("projects.searchShared")
+              : t("projects.search")
+          }
+          className="h-9 w-full rounded-lg border border-neutral-200 bg-white pl-8 pr-2 text-sm outline-none transition placeholder:text-neutral-400 focus:border-blue-500 dark:border-neutral-700 dark:bg-neutral-800/70 dark:text-neutral-100 pro:border-[#44475a] pro:bg-[#282a36] pro:text-[#f8f8f2] pro:focus:border-[#bd93f9]"
+        />
+      </label>
+
       <div className="flex-1 overflow-y-auto overflow-x-clip px-2 pb-2">
         {p.folderScope === "personal" || !p.sharedData ? (
           <>
@@ -239,17 +287,32 @@ export default function Sidebar(p: Props) {
           </button>
         </div>
 
-        {p.folders.length === 0 && (
+        {p.folders.length === 0 && !queryNorm && (
           <p className="px-2 py-3 text-sm text-neutral-500">
             {t("folders.empty")}
           </p>
         )}
 
-        {p.folders.map((folder) => {
+        {queryNorm && visiblePersonalFolders.length === 0 && (
+          <p className="px-2 py-4 text-center text-sm text-neutral-500">
+            {t("folders.noSearchResults")}
+          </p>
+        )}
+
+        {visiblePersonalFolders.map((folder) => {
+          const folderMatches = folder.name
+            .toLocaleLowerCase()
+            .includes(queryNorm);
           const items = p.projects.filter(
-            (pr) => pr.folderId === folder.id && !pr.archived,
+            (pr) =>
+              pr.folderId === folder.id &&
+              !pr.archived &&
+              (!queryNorm ||
+                folderMatches ||
+                pr.name.toLocaleLowerCase().includes(queryNorm)),
           );
-          const collapsed = p.collapsedFolderIds.has(folder.id);
+          const collapsed =
+            p.collapsedFolderIds.has(folder.id) && !queryNorm;
           return (
             <div
               key={folder.id}
@@ -269,6 +332,7 @@ export default function Sidebar(p: Props) {
                 <button
                   type="button"
                   aria-expanded={!collapsed}
+                  disabled={Boolean(queryNorm)}
                   onClick={() =>
                     p.onFolderCollapsedChange(folder.id, !collapsed)
                   }
@@ -396,6 +460,7 @@ export default function Sidebar(p: Props) {
             </div>
             <SharedFolderList
               data={p.sharedData}
+              query={query}
               selected={p.selectedSharedProject}
               onSelectProject={p.onSelectSharedProject}
             />

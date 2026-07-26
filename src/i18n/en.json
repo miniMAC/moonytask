@@ -17,7 +17,8 @@
     "sharedEmpty": "No associated user is sharing folders.",
     "sharedWaiting": "Waiting for this user's first publication.",
     "sharedNoneSelected": "This user has not selected any folders.",
-    "sharedReadOnly": "Associated users' folders are shown read-only."
+    "sharedReadOnly": "Associated users' folders are shown read-only.",
+    "noSearchResults": "No folder or project found."
   },
   "projects": {
     "new": "New project",
@@ -31,7 +32,7 @@
     "deleteConfirm": "Delete \"{{name}}\"? Its tracked time will no longer appear in reports.",
     "empty": "No projects in this folder.",
     "select": "Select a project from the sidebar",
-    "search": "Search projects…",
+    "search": "Search folders and projects…",
     "searchShared": "Search shared folders…",
     "noResults": "No projects found.",
     "todayTime": "Today",
@@ -85,6 +86,10 @@
     "entryCount": "{{count}} entries",
     "noEntries": "No shared entries for this project.",
     "amountDue": "Estimated outstanding",
+    "lastPayment": "Last payment",
+    "paymentHistory": "Payment history",
+    "paymentCount_one": "{{count}} recorded payment",
+    "paymentCount_other": "{{count}} recorded payments",
     "notPaid": "No recorded payment",
     "noPayments": "No shared payments for this project."
   },
