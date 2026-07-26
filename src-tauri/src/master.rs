@@ -5,6 +5,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU32, Ordering};
+use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
 const API_URL: &str = match option_env!("MOONYTASK_API_URL") {
@@ -24,6 +25,7 @@ static PUBLICATION_PENDING: AtomicBool = AtomicBool::new(false);
 static PUBLICATION_WORKER_STARTED: AtomicBool = AtomicBool::new(false);
 static RETRY_ATTEMPT: AtomicU32 = AtomicU32::new(0);
 static NEXT_RETRY_AT: AtomicI64 = AtomicI64::new(0);
+static APP_SESSION_CACHE: Mutex<Option<AppSessionResponse>> = Mutex::new(None);
 
 #[derive(Debug)]
 struct MasterError {
@@ -59,10 +61,11 @@ struct ErrorBody {
     message: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AppSessionResponse {
     token: String,
+    expires_at: i64,
 }
 
 #[derive(Deserialize)]
@@ -306,7 +309,7 @@ fn parse_response<T: for<'de> Deserialize<'de>>(response: Response) -> Result<T,
     })
 }
 
-fn app_session(app: &AppHandle) -> Result<String, MasterError> {
+fn request_app_session(app: &AppHandle) -> Result<AppSessionResponse, MasterError> {
     // The access token is obtained from the existing Drive connection and is
     // sent only to Google's verifier endpoint through the MoonyTask Worker.
     // It is never persisted by the Master subsystem.
@@ -321,7 +324,33 @@ fn app_session(app: &AppHandle) -> Result<String, MasterError> {
         .json(&serde_json::json!({ "googleAccessToken": google_access_token }))
         .send()
         .map_err(MasterError::from)?;
-    parse_response::<AppSessionResponse>(response).map(|session| session.token)
+    parse_response::<AppSessionResponse>(response)
+}
+
+fn app_session(app: &AppHandle) -> Result<String, MasterError> {
+    if let Ok(cache) = APP_SESSION_CACHE.lock() {
+        if let Some(session) = cache
+            .as_ref()
+            .filter(|session| session.expires_at > db::now_secs() + 30)
+        {
+            return Ok(session.token.clone());
+        }
+    }
+    let session = request_app_session(app)?;
+    let token = session.token.clone();
+    if let Ok(mut cache) = APP_SESSION_CACHE.lock() {
+        *cache = Some(session);
+    }
+    Ok(token)
+}
+
+fn fresh_app_session(app: &AppHandle) -> Result<String, MasterError> {
+    let session = request_app_session(app)?;
+    let token = session.token.clone();
+    if let Ok(mut cache) = APP_SESSION_CACHE.lock() {
+        *cache = Some(session);
+    }
+    Ok(token)
 }
 
 #[cfg(desktop)]
@@ -396,6 +425,14 @@ fn status_with_token(app: &AppHandle, token: &str) -> Result<MasterStatus, Maste
         status.can_publish = true;
     }
     cache_status(app, &status);
+    if matches!(
+        local_last_error(app).as_deref(),
+        Some(error)
+            if error.starts_with("invalid_google_token:")
+                || error.starts_with("rate_limited:")
+    ) {
+        set_last_error(app, None);
+    }
     status.last_error = local_last_error(app);
     Ok(status)
 }
@@ -497,7 +534,7 @@ fn request_master(app: &AppHandle, request_type: &str) -> Result<MasterStatus, M
 fn activate_master(app: &AppHandle, code: &str) -> Result<MasterStatus, MasterError> {
     // Always create a fresh app session here so activation proves the current
     // Drive identity even if an old device token exists locally.
-    let session = app_session(app)?;
+    let session = fresh_app_session(app)?;
     let response = http_client()?
         .post(endpoint("/v1/master/activate"))
         .bearer_auth(&session)
