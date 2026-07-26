@@ -19,9 +19,20 @@ Per attivare la sincronizzazione serve una credenziale OAuth di Google, da crear
 1. Menu ☰ → **API e servizi** → **Schermata consenso OAuth** (o "Google Auth Platform").
 2. Tipo di utenti: **Esterni** → **Crea**.
 3. Nome app: `MoonyTask`; email di assistenza: la tua; contatto sviluppatore: la tua email → **Salva e continua**.
-4. Ambiti (scopes): puoi saltare → **Salva e continua**.
-5. **Utenti di test**: aggiungi il tuo indirizzo Gmail.
-   > Finché l'app resta in modalità "test" solo gli utenti di test possono accedere: per uso personale va benissimo.
+4. Apri **Data Access** → **Add or remove scopes** e aggiungi:
+   - `https://www.googleapis.com/auth/drive.appdata`
+   - `openid`
+   - `email`
+   poi salva. Lo scope `drive.appdata` consente a MoonyTask di gestire solo
+   i dati nascosti creati dall'app, non gli altri file presenti su Drive.
+5. Apri **Audience**, imposta il tipo di utenti su **External** e seleziona
+   **Publish app** per portare lo stato su **In production**. In questo modo
+   qualsiasi account Google può autorizzare la sincronizzazione e non serve
+   mantenere una lista di utenti di test.
+6. Completa in **Branding** i dati pubblici richiesti (nome app, email di
+   assistenza e contatti sviluppatore). Se Google richiede homepage o privacy
+   policy per la pubblicazione, usa pagine pubbliche appartenenti al dominio
+   ufficiale di MoonyTask.
 
 ## 4. Crea le credenziali desktop
 
