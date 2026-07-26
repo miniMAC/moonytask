@@ -44,11 +44,7 @@ if (target && target !== "--copy-only") {
   // se non è già configurata usa quella locale (vedi UPDATES.md)
   const env = { ...process.env };
   const localKey = path.join(homedir(), ".tauri", "moonytask.key");
-  if (
-    !env.TAURI_SIGNING_PRIVATE_KEY &&
-    !env.TAURI_SIGNING_PRIVATE_KEY_PATH &&
-    existsSync(localKey)
-  ) {
+  if (!env.TAURI_SIGNING_PRIVATE_KEY && existsSync(localKey)) {
     // La CLI Tauri corrente richiede il contenuto della chiave; leggere qui il
     // file evita di inserirlo nella command line o nei log della build.
     env.TAURI_SIGNING_PRIVATE_KEY = readFileSync(localKey, "utf8");
@@ -57,6 +53,12 @@ if (target && target !== "--copy-only") {
     if (!("TAURI_SIGNING_PRIVATE_KEY_PASSWORD" in env)) {
       env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "";
     }
+  }
+  if (!env.TAURI_SIGNING_PRIVATE_KEY) {
+    console.error(
+      `Missing updater signing key. Restore ${localKey} or set TAURI_SIGNING_PRIVATE_KEY.`
+    );
+    process.exit(1);
   }
 
   const result = spawnSync(npm, args, {

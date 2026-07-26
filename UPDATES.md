@@ -27,13 +27,15 @@ Per la CI su GitHub aggiungi due secrets (Settings → Secrets and variables →
 - `TAURI_SIGNING_PRIVATE_KEY` = contenuto del file `~/.tauri/moonytask.key`
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` = stringa vuota
 
-Per compilare in locale (`npm run tauri build`) esporta prima:
+Per compilare in locale usa:
 
 ```sh
-export TAURI_SIGNING_PRIVATE_KEY_PATH=~/.tauri/moonytask.key
+npm run build:mac
 ```
 
-Senza, la build desktop fallisce perché `createUpdaterArtifacts` è attivo.
+Lo script legge in memoria `~/.tauri/moonytask.key` senza inserirne il contenuto
+nella riga di comando o nei log. Senza la chiave, la build desktop fallisce perché
+`createUpdaterArtifacts` è attivo.
 
 ## 2. Cosa caricare su FTP in `/downloads/`
 
