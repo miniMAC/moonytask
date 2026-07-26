@@ -16,6 +16,17 @@ struct DriveFile {
     id: String,
 }
 
+#[derive(Deserialize)]
+struct About {
+    user: DriveUser,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DriveUser {
+    email_address: String,
+}
+
 fn client() -> reqwest::blocking::Client {
     reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
@@ -106,6 +117,23 @@ fn google_error_summary(body: &str) -> Option<String> {
 
 pub fn find_file(token: &str) -> Result<Option<String>, String> {
     find_by_name(token, FILE_NAME)
+}
+
+pub fn account_email(token: &str) -> Result<String, String> {
+    let response = client()
+        .get("https://www.googleapis.com/drive/v3/about")
+        .query(&[("fields", "user(emailAddress)")])
+        .bearer_auth(token)
+        .send()
+        .map_err(|error| error.to_string())?;
+    let about: About = checked_response(response, "drive_account_failed")?
+        .json()
+        .map_err(|error| error.to_string())?;
+    let email = about.user.email_address.trim().to_ascii_lowercase();
+    if email.is_empty() {
+        return Err("google_email_unavailable".into());
+    }
+    Ok(email)
 }
 
 pub fn find_legacy_file(token: &str) -> Result<Option<String>, String> {

@@ -125,6 +125,13 @@ export default function App() {
       reloadSharedData();
       setRefreshKey((k) => k + 1);
     });
+    const unSetting = listen<[string, string]>("setting_changed", (e) => {
+      const [key, value] = e.payload;
+      if (key === "language" && value !== i18n.language) {
+        i18n.changeLanguage(value);
+      }
+      if (key === "currency") setCurrency(value);
+    });
     const onMasterChanged = () => reloadSharedData();
     const onFocus = () => reloadSharedData();
     window.addEventListener("master_changed", onMasterChanged);
@@ -165,6 +172,7 @@ export default function App() {
     return () => {
       unTimer.then((f) => f());
       unData.then((f) => f());
+      unSetting.then((f) => f());
       window.removeEventListener("master_changed", onMasterChanged);
       window.removeEventListener("focus", onFocus);
       unOpen.then((f) => f());

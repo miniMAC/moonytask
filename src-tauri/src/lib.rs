@@ -162,6 +162,8 @@ pub fn run() {
             db::project_payment_create,
             db::project_payment_delete,
             db::data_export,
+            db::data_import,
+            db::data_reset,
             db::project_export,
             db::report_export_pdf,
             db::watched_list,

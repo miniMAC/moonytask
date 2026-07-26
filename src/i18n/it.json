@@ -174,7 +174,16 @@
       "csv": "Esporta CSV",
       "exporting": "Esportazione…",
       "saved": "Dati salvati in {{path}}",
-      "failed": "Esportazione non riuscita."
+      "failed": "Esportazione non riuscita.",
+      "importJson": "Importa JSON…",
+      "importTitle": "Ripristina backup JSON",
+      "importConfirm": "Il file {{file}} sostituirà cartelle, progetti, tempi e pagamenti dell’account attivo. Le credenziali non verranno modificate. Vuoi continuare?",
+      "importConfirmButton": "Importa e sostituisci",
+      "importing": "Importazione…",
+      "imported": "Importazione completata: {{folders}} cartelle, {{projects}} progetti e {{entries}} registrazioni.",
+      "importFailed": "Il file non è un backup JSON valido di MoonyTask.",
+      "importReadFailed": "Impossibile leggere il file selezionato.",
+      "importStopTimer": "Ferma prima il timer attivo, poi ripeti l’importazione."
     },
     "rates": {
       "title": "Profili tariffari",
@@ -291,17 +300,17 @@
     },
     "danger": {
       "title": "Zona pericolosa",
-      "resetHelp": "Elimina tutte le cartelle, i progetti, le ore registrate e i pagamenti. Le impostazioni (lingua, tema, profili tariffari) restano.",
+      "resetHelp": "Elimina cartelle, progetti, ore e pagamenti soltanto dall’account attivo. Gli altri account e le impostazioni restano invariati.",
       "resetButton": "Reset cartelle e progetti…",
       "resetStep1Title": "Vuoi davvero cancellare tutto?",
-      "resetStep1Body": "Verranno eliminati definitivamente tutti i progetti, le cartelle, le ore registrate e i pagamenti. L'operazione non si può annullare.",
+      "resetStep1Body": "Verranno eliminati definitivamente tutti i dati dell’account attivo e la cancellazione sarà sincronizzata sul suo Google Drive. Gli altri account non saranno modificati.",
       "resetContinue": "Continua",
       "resetStep2Title": "Conferma definitiva",
       "confirmWord": "ELIMINA",
       "typeToConfirm": "Scrivi {{word}} per confermare:",
       "resetFinal": "Elimina tutto",
       "resetting": "Eliminazione…",
-      "resetDone": "Tutti i dati sono stati eliminati."
+      "resetDone": "I dati dell’account attivo sono stati eliminati."
     },
     "pdfTotalsOnly": "Nel PDF nascondi i costi nelle righe",
     "pdfTotalsOnlyHelp": "Se attivo, il PDF mantiene riepilogo e tabella, ma nella tabella mostra solo giorno e tempo.",

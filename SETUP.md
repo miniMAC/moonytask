@@ -88,6 +88,12 @@ Le credenziali sono dentro l'app: sugli altri tuoi computer basta copiare la
 
 - Nell’uso standard i dati stanno sul dispositivo e, se abiliti la sync, nel
   tuo Drive (spazio nascosto dedicato all'app, non visibile tra i file).
+- Ogni account Google usa un dataset locale separato: passando a un altro
+  account MoonyTask archivia la copia locale precedente e mostra soltanto i dati
+  appartenenti all'identità verificata da Google.
+- **Impostazioni → Generali → Esporta dati locali** permette di esportare JSON
+  o CSV e di ripristinare un backup JSON. L'importazione sostituisce soltanto il
+  dataset dell'account attivo e non importa mai credenziali o token.
 - La modalità **Master / API Web** è separata e opzionale: soltanto dopo una
   richiesta esplicita pubblica sul backend le cartelle selezionate. Il backend
   non legge Drive e non conserva access token o refresh token Google.

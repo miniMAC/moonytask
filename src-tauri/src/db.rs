@@ -102,6 +102,11 @@ pub fn init(app: &AppHandle) -> Result<Connection, Box<dyn std::error::Error>> {
             folder_id TEXT PRIMARY KEY,
             collapsed INTEGER NOT NULL DEFAULT 0,
             updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS account_datasets (
+            owner TEXT PRIMARY KEY,
+            snapshot_json TEXT NOT NULL,
+            saved_at INTEGER NOT NULL
         );",
     )?;
     // migrazione additiva: colore delle cartelle (ignora l'errore se già presente)
@@ -314,23 +319,39 @@ fn default_remind_after_secs() -> i64 {
     60
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingRow {
     pub key: String,
     pub value: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportData {
+    #[serde(default)]
     pub exported_at: i64,
+    #[serde(default)]
     pub folders: Vec<Folder>,
+    #[serde(default)]
     pub projects: Vec<Project>,
+    #[serde(default)]
     pub time_entries: Vec<TimeEntry>,
+    #[serde(default)]
     pub project_payments: Vec<ProjectPayment>,
+    #[serde(default)]
     pub watched_apps: Vec<WatchedApp>,
+    #[serde(default)]
     pub settings: Vec<SettingRow>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportSummary {
+    pub folders: usize,
+    pub projects: usize,
+    pub time_entries: usize,
+    pub project_payments: usize,
 }
 
 // ---------- helpers ----------
@@ -1194,6 +1215,282 @@ pub fn project_payment_delete(db: State<Db>, id: String) -> Result<(), String> {
 }
 
 // ---------- commands: export ----------
+
+const MAX_IMPORT_BYTES: usize = 25 * 1024 * 1024;
+
+fn checked_import_ids<'a>(
+    kind: &str,
+    ids: impl Iterator<Item = &'a str>,
+) -> Result<HashSet<String>, String> {
+    let mut result = HashSet::new();
+    for id in ids {
+        let id = id.trim();
+        if id.is_empty() || id.len() > 256 {
+            return Err(format!("invalid_import_{kind}_id"));
+        }
+        if !result.insert(id.to_string()) {
+            return Err(format!("duplicate_import_{kind}_id"));
+        }
+    }
+    Ok(result)
+}
+
+fn imported_snapshot(
+    data: ExportData,
+    current: crate::sync::merge::Snapshot,
+) -> Result<(crate::sync::merge::Snapshot, Vec<SettingRow>, ImportSummary), String> {
+    let imported_at = now_secs();
+    let mut folders = data
+        .folders
+        .into_iter()
+        .filter(|folder| folder.deleted == 0)
+        .collect::<Vec<_>>();
+    let mut projects = data
+        .projects
+        .into_iter()
+        .filter(|project| project.deleted == 0)
+        .collect::<Vec<_>>();
+    let mut time_entries = data
+        .time_entries
+        .into_iter()
+        .filter(|entry| entry.deleted == 0)
+        .collect::<Vec<_>>();
+    let mut project_payments = data
+        .project_payments
+        .into_iter()
+        .filter(|payment| payment.deleted == 0)
+        .collect::<Vec<_>>();
+    let mut watched_apps = data
+        .watched_apps
+        .into_iter()
+        .filter(|app| app.deleted == 0)
+        .collect::<Vec<_>>();
+
+    let folder_ids = checked_import_ids("folder", folders.iter().map(|folder| folder.id.as_str()))?;
+    if folders.iter().any(|folder| folder.name.trim().is_empty()) {
+        return Err("invalid_import_folder_name".into());
+    }
+    let project_ids = checked_import_ids(
+        "project",
+        projects.iter().map(|project| project.id.as_str()),
+    )?;
+    if projects.iter().any(|project| {
+        project.name.trim().is_empty()
+            || !folder_ids.contains(&project.folder_id)
+            || !project.hourly_rate.is_finite()
+            || project.hourly_rate < 0.0
+    }) {
+        return Err("invalid_import_project".into());
+    }
+    let entry_ids = checked_import_ids(
+        "time_entry",
+        time_entries.iter().map(|entry| entry.id.as_str()),
+    )?;
+    if time_entries.iter().any(|entry| {
+        !project_ids.contains(&entry.project_id)
+            || entry.duration_secs <= 0
+            || entry.ended_at < entry.started_at
+    }) {
+        return Err("invalid_import_time_entry".into());
+    }
+    let payment_ids = checked_import_ids(
+        "project_payment",
+        project_payments.iter().map(|payment| payment.id.as_str()),
+    )?;
+    if project_payments
+        .iter()
+        .any(|payment| !project_ids.contains(&payment.project_id))
+    {
+        return Err("invalid_import_project_payment".into());
+    }
+    let watched_ids = checked_import_ids(
+        "watched_app",
+        watched_apps.iter().map(|app| app.id.as_str()),
+    )?;
+    for app in &mut watched_apps {
+        if app
+            .project_id
+            .as_ref()
+            .is_some_and(|project_id| !project_ids.contains(project_id))
+        {
+            app.project_id = None;
+        }
+    }
+
+    let summary = ImportSummary {
+        folders: folders.len(),
+        projects: projects.len(),
+        time_entries: time_entries.len(),
+        project_payments: project_payments.len(),
+    };
+
+    for folder in &mut folders {
+        folder.updated_at = imported_at;
+        folder.deleted = 0;
+    }
+    for project in &mut projects {
+        project.updated_at = imported_at;
+        project.deleted = 0;
+    }
+    for entry in &mut time_entries {
+        entry.updated_at = imported_at;
+        entry.deleted = 0;
+    }
+    for payment in &mut project_payments {
+        payment.updated_at = imported_at;
+        payment.deleted = 0;
+    }
+    for app in &mut watched_apps {
+        app.updated_at = imported_at;
+        app.deleted = 0;
+    }
+
+    for mut folder in current.folders {
+        if !folder_ids.contains(&folder.id) {
+            folder.updated_at = imported_at;
+            folder.deleted = 1;
+            folders.push(folder);
+        }
+    }
+    for mut project in current.projects {
+        if !project_ids.contains(&project.id) {
+            project.updated_at = imported_at;
+            project.deleted = 1;
+            projects.push(project);
+        }
+    }
+    for mut entry in current.time_entries {
+        if !entry_ids.contains(&entry.id) {
+            entry.updated_at = imported_at;
+            entry.deleted = 1;
+            time_entries.push(entry);
+        }
+    }
+    for mut payment in current.project_payments {
+        if !payment_ids.contains(&payment.id) {
+            payment.updated_at = imported_at;
+            payment.deleted = 1;
+            project_payments.push(payment);
+        }
+    }
+    for mut app in current.watched_apps {
+        if !watched_ids.contains(&app.id) {
+            app.updated_at = imported_at;
+            app.deleted = 1;
+            watched_apps.push(app);
+        }
+    }
+
+    let folder_collapse_states = current
+        .folder_collapse_states
+        .into_iter()
+        .filter(|state| folder_ids.contains(&state.folder_id))
+        .collect();
+    let mut settings_by_key = BTreeMap::new();
+    for setting in data.settings {
+        if EXPORTABLE_SETTING_KEYS.contains(&setting.key.as_str()) && setting.value.len() <= 100_000
+        {
+            settings_by_key.insert(setting.key.clone(), setting);
+        }
+    }
+
+    Ok((
+        crate::sync::merge::Snapshot {
+            folders,
+            projects,
+            time_entries,
+            project_payments,
+            watched_apps,
+            folder_collapse_states,
+        },
+        settings_by_key.into_values().collect(),
+        summary,
+    ))
+}
+
+#[tauri::command]
+pub fn data_import(
+    app: AppHandle,
+    db: State<Db>,
+    contents: String,
+) -> Result<ImportSummary, String> {
+    if contents.len() > MAX_IMPORT_BYTES {
+        return Err("import_file_too_large".into());
+    }
+    let data: ExportData =
+        serde_json::from_str(&contents).map_err(|error| format!("invalid_import_json: {error}"))?;
+
+    let (summary, imported_settings) = {
+        let mut conn = db.0.lock().unwrap();
+        let current = crate::sync::merge::load_local(&conn)?;
+        let (snapshot, settings, summary) = imported_snapshot(data, current)?;
+        let tx = conn.transaction().map_err(err)?;
+        crate::sync::merge::replace_in_transaction(&tx, &snapshot)?;
+        for setting in &settings {
+            set_setting(&tx, &setting.key, &setting.value).map_err(err)?;
+        }
+        tx.commit().map_err(err)?;
+
+        if let Some(profiles) = settings
+            .iter()
+            .find(|setting| setting.key == "rate_profiles")
+        {
+            clear_orphaned_rate_profile_links(&conn, &profiles.value).map_err(err)?;
+        }
+        (summary, settings)
+    };
+
+    crate::sync::mark_dirty();
+    let _ = app.emit("data_changed", ());
+    for setting in imported_settings {
+        let _ = app.emit("setting_changed", (setting.key, setting.value));
+    }
+    Ok(summary)
+}
+
+fn reset_active_data(conn: &mut Connection, deleted_at: i64) -> Result<(), String> {
+    let tx = conn.transaction().map_err(err)?;
+    tx.execute(
+        "UPDATE time_entries SET deleted = 1, updated_at = ?1 WHERE deleted = 0",
+        [deleted_at],
+    )
+    .map_err(err)?;
+    tx.execute(
+        "UPDATE project_payments SET deleted = 1, updated_at = ?1 WHERE deleted = 0",
+        [deleted_at],
+    )
+    .map_err(err)?;
+    tx.execute(
+        "UPDATE watched_apps SET deleted = 1, updated_at = ?1 WHERE deleted = 0",
+        [deleted_at],
+    )
+    .map_err(err)?;
+    tx.execute(
+        "UPDATE projects SET deleted = 1, updated_at = ?1 WHERE deleted = 0",
+        [deleted_at],
+    )
+    .map_err(err)?;
+    tx.execute(
+        "UPDATE folders SET deleted = 1, updated_at = ?1 WHERE deleted = 0",
+        [deleted_at],
+    )
+    .map_err(err)?;
+    tx.execute("DELETE FROM folder_collapse_states", [])
+        .map_err(err)?;
+    tx.commit().map_err(err)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn data_reset(app: AppHandle, db: State<Db>) -> Result<(), String> {
+    let mut conn = db.0.lock().unwrap();
+    reset_active_data(&mut conn, now_secs())?;
+    drop(conn);
+
+    crate::sync::mark_dirty();
+    let _ = app.emit("data_changed", ());
+    Ok(())
+}
 
 #[tauri::command]
 pub fn data_export(app: AppHandle, db: State<Db>, format: String) -> Result<String, String> {
@@ -2429,6 +2726,7 @@ fn escape_applescript_string(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use rusqlite::Connection;
 
     #[test]
@@ -2512,6 +2810,139 @@ mod tests {
             assert!(!json.contains(secret), "secret leaked in JSON: {secret}");
             assert!(!csv.contains(secret), "secret leaked in CSV: {secret}");
         }
+    }
+
+    #[test]
+    fn json_import_restores_active_rows_and_tombstones_replaced_data() {
+        let current = crate::sync::merge::Snapshot {
+            folders: vec![Folder {
+                id: "old-folder".into(),
+                name: "Old".into(),
+                position: 0,
+                color: None,
+                updated_at: 1,
+                deleted: 0,
+            }],
+            ..crate::sync::merge::Snapshot::default()
+        };
+        let data = ExportData {
+            exported_at: 100,
+            folders: vec![Folder {
+                id: "folder-1".into(),
+                name: "Imported".into(),
+                position: 0,
+                color: None,
+                updated_at: 2,
+                deleted: 0,
+            }],
+            projects: vec![Project {
+                id: "project-1".into(),
+                folder_id: "folder-1".into(),
+                name: "Project".into(),
+                hourly_rate: 50.0,
+                rate_profile_id: None,
+                color: None,
+                archived: 0,
+                position: 0,
+                updated_at: 2,
+                deleted: 0,
+            }],
+            time_entries: vec![TimeEntry {
+                id: "entry-1".into(),
+                project_id: "project-1".into(),
+                started_at: 1_000,
+                ended_at: 1_600,
+                duration_secs: 600,
+                note: None,
+                updated_at: 2,
+                deleted: 0,
+            }],
+            project_payments: Vec::new(),
+            watched_apps: Vec::new(),
+            settings: vec![
+                SettingRow {
+                    key: "currency".into(),
+                    value: "USD".into(),
+                },
+                SettingRow {
+                    key: "google_oauth_tokens".into(),
+                    value: "must-not-import".into(),
+                },
+            ],
+        };
+
+        let (snapshot, settings, summary) = imported_snapshot(data, current).unwrap();
+
+        assert_eq!(summary.folders, 1);
+        assert_eq!(summary.projects, 1);
+        assert_eq!(summary.time_entries, 1);
+        assert!(snapshot
+            .folders
+            .iter()
+            .any(|folder| folder.id == "folder-1" && folder.deleted == 0));
+        assert!(snapshot
+            .folders
+            .iter()
+            .any(|folder| folder.id == "old-folder" && folder.deleted == 1));
+        assert_eq!(settings.len(), 1);
+        assert_eq!(settings[0].key, "currency");
+    }
+
+    #[test]
+    fn account_reset_tombstones_every_synced_record_type() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE folders (
+                id TEXT PRIMARY KEY, updated_at INTEGER NOT NULL, deleted INTEGER NOT NULL
+             );
+             CREATE TABLE projects (
+                id TEXT PRIMARY KEY, updated_at INTEGER NOT NULL, deleted INTEGER NOT NULL
+             );
+             CREATE TABLE time_entries (
+                id TEXT PRIMARY KEY, updated_at INTEGER NOT NULL, deleted INTEGER NOT NULL
+             );
+             CREATE TABLE project_payments (
+                id TEXT PRIMARY KEY, updated_at INTEGER NOT NULL, deleted INTEGER NOT NULL
+             );
+             CREATE TABLE watched_apps (
+                id TEXT PRIMARY KEY, updated_at INTEGER NOT NULL, deleted INTEGER NOT NULL
+             );
+             CREATE TABLE folder_collapse_states (
+                folder_id TEXT PRIMARY KEY, collapsed INTEGER NOT NULL, updated_at INTEGER NOT NULL
+             );
+             INSERT INTO folders VALUES ('f', 1, 0);
+             INSERT INTO projects VALUES ('p', 1, 0);
+             INSERT INTO time_entries VALUES ('e', 1, 0);
+             INSERT INTO project_payments VALUES ('pay', 1, 0);
+             INSERT INTO watched_apps VALUES ('w', 1, 0);
+             INSERT INTO folder_collapse_states VALUES ('f', 1, 1);",
+        )
+        .unwrap();
+
+        reset_active_data(&mut conn, 99).unwrap();
+
+        for table in [
+            "folders",
+            "projects",
+            "time_entries",
+            "project_payments",
+            "watched_apps",
+        ] {
+            let sql = format!("SELECT COUNT(*) FROM {table} WHERE deleted = 1 AND updated_at = 99");
+            assert_eq!(
+                conn.query_row(&sql, [], |row| row.get::<_, i64>(0))
+                    .unwrap(),
+                1,
+                "{table} was not reset"
+            );
+        }
+        assert_eq!(
+            conn.query_row("SELECT COUNT(*) FROM folder_collapse_states", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .unwrap(),
+            0
+        );
     }
 
     #[test]

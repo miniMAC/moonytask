@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
@@ -94,7 +94,7 @@ export default function SettingsView(p: Props) {
               onCurrencyChange={p.onCurrencyChange}
             />
             <DataExportSection />
-            <DangerSection projects={p.projects} />
+            <DangerSection />
           </>
         )}
         {tab === "rates" && <RateProfilesSection />}
@@ -495,6 +495,14 @@ function DataExportSection() {
   const [busyFormat, setBusyFormat] = useState<"json" | "csv" | null>(null);
   const [exportedPath, setExportedPath] = useState("");
   const [failed, setFailed] = useState(false);
+  const [pendingImport, setPendingImport] = useState<{
+    name: string;
+    contents: string;
+  } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState<api.ImportSummary | null>(null);
+  const [importError, setImportError] = useState("");
+  const importInput = useRef<HTMLInputElement>(null);
 
   const exportData = async (format: "json" | "csv") => {
     if (busyFormat) return;
@@ -507,6 +515,38 @@ function DataExportSection() {
       setFailed(true);
     } finally {
       setBusyFormat(null);
+    }
+  };
+
+  const chooseImport = async (file: File | undefined) => {
+    if (!file) return;
+    setImported(null);
+    setImportError("");
+    try {
+      setPendingImport({ name: file.name, contents: await file.text() });
+    } catch {
+      setImportError(t("settings.dataExport.importReadFailed"));
+    } finally {
+      if (importInput.current) importInput.current.value = "";
+    }
+  };
+
+  const importData = async () => {
+    if (!pendingImport || importing) return;
+    setImporting(true);
+    setImportError("");
+    try {
+      const timer = await api.timerGetState();
+      if (timer.status !== "idle") {
+        setImportError(t("settings.dataExport.importStopTimer"));
+        return;
+      }
+      setImported(await api.dataImport(pendingImport.contents));
+      setPendingImport(null);
+    } catch {
+      setImportError(t("settings.dataExport.importFailed"));
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -529,6 +569,20 @@ function DataExportSection() {
               : t(`settings.dataExport.${format}`)}
           </button>
         ))}
+        <button
+          onClick={() => importInput.current?.click()}
+          disabled={busyFormat !== null || importing}
+          className={ghostBtnCls}
+        >
+          {t("settings.dataExport.importJson")}
+        </button>
+        <input
+          ref={importInput}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(event) => chooseImport(event.target.files?.[0])}
+        />
       </div>
       <div aria-live="polite">
         {exportedPath && (
@@ -541,14 +595,58 @@ function DataExportSection() {
             {t("settings.dataExport.failed")}
           </p>
         )}
+        {imported && (
+          <p className="mt-3 text-sm font-medium text-emerald-600 dark:text-emerald-400 pro:text-[#50fa7b]">
+            {t("settings.dataExport.imported", {
+              folders: imported.folders,
+              projects: imported.projects,
+              entries: imported.timeEntries,
+            })}
+          </p>
+        )}
+        {importError && (
+          <p className="mt-3 text-sm font-medium text-red-600 dark:text-red-400 pro:text-[#ff5555]">
+            {importError}
+          </p>
+        )}
       </div>
+      {pendingImport && (
+        <Modal
+          title={t("settings.dataExport.importTitle")}
+          onClose={() => !importing && setPendingImport(null)}
+        >
+          <p className="text-base text-neutral-700 dark:text-neutral-300">
+            {t("settings.dataExport.importConfirm", {
+              file: pendingImport.name,
+            })}
+          </p>
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              onClick={() => setPendingImport(null)}
+              disabled={importing}
+              className="h-11 rounded-lg px-5 text-base text-neutral-600 hover:bg-neutral-100 disabled:opacity-50 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              onClick={importData}
+              disabled={importing}
+              className="h-11 rounded-lg bg-blue-600 px-6 text-base font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {importing
+                ? t("settings.dataExport.importing")
+                : t("settings.dataExport.importConfirmButton")}
+            </button>
+          </div>
+        </Modal>
+      )}
     </section>
   );
 }
 
 // ---------- danger zone ----------
 
-function DangerSection({ projects }: { projects: Project[] }) {
+function DangerSection() {
   const { t } = useTranslation();
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [confirmText, setConfirmText] = useState("");
@@ -568,13 +666,7 @@ function DangerSection({ projects }: { projects: Project[] }) {
     try {
       // ferma un eventuale timer attivo prima di cancellare i progetti
       await api.timerStop().catch(() => null);
-      const folders = await api.foldersList();
-      for (const project of projects) {
-        await api.projectDelete(project.id);
-      }
-      for (const folder of folders) {
-        await api.folderDelete(folder.id);
-      }
+      await api.dataReset();
       setDone(true);
       setStep(0);
       setConfirmText("");

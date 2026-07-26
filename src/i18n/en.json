@@ -174,7 +174,16 @@
       "csv": "Export CSV",
       "exporting": "Exporting…",
       "saved": "Data saved to {{path}}",
-      "failed": "Export failed."
+      "failed": "Export failed.",
+      "importJson": "Import JSON…",
+      "importTitle": "Restore JSON backup",
+      "importConfirm": "The file {{file}} will replace the folders, projects, tracked time, and payments of the active account. Credentials will not be changed. Continue?",
+      "importConfirmButton": "Import and replace",
+      "importing": "Importing…",
+      "imported": "Import complete: {{folders}} folders, {{projects}} projects, and {{entries}} time entries.",
+      "importFailed": "The file is not a valid MoonyTask JSON backup.",
+      "importReadFailed": "The selected file could not be read.",
+      "importStopTimer": "Stop the active timer before importing."
     },
     "rates": {
       "title": "Rate profiles",
@@ -290,17 +299,17 @@
     },
     "danger": {
       "title": "Danger zone",
-      "resetHelp": "Deletes every folder, project, tracked hour, and payment. Settings (language, theme, rate profiles) are kept.",
+      "resetHelp": "Deletes folders, projects, tracked time, and payments only from the active account. Other accounts and settings remain unchanged.",
       "resetButton": "Reset folders and projects…",
       "resetStep1Title": "Really delete everything?",
-      "resetStep1Body": "All projects, folders, tracked time, and payments will be permanently deleted. This cannot be undone.",
+      "resetStep1Body": "All data for the active account will be permanently deleted and the deletion will sync to its Google Drive. Other accounts will not be changed.",
       "resetContinue": "Continue",
       "resetStep2Title": "Final confirmation",
       "confirmWord": "DELETE",
       "typeToConfirm": "Type {{word}} to confirm:",
       "resetFinal": "Delete everything",
       "resetting": "Deleting…",
-      "resetDone": "All data has been deleted."
+      "resetDone": "The active account’s data has been deleted."
     },
     "pdfTotalsOnly": "Hide row costs in the PDF",
     "pdfTotalsOnlyHelp": "When enabled, the PDF keeps the summary and table, but the table shows only day and time.",

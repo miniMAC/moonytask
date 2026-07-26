@@ -87,8 +87,17 @@ export const entryAddManual = (
 
 // export
 export type ExportFormat = "csv" | "json";
+export interface ImportSummary {
+  folders: number;
+  projects: number;
+  timeEntries: number;
+  projectPayments: number;
+}
 export const dataExport = (format: ExportFormat) =>
   invoke<string>("data_export", { format });
+export const dataImport = (contents: string) =>
+  invoke<ImportSummary>("data_import", { contents });
+export const dataReset = () => invoke<void>("data_reset");
 export const projectExport = (projectId: string, format: ExportFormat) =>
   invoke<string>("project_export", { projectId, format });
 export const reportExportPdf = (request: ReportExportPdfRequest) =>

@@ -1,9 +1,9 @@
 use crate::db::{Folder, FolderCollapseState, Project, ProjectPayment, TimeEntry, WatchedApp};
-use rusqlite::Connection;
+use rusqlite::{Connection, Transaction};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct Snapshot {
     #[serde(default)]
     pub folders: Vec<Folder>,
@@ -149,7 +149,7 @@ where
     F: Fn(&T) -> (String, i64),
 {
     let mut by_id: HashMap<String, T> = HashMap::new();
-    for row in local.into_iter().chain(remote.into_iter()) {
+    for row in local.into_iter().chain(remote) {
         let (id, updated_at) = key(&row);
         match by_id.get(&id) {
             Some(existing) if key(existing).1 >= updated_at => {}
@@ -187,10 +187,8 @@ pub fn merge(local: Snapshot, remote: Snapshot) -> Snapshot {
     }
 }
 
-/// Scrive lo snapshot merged nel DB locale.
-pub fn apply(conn: &mut Connection, snap: &Snapshot) -> Result<(), String> {
+fn write_rows(tx: &Transaction<'_>, snap: &Snapshot) -> Result<(), String> {
     let err = |e: rusqlite::Error| e.to_string();
-    let tx = conn.transaction().map_err(err)?;
     for f in &snap.folders {
         tx.execute(
             "INSERT OR REPLACE INTO folders (id, name, position, color, updated_at, deleted) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -250,7 +248,30 @@ pub fn apply(conn: &mut Connection, snap: &Snapshot) -> Result<(), String> {
         )
         .map_err(err)?;
     }
+    Ok(())
+}
+
+/// Scrive lo snapshot merged nel DB locale.
+pub fn apply(conn: &mut Connection, snap: &Snapshot) -> Result<(), String> {
+    let err = |e: rusqlite::Error| e.to_string();
+    let tx = conn.transaction().map_err(err)?;
+    write_rows(&tx, snap)?;
     tx.commit().map_err(err)
+}
+
+/// Sostituisce atomicamente l'intero dataset sincronizzato. Le impostazioni e le
+/// cache degli altri account restano nel DB.
+pub fn replace_in_transaction(tx: &Transaction<'_>, snap: &Snapshot) -> Result<(), String> {
+    tx.execute_batch(
+        "DELETE FROM folder_collapse_states;
+         DELETE FROM watched_apps;
+         DELETE FROM project_payments;
+         DELETE FROM time_entries;
+         DELETE FROM projects;
+         DELETE FROM folders;",
+    )
+    .map_err(|error| error.to_string())?;
+    write_rows(tx, snap)
 }
 
 #[cfg(test)]
