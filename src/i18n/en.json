@@ -212,6 +212,7 @@
       "connectHelpAndroid": "Choose your account in Google's secure screen; when finished, you will return to MoonyTask automatically.",
       "androidClientMissing": "Google does not recognize this APK yet. Register its Android package and SHA-1 fingerprint as described in SETUP.md.",
       "authorizationCancelled": "Google authorization was cancelled.",
+      "reauthorizationRequired": "Google authorization is no longer valid or does not include access to the app’s data. Connect the account again.",
       "emailLabel": "Your Gmail account",
       "emailPlaceholder": "name@gmail.com",
       "disconnect": "Disconnect",

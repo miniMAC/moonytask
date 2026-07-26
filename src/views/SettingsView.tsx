@@ -923,7 +923,9 @@ function SyncSection() {
     ? t("settings.sync.androidClientMissing")
     : status.lastError?.includes("google_authorization_cancelled")
       ? t("settings.sync.authorizationCancelled")
-      : status.lastError;
+      : status.lastError?.includes("google_reauthorization_required")
+        ? t("settings.sync.reauthorizationRequired")
+        : status.lastError;
 
   return (
     <section className={sectionCls}>

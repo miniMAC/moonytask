@@ -145,8 +145,18 @@ fn run_sync_mode(app: &AppHandle, publish_after_success: bool) -> Result<(), Str
     emit_status(app);
     let result = perform_sync(app);
     if let Err(e) = &result {
+        let needs_reauthorization = e == drive::REAUTHORIZATION_REQUIRED;
+        if needs_reauthorization {
+            // Su mobile anche i token OAuth e Master vivono nel DB: vanno
+            // eliminati prima di acquisire qui lo stesso mutex.
+            oauth::clear_tokens(app);
+            crate::master::clear_device_token(app);
+        }
         let db = app.state::<Db>();
         let conn = db.0.lock().unwrap();
+        if needs_reauthorization {
+            let _ = db::set_setting(&conn, "google_email", "");
+        }
         let _ = db::set_setting(&conn, "sync_last_error", e);
     }
     SYNC_IN_PROGRESS.store(false, Ordering::SeqCst);
@@ -246,7 +256,7 @@ pub fn sync_login(app: AppHandle, email: Option<String>) -> Result<SyncStatus, S
     let (client_id, client_secret) = credentials(&app).ok_or("not_configured")?;
     let login = oauth::login(&app, &client_id, &client_secret, email.as_deref());
     // un login fallito deve comparire nella UI, non sparire nel nulla
-    let (_tokens, id_email) = match login {
+    let (tokens, id_email) = match login {
         Ok(v) => v,
         Err(e) => {
             let db = app.state::<Db>();
@@ -257,6 +267,30 @@ pub fn sync_login(app: AppHandle, email: Option<String>) -> Result<SyncStatus, S
             return Err(e);
         }
     };
+
+    // Non basta che Google abbia emesso un token: prima di mostrare l'account
+    // come connesso verifichiamo che possa davvero leggere appDataFolder.
+    let preflight_error = drive::find_file(&tokens.access_token).err();
+    if preflight_error.as_deref() == Some(drive::REAUTHORIZATION_REQUIRED) {
+        oauth::clear_tokens(&app);
+        let db = app.state::<Db>();
+        let conn = db.0.lock().unwrap();
+        let _ = db::set_setting(&conn, "google_email", "");
+        let _ = db::set_setting(&conn, "sync_last_error", drive::REAUTHORIZATION_REQUIRED);
+        drop(conn);
+        emit_status(&app);
+        return Err(drive::REAUTHORIZATION_REQUIRED.into());
+    }
+    if let Err(e) = oauth::save_tokens(&app, &tokens) {
+        oauth::clear_tokens(&app);
+        let db = app.state::<Db>();
+        let conn = db.0.lock().unwrap();
+        let _ = db::set_setting(&conn, "sync_last_error", &e);
+        drop(conn);
+        emit_status(&app);
+        return Err(e);
+    }
+
     {
         let db = app.state::<Db>();
         let conn = db.0.lock().unwrap();
@@ -264,10 +298,16 @@ pub fn sync_login(app: AppHandle, email: Option<String>) -> Result<SyncStatus, S
         if let Some(email) = id_email.as_ref().or(email.as_ref()) {
             let _ = db::set_setting(&conn, "google_email", email);
         }
-        let _ = db::set_setting(&conn, "sync_last_error", "");
+        let _ = db::set_setting(
+            &conn,
+            "sync_last_error",
+            preflight_error.as_deref().unwrap_or(""),
+        );
     }
     emit_status(&app);
-    request_sync(&app);
+    if preflight_error.is_none() {
+        request_sync(&app);
+    }
     Ok(status(&app))
 }
 

@@ -34,6 +34,48 @@ struct TokenResponse {
     refresh_token: Option<String>,
     expires_in: i64,
     id_token: Option<String>,
+    scope: Option<String>,
+}
+
+#[cfg(not(target_os = "android"))]
+fn checked_token_response(
+    response: reqwest::blocking::Response,
+    operation: &str,
+    invalid_grant_requires_reauthorization: bool,
+) -> Result<reqwest::blocking::Response, String> {
+    let status = response.status();
+    if status.is_success() {
+        return Ok(response);
+    }
+
+    let body = response.text().unwrap_or_default();
+    if invalid_grant_requires_reauthorization && is_invalid_grant(status, &body) {
+        return Err(crate::sync::drive::REAUTHORIZATION_REQUIRED.into());
+    }
+
+    let detail = serde_json::from_str::<serde_json::Value>(&body)
+        .ok()
+        .and_then(|value| {
+            let code = value.get("error").and_then(|value| value.as_str())?;
+            let description = value
+                .get("error_description")
+                .and_then(|value| value.as_str());
+            Some(match description {
+                Some(description) => format!(": {code}: {description}"),
+                None => format!(": {code}"),
+            })
+        })
+        .unwrap_or_default();
+    Err(format!(
+        "{operation}: HTTP {} {}{detail}",
+        status.as_u16(),
+        status.canonical_reason().unwrap_or("Google OAuth error")
+    ))
+}
+
+#[cfg(not(target_os = "android"))]
+fn is_invalid_grant(status: reqwest::StatusCode, body: &str) -> bool {
+    status == reqwest::StatusCode::BAD_REQUEST && body.contains("\"invalid_grant\"")
 }
 
 // su desktop i token vivono nel keychain; su mobile nel db SQLite,
@@ -187,7 +229,7 @@ pub fn login(
         .timeout(std::time::Duration::from_secs(20))
         .build()
         .unwrap();
-    let resp: TokenResponse = client
+    let response = client
         .post(TOKEN_URL)
         .form(&[
             ("client_id", client_id),
@@ -198,19 +240,25 @@ pub fn login(
             ("redirect_uri", &redirect_uri),
         ])
         .send()
-        .map_err(|e| e.to_string())?
-        .error_for_status()
-        .map_err(|e| format!("token_exchange_failed: {e}"))?
+        .map_err(|e| e.to_string())?;
+    let resp: TokenResponse = checked_token_response(response, "token_exchange_failed", false)?
         .json()
         .map_err(|e| e.to_string())?;
 
     let email = resp.id_token.as_deref().and_then(email_from_id_token);
+    if resp.scope.as_deref().is_some_and(|scopes| {
+        !scopes
+            .split_ascii_whitespace()
+            .any(|scope| scope == "https://www.googleapis.com/auth/drive.appdata")
+    }) {
+        return Err(crate::sync::drive::REAUTHORIZATION_REQUIRED.into());
+    }
+
     let tokens = StoredTokens {
         access_token: resp.access_token,
         refresh_token: resp.refresh_token.ok_or("no_refresh_token")?,
         expires_at: crate::db::now_secs() + resp.expires_in - 60,
     };
-    save_tokens(app, &tokens)?;
     Ok((tokens, email))
 }
 
@@ -236,7 +284,6 @@ pub fn login(
             .filter(|value| !value.is_empty())
             .map(str::to_string)
     });
-    save_tokens(app, &tokens)?;
     Ok((tokens, email))
 }
 
@@ -255,7 +302,7 @@ pub fn valid_access_token(
         .timeout(std::time::Duration::from_secs(20))
         .build()
         .unwrap();
-    let resp: TokenResponse = client
+    let response = client
         .post(TOKEN_URL)
         .form(&[
             ("client_id", client_id),
@@ -264,11 +311,17 @@ pub fn valid_access_token(
             ("grant_type", "refresh_token"),
         ])
         .send()
-        .map_err(|e| e.to_string())?
-        .error_for_status()
-        .map_err(|e| format!("token_refresh_failed: {e}"))?
-        .json()
         .map_err(|e| e.to_string())?;
+    let response = match checked_token_response(response, "token_refresh_failed", true) {
+        Ok(response) => response,
+        Err(error) => {
+            if error == crate::sync::drive::REAUTHORIZATION_REQUIRED {
+                clear_tokens(app);
+            }
+            return Err(error);
+        }
+    };
+    let resp: TokenResponse = response.json().map_err(|e| e.to_string())?;
 
     let new_tokens = StoredTokens {
         access_token: resp.access_token.clone(),
@@ -332,4 +385,26 @@ fn open_browser(app: &AppHandle, url: &str) -> Result<(), String> {
     app.opener()
         .open_url(url, None::<String>)
         .map_err(|e| e.to_string())
+}
+
+#[cfg(all(test, not(target_os = "android")))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn revoked_refresh_token_requires_reauthorization() {
+        let revoked = r#"{"error":"invalid_grant","error_description":"Token has been revoked."}"#;
+        let unrelated =
+            r#"{"error":"invalid_client","error_description":"The OAuth client was not found."}"#;
+
+        assert!(is_invalid_grant(reqwest::StatusCode::BAD_REQUEST, revoked));
+        assert!(!is_invalid_grant(
+            reqwest::StatusCode::BAD_REQUEST,
+            unrelated
+        ));
+        assert!(!is_invalid_grant(
+            reqwest::StatusCode::UNAUTHORIZED,
+            revoked
+        ));
+    }
 }
