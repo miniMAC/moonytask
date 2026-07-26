@@ -23,9 +23,14 @@ interface Props {
   projects: Project[];
   timer: TimerSnapshot;
   sharedData: MasterSharedData | null;
+  selectedSharedProject: {
+    associationId: string;
+    projectId: string;
+  } | null;
   folderScope: "personal" | "shared";
   onFolderScopeChange: (scope: "personal" | "shared") => void;
   onRefreshShared: () => void;
+  onSelectSharedProject: (associationId: string, projectId: string) => void;
   collapsedFolderIds: ReadonlySet<string>;
   onFolderCollapsedChange: (folderId: string, collapsed: boolean) => void;
   onSelectProject: (id: string) => void;
@@ -115,7 +120,13 @@ export default function MobileProjectList(p: Props) {
               {t("common.refresh")}
             </button>
           </div>
-          <SharedFolderList data={p.sharedData} query={query} mobile />
+          <SharedFolderList
+            data={p.sharedData}
+            query={query}
+            mobile
+            selected={p.selectedSharedProject}
+            onSelectProject={p.onSelectSharedProject}
+          />
         </>
       ) : (
         <>

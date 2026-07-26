@@ -8,12 +8,16 @@ interface Props {
   data: MasterSharedData;
   query?: string;
   mobile?: boolean;
+  selected?: { associationId: string; projectId: string } | null;
+  onSelectProject?: (associationId: string, projectId: string) => void;
 }
 
 export default function SharedFolderList({
   data,
   query = "",
   mobile = false,
+  selected = null,
+  onSelectProject,
 }: Props) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -25,7 +29,7 @@ export default function SharedFolderList({
         if (!normalized) return true;
         const owner = `${member.account.displayName ?? ""} ${member.account.email}`;
         const projects = (snapshot?.projects ?? []).filter(
-          (project) => project.folderId === folder.id && !project.archived,
+          (project) => project.folderId === folder.id,
         );
         return (
           owner.toLocaleLowerCase().includes(normalized) ||
@@ -100,7 +104,6 @@ export default function SharedFolderList({
               const projects = (member.snapshot?.projects ?? []).filter(
                 (project) =>
                   project.folderId === folder.id &&
-                  !project.archived &&
                   (!normalized ||
                     ownerMatches ||
                     folderMatches ||
@@ -158,12 +161,24 @@ export default function SharedFolderList({
                         </p>
                       )}
                       {projects.map((project) => (
-                        <div
+                        <button
+                          type="button"
                           key={project.id}
-                          className={`flex items-center gap-2 text-neutral-700 dark:text-neutral-200 pro:text-[#d7d7e2] ${
+                          onClick={() =>
+                            onSelectProject?.(
+                              member.associationId,
+                              project.id,
+                            )
+                          }
+                          className={`flex items-center gap-2 text-left text-neutral-700 transition dark:text-neutral-200 pro:text-[#d7d7e2] ${
                             mobile
-                              ? "min-h-12 border-t border-neutral-100 px-4 dark:border-neutral-700/60 pro:border-[#44475a]"
-                              : "ml-3 rounded-md px-2 py-1.5 text-base"
+                              ? "min-h-12 w-full border-t border-neutral-100 px-4 dark:border-neutral-700/60 pro:border-[#44475a]"
+                              : "ml-3 w-[calc(100%-0.75rem)] rounded-md px-2 py-1.5 text-base"
+                          } ${
+                            selected?.associationId === member.associationId &&
+                            selected.projectId === project.id
+                              ? "bg-blue-50 font-semibold dark:bg-blue-950/40 pro:bg-[#44475a]"
+                              : "hover:bg-neutral-100 dark:hover:bg-neutral-800/70 pro:hover:bg-[#343746]"
                           }`}
                         >
                           <span
@@ -178,7 +193,12 @@ export default function SharedFolderList({
                           <span className="min-w-0 flex-1 truncate">
                             {project.name}
                           </span>
-                        </div>
+                          {project.archived && (
+                            <span className="shrink-0 text-xs text-neutral-400">
+                              {t("sharedProject.archived")}
+                            </span>
+                          )}
+                        </button>
                       ))}
                     </div>
                   )}

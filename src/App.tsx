@@ -20,8 +20,14 @@ import FolderModal, { type FolderModalState } from "./components/FolderModal";
 import ConfirmModal from "./components/ConfirmModal";
 import Modal from "./components/Modal";
 import ProjectView from "./views/ProjectView";
+import SharedProjectView from "./views/SharedProjectView";
 import ReportsView from "./views/ReportsView";
 import SettingsView from "./views/SettingsView";
+
+interface SharedProjectSelection {
+  associationId: string;
+  projectId: string;
+}
 
 export default function App() {
   const { t, i18n } = useTranslation();
@@ -31,6 +37,8 @@ export default function App() {
     new Set(),
   );
   const [sharedData, setSharedData] = useState<MasterSharedData | null>(null);
+  const [selectedSharedProject, setSelectedSharedProject] =
+    useState<SharedProjectSelection | null>(null);
   const [folderScope, setFolderScope] = useState<"personal" | "shared">(
     "personal",
   );
@@ -93,7 +101,19 @@ export default function App() {
     const engaged = await api.settingsGet("master_engaged");
     if (engaged !== "1") return;
     try {
-      setSharedData(await api.masterSharedData());
+      const next = await api.masterSharedData();
+      setSharedData(next);
+      setSelectedSharedProject((current) => {
+        if (!current) return null;
+        const member = next.members.find(
+          (candidate) => candidate.associationId === current.associationId,
+        );
+        return member?.snapshot?.projects.some(
+          (project) => project.id === current.projectId,
+        )
+          ? current
+          : null;
+      });
     } catch {
       // Only licensed Master accounts can read associated users. Standard
       // users and members keep the normal local project list.
@@ -138,7 +158,9 @@ export default function App() {
     window.addEventListener("focus", onFocus);
     // il popover chiede di aprire un progetto nella finestra principale
     const unOpen = listen<string>("open_project", (e) => {
+      setSelectedSharedProject(null);
       setSelectedId(e.payload);
+      setFolderScope("personal");
       setView("project");
     });
     const unNote = listen<TimeEntry>("entry_note_required", (e) => {
@@ -209,6 +231,43 @@ export default function App() {
   }, [timer.status, selectedId, projectModal, folderModal, confirm, noteRequest, idlePrompt]);
 
   const selectedProject = projects.find((p) => p.id === selectedId) ?? null;
+  const selectedSharedMember =
+    sharedData?.members.find(
+      (member) =>
+        member.associationId === selectedSharedProject?.associationId,
+    ) ?? null;
+  const selectedSharedSnapshot = selectedSharedMember?.snapshot ?? null;
+  const selectedSharedProjectData =
+    selectedSharedSnapshot?.projects.find(
+      (project) => project.id === selectedSharedProject?.projectId,
+    ) ?? null;
+  const selectedSharedFolder =
+    selectedSharedSnapshot?.folders.find(
+      (folder) => folder.id === selectedSharedProjectData?.folderId,
+    ) ?? null;
+
+  const changeFolderScope = (scope: "personal" | "shared") => {
+    setFolderScope(scope);
+    if (scope === "personal") {
+      setSelectedSharedProject(null);
+    } else {
+      setSelectedId(null);
+    }
+  };
+
+  const selectPersonalProject = (id: string) => {
+    setSelectedSharedProject(null);
+    setSelectedId(id);
+    setFolderScope("personal");
+    setView("project");
+  };
+
+  const selectSharedProject = (associationId: string, projectId: string) => {
+    setSelectedId(null);
+    setSelectedSharedProject({ associationId, projectId });
+    setFolderScope("shared");
+    setView("project");
+  };
 
   const deleteFolder = (folder: Folder) => {
     setConfirm({
@@ -248,16 +307,15 @@ export default function App() {
         selectedId={selectedId}
         timer={timer}
         sharedData={sharedData}
+        selectedSharedProject={selectedSharedProject}
         folderScope={folderScope}
-        onFolderScopeChange={setFolderScope}
+        onFolderScopeChange={changeFolderScope}
         onRefreshShared={reloadSharedData}
+        onSelectSharedProject={selectSharedProject}
         collapsedFolderIds={collapsedFolderIds}
         onFolderCollapsedChange={setFolderCollapsed}
         onNav={setView}
-        onSelectProject={(id) => {
-          setSelectedId(id);
-          setView("project");
-        }}
+        onSelectProject={selectPersonalProject}
         onNewFolder={() => setFolderModal({ mode: "create" })}
         onRenameFolder={(f) => setFolderModal({ mode: "rename", folder: f })}
         onDeleteFolder={deleteFolder}
@@ -289,6 +347,17 @@ export default function App() {
               currency={currency}
               onCurrencyChange={setCurrency}
             />
+          ) : selectedSharedMember &&
+            selectedSharedSnapshot &&
+            selectedSharedProjectData &&
+            selectedSharedFolder ? (
+            <SharedProjectView
+              member={selectedSharedMember}
+              snapshot={selectedSharedSnapshot}
+              project={selectedSharedProjectData}
+              folder={selectedSharedFolder}
+              onBack={() => setSelectedSharedProject(null)}
+            />
           ) : selectedProject ? (
             <ProjectView
               project={selectedProject}
@@ -311,15 +380,14 @@ export default function App() {
                   projects={projects}
                   timer={timer}
                   sharedData={sharedData}
+                  selectedSharedProject={selectedSharedProject}
                   folderScope={folderScope}
-                  onFolderScopeChange={setFolderScope}
+                  onFolderScopeChange={changeFolderScope}
                   onRefreshShared={reloadSharedData}
+                  onSelectSharedProject={selectSharedProject}
                   collapsedFolderIds={collapsedFolderIds}
                   onFolderCollapsedChange={setFolderCollapsed}
-                  onSelectProject={(id) => {
-                    setSelectedId(id);
-                    setView("project");
-                  }}
+                  onSelectProject={selectPersonalProject}
                   onNewFolder={() => setFolderModal({ mode: "create" })}
                   onRenameFolder={(f) =>
                     setFolderModal({ mode: "rename", folder: f })
@@ -341,17 +409,17 @@ export default function App() {
         </main>
         <TimerBar
           timer={timer}
-          onOpenProject={(id) => {
-            setSelectedId(id);
-            setView("project");
-          }}
+          onOpenProject={selectPersonalProject}
         />
         <MobileNav
           view={view}
           onNav={(v) => {
             setView(v);
             // il tab Progetti torna alla lista, non all'ultimo progetto aperto
-            if (v === "project") setSelectedId(null);
+            if (v === "project") {
+              setSelectedId(null);
+              setSelectedSharedProject(null);
+            }
           }}
         />
       </div>
@@ -364,7 +432,9 @@ export default function App() {
           onSaved={async (id) => {
             setProjectModal(null);
             await reload();
+            setSelectedSharedProject(null);
             setSelectedId(id);
+            setFolderScope("personal");
             setView("project");
           }}
         />

@@ -35,9 +35,14 @@ interface Props {
   selectedId: string | null;
   timer: TimerSnapshot;
   sharedData: MasterSharedData | null;
+  selectedSharedProject: {
+    associationId: string;
+    projectId: string;
+  } | null;
   folderScope: "personal" | "shared";
   onFolderScopeChange: (scope: "personal" | "shared") => void;
   onRefreshShared: () => void;
+  onSelectSharedProject: (associationId: string, projectId: string) => void;
   collapsedFolderIds: ReadonlySet<string>;
   onFolderCollapsedChange: (folderId: string, collapsed: boolean) => void;
   onNav: (v: View) => void;
@@ -389,7 +394,11 @@ export default function Sidebar(p: Props) {
                 {t("common.refresh")}
               </button>
             </div>
-            <SharedFolderList data={p.sharedData} />
+            <SharedFolderList
+              data={p.sharedData}
+              selected={p.selectedSharedProject}
+              onSelectProject={p.onSelectSharedProject}
+            />
           </div>
         )}
       </div>

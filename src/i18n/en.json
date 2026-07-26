@@ -71,6 +71,23 @@
     "rateHelp": "Pick a profile or set a manual hourly rate. Reports and costs use this rate.",
     "rateManualHint": "Editing the rate by hand switches the project to a manual rate."
   },
+  "sharedProject": {
+    "readOnly": "Read only",
+    "archived": "Archived",
+    "hour": "h",
+    "owner": "Shared by",
+    "publishedAt": "Last publication",
+    "sourceHelp": "Data published by the associated user",
+    "hourlyValue": "Hourly value",
+    "manualRate": "Manual rate",
+    "projectUpdatedAt": "Project updated",
+    "entries": "Entries",
+    "entryCount": "{{count}} entries",
+    "noEntries": "No shared entries for this project.",
+    "amountDue": "Estimated outstanding",
+    "notPaid": "No recorded payment",
+    "noPayments": "No shared payments for this project."
+  },
   "calendar": {
     "chooseDate": "Choose a date",
     "previousMonth": "Previous month",

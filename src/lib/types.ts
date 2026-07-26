@@ -174,6 +174,43 @@ export interface PublishedProject {
   updatedAt: number;
 }
 
+export interface PublishedRateProfile {
+  id: string;
+  name: string;
+  paymentType: PaymentType;
+  hourlyRate: number;
+}
+
+export interface PublishedTimeEntry {
+  id: string;
+  projectId: string;
+  startedAt: number;
+  endedAt: number;
+  durationSecs: number;
+  note: string | null;
+  updatedAt: number;
+}
+
+export interface PublishedProjectPayment {
+  id: string;
+  projectId: string;
+  paidAt: number;
+  paidThroughAt: number;
+  note: string | null;
+  updatedAt: number;
+}
+
+export interface PublishedSnapshot {
+  schemaVersion: 1;
+  generatedAt: number;
+  currency: string;
+  folders: PublishedFolder[];
+  projects: PublishedProject[];
+  rateProfiles: PublishedRateProfile[];
+  timeEntries: PublishedTimeEntry[];
+  projectPayments: PublishedProjectPayment[];
+}
+
 export interface MasterSharedMember {
   associationId: string;
   account: {
@@ -181,13 +218,7 @@ export interface MasterSharedMember {
     displayName: string | null;
   };
   publication: MasterStatus["publication"];
-  snapshot: {
-    schemaVersion: 1;
-    generatedAt: number;
-    currency: string;
-    folders: PublishedFolder[];
-    projects: PublishedProject[];
-  } | null;
+  snapshot: PublishedSnapshot | null;
 }
 
 export interface MasterSharedData {

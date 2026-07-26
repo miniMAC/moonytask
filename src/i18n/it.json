@@ -71,6 +71,23 @@
     "rateHelp": "Scegli un profilo o imposta un costo orario manuale. Report e costi usano questa tariffa.",
     "rateManualHint": "Modificando il costo a mano il progetto passa a tariffa manuale."
   },
+  "sharedProject": {
+    "readOnly": "Sola lettura",
+    "archived": "Archiviato",
+    "hour": "h",
+    "owner": "Condiviso da",
+    "publishedAt": "Ultima pubblicazione",
+    "sourceHelp": "Dati pubblicati dall'utente associato",
+    "hourlyValue": "Valore orario",
+    "manualRate": "Tariffa manuale",
+    "projectUpdatedAt": "Progetto aggiornato",
+    "entries": "Registrazioni",
+    "entryCount": "{{count}} registrazioni",
+    "noEntries": "Nessuna registrazione condivisa per questo progetto.",
+    "amountDue": "Residuo stimato",
+    "notPaid": "Nessun saldo registrato",
+    "noPayments": "Nessun pagamento condiviso per questo progetto."
+  },
   "calendar": {
     "chooseDate": "Scegli una data",
     "previousMonth": "Mese precedente",
