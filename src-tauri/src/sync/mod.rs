@@ -447,6 +447,9 @@ pub fn sync_login(app: AppHandle, email: Option<String>) -> Result<SyncStatus, S
         emit_status(&app);
         return Err(e);
     }
+    // Anche le sessioni API Master sono legate all'identità Google: non
+    // devono sopravvivere al passaggio a un account diverso.
+    crate::master::prepare_google_identity(&app, &verified_email);
 
     {
         let db = app.state::<Db>();

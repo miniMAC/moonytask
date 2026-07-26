@@ -25,7 +25,7 @@ static PUBLICATION_PENDING: AtomicBool = AtomicBool::new(false);
 static PUBLICATION_WORKER_STARTED: AtomicBool = AtomicBool::new(false);
 static RETRY_ATTEMPT: AtomicU32 = AtomicU32::new(0);
 static NEXT_RETRY_AT: AtomicI64 = AtomicI64::new(0);
-static APP_SESSION_CACHE: Mutex<Option<AppSessionResponse>> = Mutex::new(None);
+static APP_SESSION_CACHE: Mutex<Option<CachedAppSession>> = Mutex::new(None);
 
 #[derive(Debug)]
 struct MasterError {
@@ -66,6 +66,13 @@ struct ErrorBody {
 struct AppSessionResponse {
     token: String,
     expires_at: i64,
+}
+
+#[derive(Clone)]
+struct CachedAppSession {
+    token: String,
+    expires_at: i64,
+    owner_email: String,
 }
 
 #[derive(Deserialize)]
@@ -327,29 +334,82 @@ fn request_app_session(app: &AppHandle) -> Result<AppSessionResponse, MasterErro
     parse_response::<AppSessionResponse>(response)
 }
 
+fn current_google_email(app: &AppHandle) -> Option<String> {
+    let database = app.state::<Db>();
+    let connection = database.0.lock().ok()?;
+    db::get_setting(&connection, "google_email")
+        .map(|email| email.trim().to_ascii_lowercase())
+        .filter(|email| !email.is_empty())
+}
+
+fn cached_session_is_valid(
+    session: &CachedAppSession,
+    current_email: Option<&str>,
+    now: i64,
+) -> bool {
+    current_email.is_some_and(|email| session.owner_email.eq_ignore_ascii_case(email))
+        && session.expires_at > now + 30
+}
+
+fn cache_app_session(app: &AppHandle, session: &AppSessionResponse) {
+    let Some(owner_email) = current_google_email(app) else {
+        clear_app_session_cache();
+        return;
+    };
+    if let Ok(mut cache) = APP_SESSION_CACHE.lock() {
+        *cache = Some(CachedAppSession {
+            token: session.token.clone(),
+            expires_at: session.expires_at,
+            owner_email,
+        });
+    }
+}
+
+fn clear_app_session_cache() {
+    if let Ok(mut cache) = APP_SESSION_CACHE.lock() {
+        *cache = None;
+    }
+}
+
+fn clear_local_identity_state(app: &AppHandle) {
+    clear_app_session_cache();
+    PUBLICATION_PENDING.store(false, Ordering::SeqCst);
+    RETRY_ATTEMPT.store(0, Ordering::SeqCst);
+    NEXT_RETRY_AT.store(0, Ordering::SeqCst);
+
+    let database = app.state::<Db>();
+    if let Ok(connection) = database.0.lock() {
+        for (key, value) in [
+            ("master_selected_folder_ids", "[]"),
+            ("master_api_enabled", "0"),
+            ("master_snapshot_etag", ""),
+            ("master_last_upload", ""),
+            ("master_last_error", ""),
+        ] {
+            let _ = db::set_setting(&connection, key, value);
+        }
+    };
+}
+
 fn app_session(app: &AppHandle) -> Result<String, MasterError> {
+    let current_email = current_google_email(app);
     if let Ok(cache) = APP_SESSION_CACHE.lock() {
-        if let Some(session) = cache
-            .as_ref()
-            .filter(|session| session.expires_at > db::now_secs() + 30)
-        {
+        if let Some(session) = cache.as_ref().filter(|session| {
+            cached_session_is_valid(session, current_email.as_deref(), db::now_secs())
+        }) {
             return Ok(session.token.clone());
         }
     }
     let session = request_app_session(app)?;
     let token = session.token.clone();
-    if let Ok(mut cache) = APP_SESSION_CACHE.lock() {
-        *cache = Some(session);
-    }
+    cache_app_session(app, &session);
     Ok(token)
 }
 
 fn fresh_app_session(app: &AppHandle) -> Result<String, MasterError> {
     let session = request_app_session(app)?;
     let token = session.token.clone();
-    if let Ok(mut cache) = APP_SESSION_CACHE.lock() {
-        *cache = Some(session);
-    }
+    cache_app_session(app, &session);
     Ok(token)
 }
 
@@ -371,10 +431,11 @@ fn save_device_token(_app: &AppHandle, token: &str) -> Result<(), String> {
 }
 
 #[cfg(desktop)]
-pub fn clear_device_token(_app: &AppHandle) {
+pub fn clear_device_token(app: &AppHandle) {
     if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER) {
         let _ = entry.delete_credential();
     }
+    clear_local_identity_state(app);
 }
 
 #[cfg(mobile)]
@@ -397,6 +458,17 @@ pub fn clear_device_token(app: &AppHandle) {
     if let Ok(connection) = database.0.lock() {
         let _ = db::set_setting(&connection, DEVICE_TOKEN_SETTING, "");
     };
+    clear_local_identity_state(app);
+}
+
+pub fn prepare_google_identity(app: &AppHandle, next_email: &str) {
+    let same_account = current_google_email(app)
+        .is_some_and(|email| email.eq_ignore_ascii_case(next_email.trim()));
+    if same_account {
+        clear_app_session_cache();
+    } else {
+        clear_device_token(app);
+    }
 }
 
 fn status_with_token(app: &AppHandle, token: &str) -> Result<MasterStatus, MasterError> {
@@ -1203,6 +1275,32 @@ mod tests {
         assert_eq!(retry_delay_secs(1), 4);
         assert_eq!(retry_delay_secs(5), 64);
         assert_eq!(retry_delay_secs(20), MAX_RETRY_SECS.min(2048));
+    }
+
+    #[test]
+    fn cached_app_session_is_never_reused_for_another_google_account() {
+        let session = CachedAppSession {
+            token: "session-token".into(),
+            expires_at: 10_000,
+            owner_email: "master@example.com".into(),
+        };
+
+        assert!(cached_session_is_valid(
+            &session,
+            Some("MASTER@example.com"),
+            1_000
+        ));
+        assert!(!cached_session_is_valid(
+            &session,
+            Some("member@example.com"),
+            1_000
+        ));
+        assert!(!cached_session_is_valid(&session, None, 1_000));
+        assert!(!cached_session_is_valid(
+            &session,
+            Some("master@example.com"),
+            9_980
+        ));
     }
 
     #[test]
